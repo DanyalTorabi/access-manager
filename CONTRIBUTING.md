@@ -18,6 +18,18 @@ make lint
 
 See [**go/README.md**](go/README.md) for config, environment variables, and the HTTP API.
 
+### Docker (**T19**)
+
+From the repository root:
+
+```bash
+make docker-build
+make docker-up          # detached; then: make docker-logs
+make docker-down
+```
+
+See the root [**README** — Docker (T19)](README.md#docker-t19) for image layout and port binding.
+
 ## Pull requests
 
 - Open PRs **into `main`**; follow [docs/branching.md](docs/branching.md).

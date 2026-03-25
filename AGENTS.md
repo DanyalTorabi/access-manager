@@ -54,8 +54,8 @@ AI agents and contributors automating GitHub should prefer the **`gh`** CLI (`gh
 
 ## Commands
 
-From **repository root:** `make test`, `make lint`, `make cover`, `make run` (delegate to **`go/`**).
+From **repository root:** `make test`, `make lint`, `make cover`, `make run` (delegate to **`go/`**); **`make docker-build`**, **`make docker-up`**, **`make docker-logs`**, **`make docker-down`** for **Docker** (**T19**, repo root only).
 
-From **`go/`:** same targets via [go/Makefile](go/Makefile), or plain `go test -race ./...`, `go vet ./...`.
+From **`go/`:** same Go targets via [go/Makefile](go/Makefile), or plain `go test -race ./...`, `go vet ./...`.
 
 Install **golangci-lint** v2 for `make lint` (see [go/README.md](go/README.md)).

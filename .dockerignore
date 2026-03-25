@@ -1,0 +1,13 @@
+.git
+.github
+**/.DS_Store
+**/coverage.out
+**/*.db
+**/*.db-shm
+**/*.db-wal
+go/bin
+**/dist
+.env
+config.local.yaml
+config.local.yml
+docker-data

@@ -14,16 +14,16 @@ Ship a **multi-stage Dockerfile** ending in **scratch or distroless**, and **`do
 
 ## Deliverables
 
-- **`Dockerfile`** (repo root or under **`go/`**): build context should include the **Go module** (`go/`); multi-stage build + minimal runtime image; non-root user if distroless allows.
-- **`docker-compose.yml`**: service `app` + optional `postgres` (or sqlite volume) per T1 readiness—**v1** can be app-only + volume-mounted SQLite for simplicity.
-- Document build/run in README.
+- [x] **`Dockerfile`** (repo root): context includes **`go/`**; multi-stage **distroless** `nonroot` image.
+- [x] **`docker-compose.yml`**: **`app`** only + SQLite on **tmpfs** (v1); optional Postgres deferred to **T1**.
+- [x] Document build/run in **README** (+ **go/README**, **CONTRIBUTING**).
 
 ## Steps
 
-1. Build static or mostly static binary (`CGO_ENABLED=0` if using pure Go sqlite).
-2. Copy binary + migrations into final image; set `MIGRATIONS_DIR` inside image.
-3. Compose: expose HTTP only to localhost or internal network by default (align workspace security rules).
-4. Use **T26** config/env for ports and DSN inside compose.
+1. [x] Static binary (`CGO_ENABLED=0`, pure Go sqlite).
+2. [x] Copy binary + migrations; `MIGRATIONS_DIR` + `DATABASE_URL` via env / image defaults.
+3. [x] Compose: **`127.0.0.1:8080:8080`** on host; `HTTP_ADDR=0.0.0.0:8080` in container.
+4. [x] **T26** env for ports and DSN in compose.
 
 ## Files / paths
 

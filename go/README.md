@@ -27,6 +27,10 @@ curl -s http://127.0.0.1:8080/health
 
 Example response: `{"status":"ok"}`
 
+## Docker
+
+From the **repository root** (not `go/`): **`make docker-build`**, **`make docker-up`**, **`make docker-logs`**, **`make docker-down`** — see root **[README.md](../README.md#docker-t19)** (section **Docker (T19)**).
+
 ## Configuration
 
 **Precedence:** built-in defaults → optional YAML file (if `CONFIG_PATH` is set) → **environment variables** (each non-empty env var overrides the corresponding field).
@@ -65,6 +69,8 @@ Run **`make`** from the **repository root** (`make test`, `make lint`, …) or f
 | Run server | `make run` |
 | Lint | `make lint` |
 | Tidy modules | `make tidy` |
+
+Docker (from **repo root** only): `make docker-build`, `make docker-up`, `make docker-logs`, `make docker-down` — see [root README](../README.md#docker-t19).
 
 Equivalent without Make (from **`go/`**): `go test -race ./...`, `go vet ./...`, `golangci-lint run ./...`. If `go test -cover` fails with `no such tool "covdata"` on Go 1.25+, set `GOTOOLCHAIN` to `go` plus the `go.mod` version and `+auto` (for example `go1.25.0+auto` when `go.mod` says `go 1.25.0`). The [Makefile](Makefile) exports that for `make test` / `make cover`; see [golang/go#75031](https://github.com/golang/go/issues/75031).
 

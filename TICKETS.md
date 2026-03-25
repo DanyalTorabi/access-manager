@@ -25,7 +25,7 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 | id | title | status | notes |
 |----|-------|--------|-------|
 | T8 | README | done | Quickstart, layout, env + **config file** (**T26**), how to run tests **with `-race`**, link to curriculum alignment section |
-| T9 | Makefile | done | **`go/Makefile`** + root **`Makefile`** delegating with **`make -C go`**; `build`, `test` (include **`-race`**), `cover`, `run` / `serve`, `tidy`; **`lint` → golangci-lint** (pairs **T28**) |
+| T9 | Makefile | done | **`go/Makefile`** + root **`Makefile`** delegating with **`make -C go`**; `build`, `test` (include **`-race`**), `cover`, `run` / `serve`, `tidy`; **`lint` → golangci-lint** (pairs **T28**); root **`docker-build` / `docker-up` / `docker-logs` / `docker-down`** (**T19**) |
 | T10 | Unit tests (expand) | done | Handlers, store edge cases; table-driven |
 | T11 | Integration tests | done | HTTP + real DB; **compose-backed** in **T13** |
 | T12 | Test coverage | done | `go test -cover` / profile; optional CI gate |
@@ -47,7 +47,7 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 | T16 | E2E / smoke tests | open | Full API journeys; optional Newman in CI |
 | T17 | API docs & contract testing | open | OpenAPI/Swagger + Postman collection |
 | T18 | Developer AI / editor tooling | done | `.cursor/rules`, `AGENTS.md`, tech stack doc |
-| T19 | Docker | open | Multi-stage + **scratch/distroless** final image; **compose** for app + DB for **T11**/**T13**; config via **T26** |
+| T19 | Docker | done | [Dockerfile](Dockerfile), [docker-compose.yml](docker-compose.yml), [.dockerignore](.dockerignore); distroless non-root + SQLite tmpfs; **T13** can reuse compose |
 | T1 | Per-dialect migrations (postgres/mysql) | open | **`go/migrations/`** + **`go/internal/database`** |
 | T6 | GitHub remote + repo hygiene | done | [CONTRIBUTING.md](CONTRIBUTING.md) maintainer checklist; [.github/](.github/) PR + issue templates; complete **branch protection** + **Actions/GHCR** in GitHub UI per CONTRIBUTING |
 

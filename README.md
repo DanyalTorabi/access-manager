@@ -33,6 +33,32 @@ go run ./cmd/server
 
 Details: **[go/README.md](go/README.md)** (config, env, API overview, `make` targets).
 
+## Docker (T19)
+
+Multi-stage image (distroless, non-root, `CGO_ENABLED=0` / `modernc.org/sqlite`) built from repo root; SQLite data uses a **tmpfs** mount (ephemeral) in the default compose file.
+
+From the **repository root**, use **`make`** (same idea as `make test` / `make run`):
+
+| Target | What it runs |
+|--------|----------------|
+| `make docker-build` | `docker compose build` |
+| `make docker-up` | `docker compose up -d` (detached) |
+| `make docker-logs` | `docker compose logs -f` (follow app logs) |
+| `make docker-down` | `docker compose down` |
+
+```bash
+make docker-build
+make docker-up
+curl -s http://127.0.0.1:8080/health
+make docker-down
+```
+
+`docker-compose.yml` publishes **`127.0.0.1:8080:8080`** only (not all interfaces on the host). The process listens on **`0.0.0.0:8080`** inside the container so port mapping works.
+
+- **[Dockerfile](Dockerfile)** — build context `.`, copies **`go/`**  
+- **[docker-compose.yml](docker-compose.yml)** — `app` service  
+- **[.dockerignore](.dockerignore)**
+
 ## Branching and pull requests (T14)
 
 All changes should go to **`main`** via **pull requests**. Branch naming, merge policy, and how this ties to CI (**T13**) and branch protection (**T6**) are documented in **[docs/branching.md](docs/branching.md)**.
