@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS group_permissions;
+DROP TABLE IF EXISTS user_permissions;
+DROP TABLE IF EXISTS group_members;
+DROP TABLE IF EXISTS permissions;
+DROP TABLE IF EXISTS access_types;
+DROP TABLE IF EXISTS resources;
+DROP TABLE IF EXISTS groups;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS domains;
