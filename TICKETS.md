@@ -24,7 +24,7 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 
 | id | title | status | notes |
 |----|-------|--------|-------|
-| T8 | README | open | Quickstart, layout, env + **config file** (**T26**), how to run tests **with `-race`**, link to curriculum alignment section |
+| T8 | README | done | Quickstart, layout, env + **config file** (**T26**), how to run tests **with `-race`**, link to curriculum alignment section |
 | T9 | Makefile | open | `build`, `test` (include **`-race`**), `cover`, `run` / `serve`, `tidy`; **`lint` → golangci-lint** (pairs **T28**) |
 | T10 | Unit tests (expand) | open | Handlers, store edge cases; table-driven |
 | T11 | Integration tests | open | HTTP + real DB; **compose-backed** in **T13** |
@@ -45,7 +45,7 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 | T15 | CHANGELOG | open | Keep a Changelog, semver, tags/releases |
 | T16 | E2E / smoke tests | open | Full API journeys; optional Newman in CI |
 | T17 | API docs & contract testing | open | OpenAPI/Swagger + Postman collection |
-| T18 | Developer AI / editor tooling | open | `.cursor/rules`, `AGENTS.md`, tech stack doc |
+| T18 | Developer AI / editor tooling | done | `.cursor/rules`, `AGENTS.md`, tech stack doc |
 | T19 | Docker | open | Multi-stage + **scratch/distroless** final image; **compose** for app + DB for **T11**/**T13**; config via **T26** |
 | T1 | Per-dialect migrations (postgres/mysql) | open | `migrations/` + `internal/database` |
 | T6 | GitHub remote + repo hygiene | open | Origin, branch protection, GHCR package permissions for **T13** |
