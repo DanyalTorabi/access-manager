@@ -38,14 +38,20 @@ Copy [`.env.example`](.env.example) to `.env` for local overrides; do **not** co
 
 **Structured config file** (YAML/TOML + env overrides) is planned under **T26**—until then, use environment variables only.
 
-## Tests
+## Development
 
-```bash
-go test -race ./...
-go vet ./...
-```
+`make lint` runs **golangci-lint v2** via `go run` (first run may download modules). For a faster local binary, install with Go **1.25+** and override: `make lint GOLANGCI_LINT=golangci-lint`.
 
-When the Makefile exists (**T9**), prefer `make test` and `make cover` (**T12**).
+| Target | Command |
+|--------|---------|
+| Build binary | `make build` → `bin/server` |
+| Tests (race) | `make test` |
+| Coverage profile | `make cover` → `coverage.out` |
+| Run server | `make run` |
+| Lint | `make lint` |
+| Tidy modules | `make tidy` |
+
+Equivalent without Make: `go test -race ./...`, `go vet ./...`, `golangci-lint run ./...`.
 
 ## API overview
 

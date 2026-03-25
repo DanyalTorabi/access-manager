@@ -1,0 +1,21 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: standard
+  disable:
+    # noisy or redundant with go vet for this small codebase; re-enable as needed
+    - depguard
+    - exhaustruct
+    - funlen
+    - gochecknoglobals
+    - lll
+    - nlreturn
+    - tagliatelle
+    - varnamelen
+    - wsl
+
+issues:
+  max-same-issues: 10

@@ -3,6 +3,7 @@
 *.db-wal
 .env
 bin/
+coverage.out
 dist/
 .DS_Store
 .idea/

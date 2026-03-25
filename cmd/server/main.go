@@ -21,7 +21,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("open database: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if !filepath.IsAbs(migDir) {
 		if wd, err := os.Getwd(); err == nil {

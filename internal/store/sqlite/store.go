@@ -45,7 +45,7 @@ func (s *Store) DomainList(ctx context.Context) ([]store.Domain, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var list []store.Domain
 	for rows.Next() {
 		var d store.Domain
@@ -80,7 +80,7 @@ func (s *Store) UserList(ctx context.Context, domainID string) ([]store.User, er
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var list []store.User
 	for rows.Next() {
 		var u store.User
@@ -125,7 +125,7 @@ func (s *Store) GroupList(ctx context.Context, domainID string) ([]store.Group, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var list []store.Group
 	for rows.Next() {
 		var g store.Group
@@ -203,7 +203,7 @@ func (s *Store) ResourceList(ctx context.Context, domainID string) ([]store.Reso
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var list []store.Resource
 	for rows.Next() {
 		var r store.Resource
@@ -226,7 +226,7 @@ func (s *Store) AccessTypeList(ctx context.Context, domainID string) ([]store.Ac
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var list []store.AccessType
 	for rows.Next() {
 		var a store.AccessType
@@ -265,7 +265,7 @@ func (s *Store) PermissionList(ctx context.Context, domainID string) ([]store.Pe
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var list []store.Permission
 	for rows.Next() {
 		var p store.Permission
@@ -361,7 +361,7 @@ func (s *Store) PermissionMasksForUserResource(ctx context.Context, domainID, us
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var masks []uint64
 	for rows.Next() {
 		var m int64
