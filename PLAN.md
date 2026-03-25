@@ -29,3 +29,4 @@ Effective mask for `(domain_id, user_id, resource_id)`: query all matching `acce
 1. Phase 1 (current): SQLite, CRUD, authz check, tests.
 2. Add postgres/mysql drivers + dialect migrations.
 3. Optional inheritance and resource trees.
+4. **Org Backend Engineering curriculum (applicable themes only):** config file + env, graceful HTTP shutdown, `go test -race`, `go vet` + **golangci-lint**, Docker (scratch-style image + compose for integration tests), CI on Ubuntu with integration + **GHCR** publish on merge to `main`, Prometheus/Grafana when ready, Kubernetes after Docker—see [`TICKETS.md`](TICKETS.md). Event streaming (Kafka/Redpanda), Protobuf, and Cassandra are **out of scope** for this SQL/HTTP service unless requirements change.
