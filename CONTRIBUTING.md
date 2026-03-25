@@ -68,12 +68,12 @@ In GitHub: **Settings → Branches → Branch protection rules** for `main`:
 
 - Require a **pull request** before merging (disable direct pushes to `main`).
 - Optionally require **approvals**.
-- After **T13** adds Actions: require **status checks** to pass before merge.
+- Require the **CI** workflow (`.github/workflows/ci.yml`) as a **required status check** once it passes on `main`.
 
 ### Actions and GHCR (**T13**)
 
 - **Settings → Actions → General:** enable Actions as appropriate for the org.
-- To **push images to GHCR** from a workflow, grant **`packages: write`** to `GITHUB_TOKEN` in that workflow (e.g. top-level `permissions:`). Details belong in the **T13** workflow file when it exists.
+- CI workflow: **[`.github/workflows/ci.yml`](.github/workflows/ci.yml)** — the **Publish image to GHCR** job sets **`packages: write`** on `GITHUB_TOKEN` and pushes **`ghcr.io/<lowercase-owner>/access-manager`** on every push to **`main`**.
 
 ### Go module path
 

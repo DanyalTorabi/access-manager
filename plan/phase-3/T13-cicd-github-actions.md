@@ -14,17 +14,17 @@ On **pull requests** to **main**: run **unit tests**, **integration tests** (com
 
 ## Deliverables
 
-- `.github/workflows/ci.yml` (or split PR vs release).
-- Ubuntu runners; Go version aligned with [`go/go.mod`](../../go/go.mod) (run jobs with **`defaults.run.working-directory: go`** or equivalent).
-- Cache `~/go/pkg/mod`.
+- [x] `.github/workflows/ci.yml` — PR + push **`main`**; publish job conditional.
+- [x] Ubuntu runners; Go from [`go/go.mod`](../../go/go.mod); **`defaults.run.working-directory: go`** on Go job.
+- [x] Module cache via **actions/setup-go** `cache-dependency-path: go/go.sum`.
 
 ## Steps
 
-1. **PR job:** checkout, setup-go, `go test -race ./...`, `go vet ./...`, `golangci-lint run`, `docker build`.
-2. **Integration:** `docker compose up -d` (wait for health), run `go test -tags=integration ./...` or dedicated script; `compose down`.
-3. **Main branch job:** build and push to `ghcr.io/<org>/<repo>:tag` (semver or `sha-<short>`).
-4. Document required secrets (usually none for GHCR with `GITHUB_TOKEN`).
-5. Optional: [nektos/act](https://github.com/nektos/act) note in README.
+1. [x] **PR / push:** checkout, setup-go, `go test -race ./...`, `go vet ./...`, golangci-lint (`go run` pin v2.11.4), `docker compose` build + smoke **`/health`**.
+2. [x] Compose smoke (no separate `-tags=integration` suite yet — covered by **Go** job tests + **health** check).
+3. [x] **Push `main`:** build and push **`ghcr.io/<lowercase-owner>/<repo>:latest`** and **`:sha-<full>`**.
+4. [x] Document: no extra secrets for GHCR (`GITHUB_TOKEN` in publish job).
+5. [x] Optional **act** note in README.
 
 ## Files / paths
 

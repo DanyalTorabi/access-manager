@@ -1,5 +1,7 @@
 # access-manager
 
+[![CI](https://github.com/DanyalTorabi/access-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/DanyalTorabi/access-manager/actions/workflows/ci.yml)
+
 Educational / product repo for **domain-scoped** access control (users, groups, resources, access-type bits, permissions). Implementations can live side by side: the **Go** HTTP service is under **[`go/`](go/)**; shared contracts and other language trees may be added at the root later (**T29**, **T17** / `spec/`).
 
 ## Repository layout
@@ -59,6 +61,20 @@ make docker-down
 - **[docker-compose.yml](docker-compose.yml)** — `app` service  
 - **[.dockerignore](.dockerignore)**
 
+## CI / GitHub Actions (T13)
+
+Workflow: **[`.github/workflows/ci.yml`](.github/workflows/ci.yml)** runs on **pull requests** and **pushes** to **`main`**:
+
+| Job | What it does |
+|-----|----------------|
+| **Go** | From **`go/`**: `go test -race ./...`, `go vet ./...`, **golangci-lint** (same pin as `go/Makefile`) |
+| **Docker** | `docker compose build`, `compose up`, **`curl /health`**, `compose down` |
+| **Publish** | On **`push` to `main`** only: push image to **`ghcr.io/<owner>/access-manager`** as **`latest`** and **`sha-<commit>`** (`packages: write` on `GITHUB_TOKEN`) |
+
+Enable **Actions** for the repo; for **branch protection**, add required checks matching the workflow **job** names after the first green run (e.g. **Go (test, vet, lint)** and **Docker build & compose smoke**) — see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Optional: run workflows locally with **[nektos/act](https://github.com/nektos/act)** (limited parity vs GitHub runners).
+
 ## Branching and pull requests (T14)
 
 All changes should go to **`main`** via **pull requests**. Branch naming, merge policy, and how this ties to CI (**T13**) and branch protection (**T6**) are documented in **[docs/branching.md](docs/branching.md)**.
@@ -75,6 +91,7 @@ See **[CONTRIBUTING.md](CONTRIBUTING.md)** for local setup, PR expectations, **`
 - [docs/branching.md](docs/branching.md) — branches and PRs to `main` (**T14**)  
 - [CONTRIBUTING.md](CONTRIBUTING.md) — contributor guide and GitHub hygiene (**T6**)  
 - [AGENTS.md](AGENTS.md) — contributor rules for humans and AI  
+- [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — CI + GHCR (**T13**)  
 
 ## License
 
