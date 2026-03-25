@@ -21,12 +21,12 @@ Make **coverage visible and repeatable**: profile output, optional threshold, do
 
 1. Ensure `make cover` runs `go test -race -coverprofile=coverage.out ./...`.
 2. Add `coverage.out` and `*.html` to `.gitignore` if generated locally.
-3. Identify low-coverage packages (`internal/api`, `cmd/server`); add tests in T10/T11.
+3. Identify low-coverage packages (`go/internal/api`, `go/cmd/server`); add tests in T10/T11.
 4. Optionally add `-covermode=atomic` if concurrent tests warrant it.
 
 ## Files / paths
 
-- **Edit:** [Makefile](../../Makefile), [.gitignore](../../.gitignore), [README.md](../../README.md)
+- **Edit:** [Makefile](../../Makefile) (root forwards to `go/`), [go/Makefile](../../go/Makefile), [.gitignore](../../.gitignore), [README.md](../../README.md)
 
 ## Acceptance criteria
 

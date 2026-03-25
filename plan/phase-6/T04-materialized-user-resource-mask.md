@@ -26,7 +26,7 @@ For very large scale, maintain **`(domain_id, user_id, resource_id) → access_m
 
 ## Files / paths
 
-- **Edit:** [internal/store/sqlite/store.go](../../internal/store/sqlite/store.go), migrations, possibly [PLAN.md](../../PLAN.md)
+- **Edit:** [internal/store/sqlite/store.go](../../go/internal/store/sqlite/store.go), migrations, possibly [PLAN.md](../../PLAN.md)
 
 ## Acceptance criteria
 

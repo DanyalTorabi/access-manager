@@ -14,7 +14,7 @@ Provide **one command surface** for build, test (with race), coverage, run, mod 
 
 ## Deliverables
 
-- **`Makefile`** at repo root with documented targets.
+- **`Makefile`** at repo root (may delegate to **`go/Makefile`** after **T29**); documented targets.
 
 ## Steps
 
@@ -28,7 +28,7 @@ Provide **one command surface** for build, test (with race), coverage, run, mod 
 
 ## Files / paths
 
-- **Create:** `Makefile`
+- **Create:** `Makefile` (and **`go/Makefile`** when the module lives under **`go/`**)
 - **Edit:** [README.md](../../README.md), [.gitignore](../../.gitignore) if `bin/` needed
 
 ## Acceptance criteria

@@ -15,7 +15,7 @@ Verify **HTTP + SQLite + migrations** together: real `chi` router, real store, t
 ## Deliverables
 
 - Integration test package that starts app wiring (or uses `httptest` against full router + migrated DB).
-- Reuse migration path resolution pattern from [internal/store/sqlite/store_test.go](../../internal/store/sqlite/store_test.go).
+- Reuse migration path resolution pattern from [internal/store/sqlite/store_test.go](../../go/internal/store/sqlite/store_test.go).
 
 ## Steps
 

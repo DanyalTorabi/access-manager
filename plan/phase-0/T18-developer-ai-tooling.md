@@ -41,10 +41,10 @@ Complete what exists today; do not block on missing tooling.
 
 **Intent:** The **access control model** (types, masks, evaluation helpers, store **interfaces**) should be usable as a **Go library** in another binary or repo later—without dragging the HTTP server.
 
-- **Today:** Core logic lives under [`internal/access`](../../internal/access) and contracts under [`internal/store`](../../internal/store). **`internal/`** cannot be imported by **other modules**; only this module’s packages can import it.
+- **Today:** Core logic lives under [`internal/access`](../../go/internal/access) and contracts under [`internal/store`](../../go/internal/store). **`internal/`** cannot be imported by **other modules**; only this module’s packages can import it.
 - **Direction (incremental):** When the API stabilizes, introduce **`pkg/...`** (e.g. `pkg/accesscore` for pure domain + bitmask; `pkg/accessmanager` for `Store` interfaces and service façade) and move or re-export there. **Do not** do a big-bang move in a single “simple task”—track a dedicated follow-up if needed.
-- **Until `pkg/` exists:** Add new domain/store logic in `internal/access` and `internal/store` as if it will move: **no** chi/router imports in those packages; keep HTTP-only code in [`internal/api`](../../internal/api) and wiring in [`cmd/server`](../../cmd/server).
-- **SQLite / drivers:** Concrete DB code may stay `internal/store/sqlite` or move to `pkg/.../sqlite` later; [`internal/database`](../../internal/database) stays wiring for `cmd`.
+- **Until `pkg/` exists:** Add new domain/store logic in `internal/access` and `internal/store` as if it will move: **no** chi/router imports in those packages; keep HTTP-only code in [`internal/api`](../../go/internal/api) and wiring in [`cmd/server`](../../go/cmd/server).
+- **SQLite / drivers:** Concrete DB code may stay `internal/store/sqlite` or move to `pkg/.../sqlite` later; [`internal/database`](../../go/internal/database) stays wiring for `cmd`.
 
 ## Steps
 

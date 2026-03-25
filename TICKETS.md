@@ -10,7 +10,7 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 
 | # | Curriculum theme | How we align |
 |---|------------------|--------------|
-| 1 | **Go** | `cmd/` layout, health (`/health`), tests, **`go test -race`** (**T9**, **T10**, **T27**). Prefer **stdlib** where practical; small router dep is acceptable. Port from env/config (**T26**), not a fixed lab port. |
+| 1 | **Go** | **`go/`** module: `cmd/` layout, health (`/health`), tests, **`go test -race`** (**T9**, **T10**, **T27**). Prefer **stdlib** where practical; small router dep is acceptable. Port from env/config (**T26**), not a fixed lab port. |
 | 2 | **Docker** | **Dockerfile**, **scratch/minimal** final stage (**T8**, **T19**); config from file + env (**T26**). |
 | 3 | **Databases** | **Pluggable SQL** (**T1**), **integration tests** (**T11**), **docker-compose** for app + DB in CI/local (**T13**, **T19**), **auth middleware** (**T7**). Relational schema only. |
 | 4 | **CI/CD** | PRs to **main** on **ubuntu**: unit + **integration (compose)**, **`go vet`**, **[golangci-lint](https://github.com/golangci/golangci-lint)**, build image, **publish to ghcr.io** on merge (**T13**). Local **[act](https://github.com/nektos/act)** optional. |
@@ -25,16 +25,17 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 | id | title | status | notes |
 |----|-------|--------|-------|
 | T8 | README | done | Quickstart, layout, env + **config file** (**T26**), how to run tests **with `-race`**, link to curriculum alignment section |
-| T9 | Makefile | done | `build`, `test` (include **`-race`**), `cover`, `run` / `serve`, `tidy`; **`lint` → golangci-lint** (pairs **T28**) |
+| T9 | Makefile | done | **`go/Makefile`** + root **`Makefile`** delegating with **`make -C go`**; `build`, `test` (include **`-race`**), `cover`, `run` / `serve`, `tidy`; **`lint` → golangci-lint** (pairs **T28**) |
 | T10 | Unit tests (expand) | done | Handlers, store edge cases; table-driven |
 | T11 | Integration tests | done | HTTP + real DB; **compose-backed** in **T13** |
 | T12 | Test coverage | done | `go test -cover` / profile; optional CI gate |
-| T13 | CI/CD (curriculum-aligned) | open | **Ubuntu**; on **PR**: unit + **integration (compose)**, **`go vet`**, **golangci-lint**; build Docker image; on **merge to main**: **publish `ghcr.io`**; module cache; requires **T6** |
+| T13 | CI/CD (curriculum-aligned) | open | **Ubuntu**; on **PR**: unit + **integration (compose)**, **`go vet`**, **golangci-lint**; build Docker image; on **merge to main**: **publish `ghcr.io`**; module cache; run Go jobs from **`go/`**; requires **T6**, **T29** |
 | T14 | Branching strategy | open | PRs to **main**, naming, protection |
 | T26 | Config: file + env | done | File for ports, DSN, URLs, toggles; **env overrides**; no secrets in repo |
 | T27 | Graceful shutdown & concurrency safety | done | **SIGINT/SIGTERM** → `Server.Shutdown`, drain in-flight; **context** on store/API; **`-race`** in Makefile/CI |
-| T28 | golangci-lint | done | Add `.golangci.yml` (or org template), wire **T9** + **T13** |
+| T28 | golangci-lint | done | Add **`go/.golangci.yml`** (or org template), wire **T9** + **T13** |
 | T7 | API authentication middleware | open | Bearer / JWT when exposing beyond loopback |
+| T29 | Monorepo: Go under `go/` | done | Go module + service under **`go/`**; root **`Makefile`** → `go/`; room for **`spec/`**, other language dirs at repo root; plan: [plan/phase-3/T29-monorepo-go-directory.md](plan/phase-3/T29-monorepo-go-directory.md) |
 
 ---
 
@@ -47,7 +48,7 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 | T17 | API docs & contract testing | open | OpenAPI/Swagger + Postman collection |
 | T18 | Developer AI / editor tooling | done | `.cursor/rules`, `AGENTS.md`, tech stack doc |
 | T19 | Docker | open | Multi-stage + **scratch/distroless** final image; **compose** for app + DB for **T11**/**T13**; config via **T26** |
-| T1 | Per-dialect migrations (postgres/mysql) | open | `migrations/` + `internal/database` |
+| T1 | Per-dialect migrations (postgres/mysql) | open | **`go/migrations/`** + **`go/internal/database`** |
 | T6 | GitHub remote + repo hygiene | open | Origin, branch protection, GHCR package permissions for **T13** |
 
 ---
@@ -73,9 +74,9 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 |-------|------------|
 | Curriculum map | Table at top of this file |
 | Docs & process | T8, T14, T15 |
-| Build & local dev | T9, T19, T26, T28 |
+| Build & local dev | T9, T19, T26, T28, T29 |
 | Testing & quality | T10, T11, T12, T16, T17, T27, T5 |
-| Platform & delivery | T6, T13, T19, T21, T22 |
+| Platform & delivery | T6, T13, T19, T21, T22, T29 |
 | Security & access | T7, T20 |
 | Product / data model | T1–T4 |
 | Tooling / AI | T18 |

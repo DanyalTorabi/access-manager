@@ -13,6 +13,8 @@ Living summary aligned with the bootstrap design (see repository layout and code
 
 ## Layout
 
+Go module root: **`go/`** (see **T29**). Paths below are under `go/`.
+
 - `cmd/server` — config, migrate, HTTP
 - `internal/access` — bitmask helpers
 - `internal/store` — interfaces

@@ -14,7 +14,7 @@ Add a **lint configuration** and a standard local command so code style and comm
 
 ## Deliverables
 
-- **`.golangci.yml`** at repo root with a **minimal** linter set appropriate for Go 1.22+.
+- **`.golangci.yml`** under **`go/`** (module root) with a **minimal** linter set appropriate for Go 1.22+.
 - Document install: `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest` (or brew; pin version in README if team requires).
 
 ## Steps
@@ -26,7 +26,7 @@ Add a **lint configuration** and a standard local command so code style and comm
 
 ## Files / paths
 
-- **Create:** `.golangci.yml`
+- **Create:** `go/.golangci.yml`
 - **Edit:** `README.md` (lint section), `Makefile` (T9 adds `lint` target)
 
 ## Acceptance criteria

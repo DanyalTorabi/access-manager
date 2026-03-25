@@ -20,7 +20,7 @@ Publish **OpenAPI 3** (YAML/JSON) for REST routes and a **Postman collection** (
 
 ## Steps
 
-1. Inventory routes from [internal/api/server.go](../../internal/api/server.go).
+1. Inventory routes from [internal/api/server.go](../../go/internal/api/server.go).
 2. Document request/response schemas (UUID strings, error body shape).
 3. Optional: `oapi-codegen` or `swag` if you want generated types later—not required v1.
 4. Optional Newman step in T13 for smoke (link in Dependencies).

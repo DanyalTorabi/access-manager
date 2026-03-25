@@ -15,7 +15,7 @@ When enabled, users inherit **group_permissions** from **ancestor groups** (walk
 ## Deliverables
 
 - Product flag or versioned behavior documented in PLAN.
-- Evaluator changes in [internal/access](../../internal/access) + store query or precomputed closure.
+- Evaluator changes in [internal/access](../../go/internal/access) + store query or precomputed closure.
 - Migration if storing closure table; or recursive CTE per dialect.
 
 ## Steps
@@ -26,7 +26,7 @@ When enabled, users inherit **group_permissions** from **ancestor groups** (walk
 
 ## Files / paths
 
-- **Edit:** [internal/store/sqlite/store.go](../../internal/store/sqlite/store.go), migrations, [PLAN.md](../../PLAN.md)
+- **Edit:** [internal/store/sqlite/store.go](../../go/internal/store/sqlite/store.go), migrations, [PLAN.md](../../PLAN.md)
 
 ## Acceptance criteria
 

@@ -26,7 +26,7 @@ Add optional **`parent_resource_id`** on resources (same domain), cycle preventi
 
 ## Files / paths
 
-- **Edit:** migrations, [internal/store/store.go](../../internal/store/store.go), [internal/api/server.go](../../internal/api/server.go)
+- **Edit:** migrations, [internal/store/store.go](../../go/internal/store/store.go), [internal/api/server.go](../../go/internal/api/server.go)
 
 ## Acceptance criteria
 

@@ -29,7 +29,7 @@ Stop the HTTP server **cleanly** on SIGINT/SIGTERM, respect **context** on outbo
 
 ## Files / paths
 
-- **Edit:** [cmd/server/main.go](../../cmd/server/main.go), [internal/api/server.go](../../internal/api/server.go), [internal/store/store.go](../../internal/store/store.go) and sqlite impl as needed
+- **Edit:** [cmd/server/main.go](../../go/cmd/server/main.go), [internal/api/server.go](../../go/internal/api/server.go), [internal/store/store.go](../../go/internal/store/store.go) and sqlite impl as needed
 
 ## Acceptance criteria
 

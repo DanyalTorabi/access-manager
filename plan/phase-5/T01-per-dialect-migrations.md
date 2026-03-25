@@ -10,7 +10,7 @@
 
 ## Goal
 
-Extend [internal/database/open.go](../../internal/database/open.go) and add **Postgres** and/or **MySQL** drivers, **dialect-specific migrations**, and store implementations that satisfy [internal/store/store.go](../../internal/store/store.go).
+Extend [internal/database/open.go](../../go/internal/database/open.go) and add **Postgres** and/or **MySQL** drivers, **dialect-specific migrations**, and store implementations that satisfy [internal/store/store.go](../../go/internal/store/store.go).
 
 ## Deliverables
 
@@ -28,7 +28,7 @@ Extend [internal/database/open.go](../../internal/database/open.go) and add **Po
 ## Files / paths
 
 - **Create:** `internal/store/postgres/`, `internal/store/mysql/`, migration files
-- **Edit:** [internal/database/open.go](../../internal/database/open.go), [README.md](../../README.md)
+- **Edit:** [internal/database/open.go](../../go/internal/database/open.go), [README.md](../../README.md)
 
 ## Acceptance criteria
 

@@ -29,7 +29,7 @@ Protect HTTP routes when the service is exposed beyond **loopback**: **Bearer to
 ## Files / paths
 
 - **Create:** `internal/api/auth.go`, `internal/api/auth_test.go` (or `internal/auth/`)
-- **Edit:** [internal/api/server.go](../../internal/api/server.go), [cmd/server/main.go](../../cmd/server/main.go), config
+- **Edit:** [internal/api/server.go](../../go/internal/api/server.go), [cmd/server/main.go](../../go/cmd/server/main.go), config
 
 ## Acceptance criteria
 

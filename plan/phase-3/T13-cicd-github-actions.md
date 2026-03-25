@@ -15,7 +15,7 @@ On **pull requests** to **main**: run **unit tests**, **integration tests** (com
 ## Deliverables
 
 - `.github/workflows/ci.yml` (or split PR vs release).
-- Ubuntu runners; Go version aligned with `go.mod`.
+- Ubuntu runners; Go version aligned with [`go/go.mod`](../../go/go.mod) (run jobs with **`defaults.run.working-directory: go`** or equivalent).
 - Cache `~/go/pkg/mod`.
 
 ## Steps
@@ -41,10 +41,10 @@ On **pull requests** to **main**: run **unit tests**, **integration tests** (com
 
 ## Dependencies
 
-- **T6** GitHub remote; **T28** lint config; **T19** compose for integration; **T9** parity with local commands.
+- **T29** `go/` module root; **T6** GitHub remote; **T28** lint config; **T19** compose for integration; **T9** parity with local commands.
 
 ## Curriculum link
 
 **Theme 4** — full pipeline on Ubuntu, GHCR publish.
 
-**Order in phase 3:** **T14 → T6 → T19 → T13**.
+**Order in phase 3:** **T29 → T14 → T6 → T19 → T13**.

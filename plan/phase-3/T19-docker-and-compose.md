@@ -14,7 +14,7 @@ Ship a **multi-stage Dockerfile** ending in **scratch or distroless**, and **`do
 
 ## Deliverables
 
-- **`Dockerfile`**: build stage + minimal runtime image; non-root user if distroless allows.
+- **`Dockerfile`** (repo root or under **`go/`**): build context should include the **Go module** (`go/`); multi-stage build + minimal runtime image; non-root user if distroless allows.
 - **`docker-compose.yml`**: service `app` + optional `postgres` (or sqlite volume) per T1 readiness—**v1** can be app-only + volume-mounted SQLite for simplicity.
 - Document build/run in README.
 

@@ -5,9 +5,9 @@ alwaysApply: true
 
 # access-manager
 
-- **Module:** `github.com/dtorabi/access-manager`. Read [AGENTS.md](AGENTS.md) for layout and workflow.
+- **Module:** `github.com/dtorabi/access-manager` with **module root `go/`**. Read [AGENTS.md](AGENTS.md) for layout and workflow.
 - **Security:** No secrets in code or committed config. Prefer 127.0.0.1 for dev. Do not suggest public `0.0.0.0` without auth and an explicit requirement.
-- **Library boundary:** Keep `internal/access` and `internal/store` free of chi/HTTP imports. Put HTTP-only code in `internal/api` and wiring in `cmd/server`. Target future `pkg/...` for APIs other projects can import; avoid coupling core logic to the router.
+- **Library boundary:** Under **`go/`**: keep `internal/access` and `internal/store` free of chi/HTTP imports. Put HTTP-only code in `internal/api` and wiring in `cmd/server`. Target future `go/pkg/...` for APIs other projects can import; avoid coupling core logic to the router.
 - **Changes:** Match existing style; avoid unrelated refactors. For small fixes, proportionate checks only.
-- **After substantive changes:** Update README if setup/behavior changed; add CHANGELOG Unreleased if the file exists and the change is user-facing. Run `go test -race ./...` (or `make test`), and lint/coverage when Makefile + golangci-lint exist (`make lint`, `make cover`).
+- **After substantive changes:** Update **`go/README.md`** (and root **README.md** if repo layout/entrypoints changed); add CHANGELOG Unreleased if the file exists and the change is user-facing. Run **`make test`** from repo root or **`go test -race ./...`** from **`go/`**; use **`make lint`**, **`make cover`** when configured.
 - **Future work:** Deferred work must map to a ticket in TICKETS.md. Mention the ticket id in comments (e.g. `TODO(T23): ...`). Extend an existing open ticket when related; do not create a new ticket for every tiny follow-up unless it is a distinct work item.

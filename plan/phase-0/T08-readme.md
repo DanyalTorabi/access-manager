@@ -18,9 +18,9 @@ Add a root **README.md** so anyone can clone, configure env, run the server, and
 
 ## Steps
 
-1. Document **Go version** (match `go` directive in [go.mod](../../go.mod); note toolchain if used).
+1. Document **Go version** (match `go` directive in [go.mod](../../go/go.mod); note toolchain if used).
 2. **Build/run:** `go run ./cmd/server` or `make run` after T9.
-3. **Environment:** `DATABASE_DRIVER`, `DATABASE_URL`, `HTTP_ADDR`, `MIGRATIONS_DIR` (see [cmd/server/main.go](../../cmd/server/main.go)).
+3. **Environment:** `DATABASE_DRIVER`, `DATABASE_URL`, `HTTP_ADDR`, `MIGRATIONS_DIR` (see [cmd/server/main.go](../../go/cmd/server/main.go)).
 4. **Smoke test:** `curl` example for `GET /health`.
 5. Link [TICKETS.md](../../TICKETS.md) curriculum table and [plan/README.md](../README.md).
 6. State that **structured config file** is introduced in **T26** (until then, env only).

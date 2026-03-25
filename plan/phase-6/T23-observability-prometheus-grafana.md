@@ -29,7 +29,7 @@ Expose **Prometheus** metrics from the Go process and provide **Grafana** dashbo
 ## Files / paths
 
 - **Create:** `internal/api/metrics.go`, `observability/*` compose fragments, dashboard JSON
-- **Edit:** [internal/api/server.go](../../internal/api/server.go), [go.mod](../../go.mod)
+- **Edit:** [internal/api/server.go](../../go/internal/api/server.go), [go.mod](../../go/go.mod)
 
 ## Acceptance criteria
 

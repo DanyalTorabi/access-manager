@@ -40,6 +40,7 @@ Connect the local repo to **GitHub**, protect **main**, and enable **GHCR** publ
 ## Dependencies
 
 - **T14** doc ready for contributors.
+- **T29** monorepo **`go/`** layout in place (recommended before first push so the default tree matches CI and docs).
 
 ## Curriculum link
 

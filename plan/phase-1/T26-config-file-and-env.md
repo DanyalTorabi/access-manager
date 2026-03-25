@@ -29,7 +29,7 @@ Load **ports, DSN, migrations path, and toggles** from a **config file** with **
 ## Files / paths
 
 - **Create:** `config.example.yaml` (or `.toml`), `internal/config/config.go` (optional)
-- **Edit:** [cmd/server/main.go](../../cmd/server/main.go), [README.md](../../README.md), [.env.example](../../.env.example) alignment
+- **Edit:** [cmd/server/main.go](../../go/cmd/server/main.go), [README.md](../../README.md), [.env.example](../../go/.env.example) alignment
 
 ## Acceptance criteria
 
