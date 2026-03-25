@@ -37,12 +37,17 @@ Details: **[go/README.md](go/README.md)** (config, env, API overview, `make` tar
 
 All changes should go to **`main`** via **pull requests**. Branch naming, merge policy, and how this ties to CI (**T13**) and branch protection (**T6**) are documented in **[docs/branching.md](docs/branching.md)**.
 
+## Contributing
+
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for local setup, PR expectations, **`gh`** usage, and the **maintainer checklist** (remote, branch protection, Actions/GHCR) for **T6**.
+
 ## Docs and planning
 
 - [PLAN.md](PLAN.md) — product goals and milestones  
 - [TICKETS.md](TICKETS.md) — backlog and curriculum alignment table  
 - [plan/README.md](plan/README.md) — phased implementation plans per ticket  
 - [docs/branching.md](docs/branching.md) — branches and PRs to `main` (**T14**)  
+- [CONTRIBUTING.md](CONTRIBUTING.md) — contributor guide and GitHub hygiene (**T6**)  
 - [AGENTS.md](AGENTS.md) — contributor rules for humans and AI  
 
 ## License

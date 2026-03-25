@@ -33,5 +33,6 @@ Release branches and version tags are **out of scope** until **T15** (CHANGELOG 
 
 ## See also
 
+- [CONTRIBUTING.md](../CONTRIBUTING.md) — maintainer checklist: remote, branch protection, Actions/GHCR (**T6**)
 - [TICKETS.md](../TICKETS.md) — **T6** (remote + protection), **T13** (CI)
 - [plan/phase-3/T14-branching-strategy.md](../plan/phase-3/T14-branching-strategy.md)

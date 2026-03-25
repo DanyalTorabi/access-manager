@@ -14,16 +14,17 @@ Connect the local repo to **GitHub**, protect **main**, and enable **GHCR** publ
 
 ## Deliverables
 
-- `origin` remote pointing at GitHub repo.
-- Branch protection on `main` (require PR, optional required checks once T13 exists).
-- **GitHub Packages / GHCR** permissions for Actions to push images.
+- [x] `origin` / canonical URL documented ([CONTRIBUTING.md](../../CONTRIBUTING.md)); maintainer adds or verifies remote locally.
+- [ ] Branch protection on `main` — **GitHub Settings** (steps in CONTRIBUTING).
+- [ ] **GHCR** `packages: write` — in **T13** workflow when images are published.
+- [x] Issue/PR templates ([`.github/`](../../.github/)), **CONTRIBUTING.md**.
 
 ## Steps
 
-1. Create empty GitHub repo; `git remote add origin …`; push `main`/`master`.
-2. Settings → Branches → protect default branch.
-3. Enable **Actions**; for GHCR: use `GITHUB_TOKEN` with `packages: write` in workflow (document in T13).
-4. Optional: issue/PR templates, `CONTRIBUTING.md`.
+1. [x] Create GitHub repo; `git remote add origin …`; push `main`.
+2. [ ] Settings → Branches → protect **main** (contributor completes in GitHub).
+3. [ ] Enable **Actions**; GHCR permissions when **T13** workflow exists.
+4. [x] Issue/PR templates, **CONTRIBUTING.md**.
 
 ## Files / paths
 

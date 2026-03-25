@@ -1,6 +1,6 @@
 # AGENTS.md — access-manager
 
-Guidance for human and AI contributors. Phased work: [plan/README.md](plan/README.md). Product context: [PLAN.md](PLAN.md), backlog: [TICKETS.md](TICKETS.md). Branching: [docs/branching.md](docs/branching.md) (**T14**).
+Guidance for human and AI contributors. Phased work: [plan/README.md](plan/README.md). Product context: [PLAN.md](PLAN.md), backlog: [TICKETS.md](TICKETS.md). Branching: [docs/branching.md](docs/branching.md) (**T14**). Contributing + GitHub: [CONTRIBUTING.md](CONTRIBUTING.md) (**T6**).
 
 ## Repository shape
 
@@ -50,7 +50,7 @@ Match effort to change size.
 
 ## GitHub
 
-AI agents and contributors automating GitHub should prefer the **`gh`** CLI (`gh issue`, `gh pr`, `gh run`, `gh api`, etc.) over raw REST `curl` when possible. Requires [GitHub CLI](https://cli.github.com/) and a logged-in session (`gh auth login` / `gh auth status`).
+AI agents and contributors automating GitHub should prefer the **`gh`** CLI (`gh issue`, `gh pr`, `gh run`, `gh api`, etc.) over raw REST `curl` when possible. Requires [GitHub CLI](https://cli.github.com/) and a logged-in session (`gh auth login` / `gh auth status`). Maintainer-facing steps: [CONTRIBUTING.md](CONTRIBUTING.md) (**T6**).
 
 ## Commands
 

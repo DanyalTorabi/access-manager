@@ -29,7 +29,7 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 | T10 | Unit tests (expand) | done | Handlers, store edge cases; table-driven |
 | T11 | Integration tests | done | HTTP + real DB; **compose-backed** in **T13** |
 | T12 | Test coverage | done | `go test -cover` / profile; optional CI gate |
-| T13 | CI/CD (curriculum-aligned) | open | **Ubuntu**; on **PR**: unit + **integration (compose)**, **`go vet`**, **golangci-lint**; build Docker image; on **merge to main**: **publish `ghcr.io`**; module cache; run Go jobs from **`go/`**; requires **T6**, **T29** |
+| T13 | CI/CD (curriculum-aligned) | open | **Ubuntu**; on **PR**: unit + **integration (compose)**, **`go vet`**, **golangci-lint**; build Docker image; on **merge to main**: **publish `ghcr.io`**; run Go jobs from **`go/`**; requires **T29**; GitHub **branch protection** / **GHCR** per [CONTRIBUTING.md](CONTRIBUTING.md) when you wire CI |
 | T14 | Branching strategy | done | [docs/branching.md](docs/branching.md); [README.md](README.md) section (**T14**) |
 | T26 | Config: file + env | done | File for ports, DSN, URLs, toggles; **env overrides**; no secrets in repo |
 | T27 | Graceful shutdown & concurrency safety | done | **SIGINT/SIGTERM** → `Server.Shutdown`, drain in-flight; **context** on store/API; **`-race`** in Makefile/CI |
@@ -49,7 +49,7 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 | T18 | Developer AI / editor tooling | done | `.cursor/rules`, `AGENTS.md`, tech stack doc |
 | T19 | Docker | open | Multi-stage + **scratch/distroless** final image; **compose** for app + DB for **T11**/**T13**; config via **T26** |
 | T1 | Per-dialect migrations (postgres/mysql) | open | **`go/migrations/`** + **`go/internal/database`** |
-| T6 | GitHub remote + repo hygiene | open | Origin, branch protection, GHCR package permissions for **T13** |
+| T6 | GitHub remote + repo hygiene | done | [CONTRIBUTING.md](CONTRIBUTING.md) maintainer checklist; [.github/](.github/) PR + issue templates; complete **branch protection** + **Actions/GHCR** in GitHub UI per CONTRIBUTING |
 
 ---
 
