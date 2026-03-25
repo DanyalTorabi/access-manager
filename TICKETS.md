@@ -30,7 +30,7 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 | T11 | Integration tests | done | HTTP + real DB; **compose-backed** in **T13** |
 | T12 | Test coverage | done | `go test -cover` / profile; optional CI gate |
 | T13 | CI/CD (curriculum-aligned) | open | **Ubuntu**; on **PR**: unit + **integration (compose)**, **`go vet`**, **golangci-lint**; build Docker image; on **merge to main**: **publish `ghcr.io`**; module cache; run Go jobs from **`go/`**; requires **T6**, **T29** |
-| T14 | Branching strategy | open | PRs to **main**, naming, protection |
+| T14 | Branching strategy | done | [docs/branching.md](docs/branching.md); [README.md](README.md) section (**T14**) |
 | T26 | Config: file + env | done | File for ports, DSN, URLs, toggles; **env overrides**; no secrets in repo |
 | T27 | Graceful shutdown & concurrency safety | done | **SIGINT/SIGTERM** → `Server.Shutdown`, drain in-flight; **context** on store/API; **`-race`** in Makefile/CI |
 | T28 | golangci-lint | done | Add **`go/.golangci.yml`** (or org template), wire **T9** + **T13** |

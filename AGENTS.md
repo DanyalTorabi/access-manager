@@ -1,6 +1,6 @@
 # AGENTS.md — access-manager
 
-Guidance for human and AI contributors. Phased work: [plan/README.md](plan/README.md). Product context: [PLAN.md](PLAN.md), backlog: [TICKETS.md](TICKETS.md).
+Guidance for human and AI contributors. Phased work: [plan/README.md](plan/README.md). Product context: [PLAN.md](PLAN.md), backlog: [TICKETS.md](TICKETS.md). Branching: [docs/branching.md](docs/branching.md) (**T14**).
 
 ## Repository shape
 

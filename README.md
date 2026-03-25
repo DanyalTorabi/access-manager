@@ -33,11 +33,16 @@ go run ./cmd/server
 
 Details: **[go/README.md](go/README.md)** (config, env, API overview, `make` targets).
 
+## Branching and pull requests (T14)
+
+All changes should go to **`main`** via **pull requests**. Branch naming, merge policy, and how this ties to CI (**T13**) and branch protection (**T6**) are documented in **[docs/branching.md](docs/branching.md)**.
+
 ## Docs and planning
 
 - [PLAN.md](PLAN.md) — product goals and milestones  
 - [TICKETS.md](TICKETS.md) — backlog and curriculum alignment table  
 - [plan/README.md](plan/README.md) — phased implementation plans per ticket  
+- [docs/branching.md](docs/branching.md) — branches and PRs to `main` (**T14**)  
 - [AGENTS.md](AGENTS.md) — contributor rules for humans and AI  
 
 ## License

@@ -14,14 +14,14 @@ Document how work flows into **main**: branch naming, PR requirement, and merge 
 
 ## Deliverables
 
-- Short doc in **README** section or **`docs/branching.md`** (link from README).
+- [x] **`docs/branching.md`** + link from **README**.
 
 ## Steps
 
-1. Choose model: **trunk-based** with short-lived `feature/*` or `fix/*` branches.
-2. Require **PR to `main`**; optional: squash merge default.
-3. Naming convention: `feature/T10-unit-tests`, `fix/authz-check-query`, etc.
-4. Link **T13** when Actions are enabled.
+1. [x] Choose model: **trunk-based** with short-lived `feature/*` or `fix/*` branches.
+2. [x] Require **PR to `main`**; optional: squash merge default.
+3. [x] Naming convention: `feature/T10-unit-tests`, `fix/authz-check-query`, etc.
+4. [x] Link **T13** when Actions are enabled.
 
 ## Files / paths
 
