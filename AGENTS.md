@@ -48,6 +48,10 @@ Match effort to change size.
 3. **Lint** — `golangci-lint run ./...` from **`go/`** or **`make lint`** from root (T28/T9).
 4. **Coverage** — Optional for tiny edits; use **`make cover`** for larger or risky changes (T12).
 
+## GitHub
+
+AI agents and contributors automating GitHub should prefer the **`gh`** CLI (`gh issue`, `gh pr`, `gh run`, `gh api`, etc.) over raw REST `curl` when possible. Requires [GitHub CLI](https://cli.github.com/) and a logged-in session (`gh auth login` / `gh auth status`).
+
 ## Commands
 
 From **repository root:** `make test`, `make lint`, `make cover`, `make run` (delegate to **`go/`**).
