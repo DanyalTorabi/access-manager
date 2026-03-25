@@ -17,7 +17,7 @@ Educational / product repo for **domain-scoped** access control (users, groups, 
 From the **repository root**, `make` delegates to `go/`:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/DanyalTorabi/access-manager.git
 cd access-manager
 make test
 make run
