@@ -3,23 +3,13 @@ package sqlite
 import (
 	"context"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/dtorabi/access-manager/internal/access"
 	"github.com/dtorabi/access-manager/internal/store"
+	"github.com/dtorabi/access-manager/internal/testutil"
 	"github.com/google/uuid"
 )
-
-func testMigrationsDir(t *testing.T) string {
-	t.Helper()
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed")
-	}
-	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", ".."))
-	return filepath.Join(repoRoot, "migrations", "sqlite")
-}
 
 func newTestStore(t *testing.T) *Store {
 	t.Helper()
@@ -28,7 +18,7 @@ func newTestStore(t *testing.T) *Store {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	if err := MigrateUp(db, testMigrationsDir(t)); err != nil {
+	if err := MigrateUp(db, testutil.SQLiteMigrationsDir(t)); err != nil {
 		t.Fatal(err)
 	}
 	return New(db)

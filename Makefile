@@ -1,4 +1,4 @@
-.PHONY: build test cover run tidy lint
+.PHONY: build test cover cover-func run tidy lint
 
 # Override with `make lint GOLANGCI_LINT=golangci-lint` if you have a local v2 binary (faster).
 GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4
@@ -11,7 +11,12 @@ test:
 
 cover:
 	go test -race -coverprofile=coverage.out ./...
+	@go tool cover -func=coverage.out | tail -n 1
 	@echo "coverage.out written; run: go tool cover -html=coverage.out"
+
+# Per-package function summary (T12); runs tests via dependency on cover.
+cover-func: cover
+	go tool cover -func=coverage.out
 
 run:
 	go run ./cmd/server

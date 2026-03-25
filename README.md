@@ -56,7 +56,8 @@ Loader: [internal/config](internal/config/config.go).
 |--------|---------|
 | Build binary | `make build` → `bin/server` |
 | Tests (race) | `make test` |
-| Coverage profile | `make cover` → `coverage.out` |
+| Coverage profile | `make cover` → `coverage.out`, prints total statement coverage; HTML: `go tool cover -html=coverage.out` |
+| Coverage by function | `make cover-func` |
 | Run server | `make run` |
 | Lint | `make lint` |
 | Tidy modules | `make tidy` |
