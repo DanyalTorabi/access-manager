@@ -1,5 +1,10 @@
 .PHONY: build test cover cover-func run tidy lint
 
+# golang/go#75031: GOTOOLCHAIN=auto can make `go test -cover` fail with "no such tool covdata".
+# Pin the minimum toolchain to the `go` version in go.mod (override: `make test GOTOOLCHAIN=local`).
+GOMOD_GO_VERSION := $(shell sed -n 's/^go //p' go.mod | head -1)
+export GOTOOLCHAIN := go$(GOMOD_GO_VERSION)+auto
+
 # Override with `make lint GOLANGCI_LINT=golangci-lint` if you have a local v2 binary (faster).
 GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4
 

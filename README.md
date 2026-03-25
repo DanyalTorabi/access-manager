@@ -62,7 +62,7 @@ Loader: [internal/config](internal/config/config.go).
 | Lint | `make lint` |
 | Tidy modules | `make tidy` |
 
-Equivalent without Make: `go test -race ./...`, `go vet ./...`, `golangci-lint run ./...`.
+Equivalent without Make: `go test -race ./...`, `go vet ./...`, `golangci-lint run ./...`. If `go test -cover` fails with `no such tool "covdata"` on Go 1.25+, set `GOTOOLCHAIN` to `go` plus the `go.mod` version and `+auto` (for example `go1.25.0+auto` when `go.mod` says `go 1.25.0`). The [Makefile](Makefile) exports that for `make test` / `make cover`; see [golang/go#75031](https://github.com/golang/go/issues/75031).
 
 ## API overview
 
