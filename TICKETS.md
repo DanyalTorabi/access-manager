@@ -31,8 +31,8 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 | T12 | Test coverage | open | `go test -cover` / profile; optional CI gate |
 | T13 | CI/CD (curriculum-aligned) | open | **Ubuntu**; on **PR**: unit + **integration (compose)**, **`go vet`**, **golangci-lint**; build Docker image; on **merge to main**: **publish `ghcr.io`**; module cache; requires **T6** |
 | T14 | Branching strategy | open | PRs to **main**, naming, protection |
-| T26 | Config: file + env | open | File for ports, DSN, URLs, toggles; **env overrides**; no secrets in repo |
-| T27 | Graceful shutdown & concurrency safety | open | **SIGINT/SIGTERM** → `Server.Shutdown`, drain in-flight; **context** on store/API; **`-race`** in Makefile/CI |
+| T26 | Config: file + env | done | File for ports, DSN, URLs, toggles; **env overrides**; no secrets in repo |
+| T27 | Graceful shutdown & concurrency safety | done | **SIGINT/SIGTERM** → `Server.Shutdown`, drain in-flight; **context** on store/API; **`-race`** in Makefile/CI |
 | T28 | golangci-lint | done | Add `.golangci.yml` (or org template), wire **T9** + **T13** |
 | T7 | API authentication middleware | open | Bearer / JWT when exposing beyond loopback |
 

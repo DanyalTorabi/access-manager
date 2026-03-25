@@ -2,6 +2,8 @@
 *.db-shm
 *.db-wal
 .env
+config.local.yaml
+config.local.yml
 bin/
 coverage.out
 dist/

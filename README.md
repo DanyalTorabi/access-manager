@@ -15,7 +15,7 @@ go mod download
 go run ./cmd/server
 ```
 
-The server listens on **`127.0.0.1:8080`** by default. Migrations run on startup against the configured SQLite file.
+The server listens on **`127.0.0.1:8080`** by default. Migrations run on startup against the configured SQLite file. **SIGINT** / **SIGTERM** triggers graceful shutdown (see `SHUTDOWN_TIMEOUT_SECONDS` / `shutdown_timeout_seconds` in config).
 
 ### Health check
 
@@ -25,18 +25,28 @@ curl -s http://127.0.0.1:8080/health
 
 Example response: `{"status":"ok"}`
 
-## Configuration (environment)
+## Configuration
+
+**Precedence:** built-in defaults → optional YAML file (if `CONFIG_PATH` is set) → **environment variables** (each non-empty env var overrides the corresponding field).
+
+### Environment variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATABASE_DRIVER` | `sqlite` | SQL driver name (`sqlite` / `sqlite3` via [internal/database](internal/database/open.go)) |
-| `DATABASE_URL` | `file:access.db?_pragma=foreign_keys(1)` | DSN for the database |
+| `CONFIG_PATH` | _(unset)_ | Path to YAML file; if unset, only defaults + env apply |
+| `DATABASE_DRIVER` | `sqlite` | SQL driver (`sqlite` / `sqlite3` via [internal/database](internal/database/open.go)) |
+| `DATABASE_URL` | `file:access.db?_pragma=foreign_keys(1)` | Database DSN |
 | `HTTP_ADDR` | `127.0.0.1:8080` | Listen address (**use loopback in dev**; see [AGENTS.md](AGENTS.md)) |
-| `MIGRATIONS_DIR` | `migrations/sqlite` | Path to migration `.up.sql` files (resolved relative to process working directory if not absolute) |
+| `MIGRATIONS_DIR` | `migrations/sqlite` | Migration `.up.sql` directory (relative paths are resolved from the process working directory) |
+| `SHUTDOWN_TIMEOUT_SECONDS` | `30` | Max seconds to wait for graceful shutdown after **SIGINT** / **SIGTERM** |
 
 Copy [`.env.example`](.env.example) to `.env` for local overrides; do **not** commit real secrets.
 
-**Structured config file** (YAML/TOML + env overrides) is planned under **T26**—until then, use environment variables only.
+### YAML file (optional)
+
+See [config.example.yaml](config.example.yaml). Copy to a path outside VCS (e.g. `config.local.yaml`, gitignored) and set `CONFIG_PATH` to that path.
+
+Loader: [internal/config](internal/config/config.go).
 
 ## Development
 

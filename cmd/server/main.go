@@ -1,28 +1,34 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
+	"time"
 
 	"github.com/dtorabi/access-manager/internal/api"
+	"github.com/dtorabi/access-manager/internal/config"
 	"github.com/dtorabi/access-manager/internal/database"
 	sqlstore "github.com/dtorabi/access-manager/internal/store/sqlite"
 )
 
 func main() {
-	driver := getenv("DATABASE_DRIVER", "sqlite")
-	dsn := getenv("DATABASE_URL", "file:access.db?_pragma=foreign_keys(1)")
-	addr := getenv("HTTP_ADDR", "127.0.0.1:8080")
-	migDir := getenv("MIGRATIONS_DIR", "migrations/sqlite")
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("config: %v", err)
+	}
 
-	db, _, err := database.Open(driver, dsn)
+	db, _, err := database.Open(cfg.DatabaseDriver, cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("open database: %v", err)
 	}
 	defer func() { _ = db.Close() }()
 
+	migDir := cfg.MigrationsDir
 	if !filepath.IsAbs(migDir) {
 		if wd, err := os.Getwd(); err == nil {
 			migDir = filepath.Join(wd, migDir)
@@ -35,15 +41,32 @@ func main() {
 	st := sqlstore.New(db)
 	srv := &api.Server{Store: st}
 
-	log.Printf("listening on http://%s", addr)
-	if err := http.ListenAndServe(addr, srv.Router()); err != nil {
-		log.Fatal(err)
+	httpSrv := &http.Server{
+		Addr:              cfg.HTTPAddr,
+		Handler:           srv.Router(),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
-}
 
-func getenv(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		log.Printf("listening on http://%s", cfg.HTTPAddr)
+		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %v", err)
+		}
+	}()
+
+	sig := <-sigCh
+	log.Printf("signal received: %v, shutting down", sig)
+
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+	defer cancel()
+	if err := httpSrv.Shutdown(ctx); err != nil {
+		log.Printf("shutdown: %v", err)
 	}
-	return def
+	log.Printf("server stopped")
 }

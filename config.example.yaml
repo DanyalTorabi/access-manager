@@ -1,0 +1,10 @@
+# Example configuration — copy to a local path and set CONFIG_PATH, or override any field via environment.
+# Do not commit real credentials. Env vars override these values when set (see README).
+
+database_driver: sqlite
+database_url: "file:access.db?_pragma=foreign_keys(1)"
+http_addr: "127.0.0.1:8080"
+migrations_dir: migrations/sqlite
+
+# Graceful shutdown timeout (seconds) after SIGINT/SIGTERM
+shutdown_timeout_seconds: 30
