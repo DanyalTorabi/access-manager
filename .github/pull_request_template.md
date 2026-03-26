@@ -1,10 +1,10 @@
 ## Summary
 
-<!-- What does this PR change and why? -->
+<!-- What changed and why (one short paragraph). -->
 
-## Ticket / context
+## Ticket
 
-<!-- e.g. T19, T13 — link to TICKETS.md or an issue -->
+<!-- e.g. T13 — id from [TICKETS.md](../TICKETS.md) or “n/a” for docs-only typos -->
 
 ## Checklist
 

@@ -33,8 +33,30 @@ See the root [**README** — Docker (T19)](README.md#docker-t19) for image layou
 ## Pull requests
 
 - Open PRs **into `main`**; follow [docs/branching.md](docs/branching.md).
+- Use the repo **[pull request template](.github/pull_request_template.md)** (GitHub fills it when you open a PR from the UI): **Summary**, **Ticket**, **Checklist**.
 - Reference a ticket from [TICKETS.md](TICKETS.md) when it applies (e.g. `T19`).
 - Keep **`make test`** and **`make lint`** green for Go changes.
+
+### Create a PR with `gh`
+
+After `git push -u origin <branch>`:
+
+```bash
+gh pr create --base main \
+  --title "ci: GitHub Actions, Docker smoke, GHCR on main" \
+  --body "## Summary
+Adds \`.github/workflows/ci.yml\`: Go test/vet/lint in \`go/\`, Docker compose health smoke, and GHCR publish on pushes to \`main\`.
+
+## Ticket
+T13
+
+## Checklist
+- [x] \`make test\` / \`make lint\` locally
+- [x] Docs updated (README, CONTRIBUTING, AGENTS, TICKETS)
+"
+```
+
+Match the **same three sections** as the template; swap the title and body for your change.
 
 ## GitHub CLI
 
