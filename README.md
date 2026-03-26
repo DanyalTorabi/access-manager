@@ -2,13 +2,14 @@
 
 [![CI](https://github.com/DanyalTorabi/access-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/DanyalTorabi/access-manager/actions/workflows/ci.yml)
 
-Educational / product repo for **domain-scoped** access control (users, groups, resources, access-type bits, permissions). Implementations can live side by side: the **Go** HTTP service is under **[`go/`](go/)**; shared contracts and other language trees may be added at the root later (**T29**, **T17** / `spec/`).
+Educational / product repo for **domain-scoped** access control (users, groups, resources, access-type bits, permissions). Implementations can live side by side: the **Go** HTTP service is under **[`go/`](go/)**; the HTTP contract lives under **[`api/`](api/)** (**T17** — OpenAPI + Postman).
 
 ## Repository layout
 
 | Path | Purpose |
 |------|---------|
 | **[`go/`](go/)** | Go module `github.com/dtorabi/access-manager`: HTTP service, `internal/*`, SQLite migrations |
+| [`api/`](api/) | OpenAPI 3 spec and Postman collection (**T17**); see [api/README.md](api/README.md) |
 | [`plan/`](plan/) | Phased implementation plans per ticket |
 | [`PLAN.md`](PLAN.md), [`TICKETS.md`](TICKETS.md) | Product goals and backlog |
 
@@ -95,6 +96,7 @@ See **[CONTRIBUTING.md](CONTRIBUTING.md)** for local setup, PR expectations, **`
 - [AGENTS.md](AGENTS.md) — contributor rules for humans and AI  
 - [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — CI + GHCR (**T13**)  
 - [CHANGELOG.md](CHANGELOG.md) — release notes (**T15**); see below  
+- [api/README.md](api/README.md) — OpenAPI + Postman import and variables (**T17**)  
 
 ### Changelog (**T15**)
 
