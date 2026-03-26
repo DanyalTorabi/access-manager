@@ -32,8 +32,11 @@ See the root [**README** — Docker (T19)](README.md#docker-t19) for image layou
 
 ## Commits
 
-- Do **not** add **“made with Cursor”** (or similar tool/AI attribution) to commit messages or trailers unless the author explicitly asks for it.
 - Include **tests** for behavioral changes when practical; see [AGENTS.md](AGENTS.md).
+
+### AI assistants (Cursor, etc.)
+
+Provide **proposed** commit message and PR description text only. Do **not** run `git commit`, `git push`, or `gh pr create` unless the contributor explicitly asks. The contributor runs git and GitHub CLI locally.
 
 ## Pull requests
 
