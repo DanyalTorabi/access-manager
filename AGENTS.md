@@ -48,9 +48,15 @@ Match effort to change size.
 3. **Lint** — `golangci-lint run ./...` from **`go/`** or **`make lint`** from root (T28/T9).
 4. **Coverage** — Optional for tiny edits; use **`make cover`** for larger or risky changes (T12).
 
+<<<<<<< danyal/t7-api-authentication-middleware-rules-correction
 ## Commits and pull requests (AI assistants)
 
 By default, **do not** run `git commit`, `git push`, or `gh pr create`. Provide a **proposed commit message** and **PR body** (Summary, Ticket, Checklist per [`.github/pull_request_template.md`](.github/pull_request_template.md)) for the human to paste. Run those git/`gh` commands only when the human **explicitly** asks you to.
+=======
+## Commits
+
+Do **not** add **“made with Cursor”** (or similar editor/AI attribution) to commit messages or trailers unless the author explicitly requests it.
+>>>>>>> main
 
 ## GitHub
 
