@@ -2,7 +2,7 @@
 
 | File | Purpose |
 |------|---------|
-| [openapi.yaml](openapi.yaml) | OpenAPI 3.0 description of all public HTTP routes (`/health`, `/api/v1/...`). Bearer auth is documented for when `API_BEARER_TOKEN` is set. |
+| [openapi.yaml](openapi.yaml) | OpenAPI 3.0 description of all public HTTP routes (`/health`, `/api/v1/...`). Root `security` lists `{}` and `bearerAuth` so the contract matches optional Bearer when the token env is unset. |
 | [postman/access-manager.postman_collection.json](postman/access-manager.postman_collection.json) | Postman v2.1 collection for manual calls. |
 
 ## Postman

@@ -3,8 +3,12 @@ info:
   title: access-manager HTTP API
   description: |
     Domain-scoped access control (users, groups, resources, permissions, authorization checks).
-    JSON field names match the Go service (`encoding/json` default: exported struct fields).
-    When `API_BEARER_TOKEN` is set, all `/api/v1/*` routes require `Authorization: Bearer <token>`.
+
+    **Responses** use Go struct field names as serialized by `encoding/json` (e.g. `ID`, `DomainID`, `AccessMask`).
+
+    **Request bodies** use explicit `json` struct tags, mostly **snake_case** (e.g. `title`, `resource_id`, `access_mask`, `parent_group_id`).
+
+    **Bearer auth:** The server applies `Authorization: Bearer <token>` only when `API_BEARER_TOKEN` / `api_bearer_token` is set. This spec models that as **optional** Bearer (see root `security`).
   version: 0.1.0
 
 servers:
@@ -29,7 +33,9 @@ components:
       type: http
       scheme: bearer
       bearerFormat: opaque
-      description: Required on `/api/v1/*` when the server is configured with `API_BEARER_TOKEN`.
+      description: |
+        When the server is configured with `API_BEARER_TOKEN`, valid `Authorization: Bearer <token>` is required on `/api/v1/*`.
+        When unset, the server does not enforce this scheme (see root `security` — optional auth).
 
   parameters:
     domainID:
@@ -821,11 +827,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/AuthzCheckResponse"
         "400":
-          description: Missing or invalid query parameters
+          description: |
+            Missing required query parameters (`text/plain` from `http.Error`), or invalid `access_bit` (`application/json` from `writeErr` / parse error).
           content:
             text/plain:
               schema:
                 type: string
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "401":
           description: Unauthorized
           content:
@@ -871,5 +881,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
 
+# Optional Bearer: matches runtime when `API_BEARER_TOKEN` is unset (no middleware) or set (require valid token).
 security:
+  - {}
   - bearerAuth: []
