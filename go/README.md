@@ -89,7 +89,7 @@ When **`API_BEARER_TOKEN`** (or YAML **`api_bearer_token`**) is non-empty, clien
 
 `Authorization: Bearer <token>`
 
-on **`/api/v1/*`** requests. **`/health`** is not protected. If the token is unset and **`HTTP_ADDR`** binds beyond loopback (for example **`0.0.0.0:8080`** or **`:8080`**), the server logs a one-time warning at startup. JWT/JWKS validation is out of scope for this ticket.
+on **`/api/v1/*`** requests. **`/health`** is not protected. The service compares the presented token to the configured secret using **SHA-256** digests and a **constant-time** equality check (you still send the plain token in the header). If the token is unset and **`HTTP_ADDR`** binds beyond loopback (for example **`0.0.0.0:8080`** or **`:8080`**), the server logs a one-time warning at startup. JWT/JWKS validation is out of scope for this ticket.
 
 Full contract documentation is **T17** (OpenAPI / Postman).
 

@@ -12,6 +12,39 @@ import (
 	"github.com/dtorabi/access-manager/internal/testutil"
 )
 
+func TestBearerAuth_emptyExpectedDeniesAll(t *testing.T) {
+	cases := []struct {
+		name string
+		exp  string
+	}{
+		{name: "empty", exp: ""},
+		{name: "whitespace_only", exp: "   \t"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := BearerAuth(tc.exp)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				t.Fatal("next handler must not run")
+			}))
+			srv := httptest.NewServer(h)
+			t.Cleanup(srv.Close)
+
+			req, err := http.NewRequest(http.MethodGet, srv.URL+"/x", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header.Set("Authorization", "Bearer anything")
+			res, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = res.Body.Close() }()
+			if res.StatusCode != http.StatusUnauthorized {
+				t.Fatalf("status %d", res.StatusCode)
+			}
+		})
+	}
+}
+
 func TestBearerAuth_missingToken(t *testing.T) {
 	h := BearerAuth("secret")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
