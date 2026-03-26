@@ -21,6 +21,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("config: %v", err)
 	}
+	maybeWarnAPIAuth(cfg)
 
 	db, _, err := database.Open(cfg.DatabaseDriver, cfg.DatabaseURL)
 	if err != nil {
@@ -39,7 +40,7 @@ func main() {
 	}
 
 	st := sqlstore.New(db)
-	srv := &api.Server{Store: st}
+	srv := &api.Server{Store: st, APIBearerToken: cfg.APIBearerToken}
 
 	httpSrv := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -69,4 +70,11 @@ func main() {
 		log.Printf("shutdown: %v", err)
 	}
 	log.Printf("server stopped")
+}
+
+// maybeWarnAPIAuth logs once if the API may be reachable beyond loopback without Bearer protection.
+func maybeWarnAPIAuth(cfg config.Config) {
+	if msg := config.APIAuthStartupWarning(cfg); msg != "" {
+		log.Printf("warning: %s", msg)
+	}
 }

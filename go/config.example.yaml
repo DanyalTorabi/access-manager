@@ -8,3 +8,7 @@ migrations_dir: migrations/sqlite
 
 # Graceful shutdown timeout (seconds) after SIGINT/SIGTERM
 shutdown_timeout_seconds: 30
+
+# Optional: require Authorization: Bearer <token> on /api/v1/*. Env API_BEARER_TOKEN overrides when set.
+# Leave empty for local loopback-only dev; do not commit real secrets.
+# api_bearer_token: ""

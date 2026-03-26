@@ -14,9 +14,9 @@ Protect HTTP routes when the service is exposed beyond **loopback**: **Bearer to
 
 ## Deliverables
 
-- Middleware applied to `/api/*` (or entire router except `/health` if agreed).
-- Config keys from **T26**: e.g. `AUTH_JWKS_URL`, `AUTH_ISSUER`, or static `API_BEARER_TOKEN` for simple cases (dev only—document risk).
-- No “auth disabled in production” code paths without explicit build tag and warnings.
+- [x] Middleware applied to `/api/v1/*` (`/health` public).
+- [x] Config: static `API_BEARER_TOKEN` / `api_bearer_token` (JWT/JWKS deferred).
+- [x] Startup warning when binding beyond loopback with an empty token (no silent “open API” in that case).
 
 ## Steps
 
