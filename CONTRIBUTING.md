@@ -90,7 +90,7 @@ In GitHub: **Settings → Branches → Branch protection rules** for `main`:
 
 - Require a **pull request** before merging (disable direct pushes to `main`).
 - Optionally require **approvals**.
-- Require the **CI** workflow (`.github/workflows/ci.yml`) as a **required status check** once it passes on `main`.
+- After the first green CI run on **`main`**, add **required status checks** by **check / job name** (GitHub does not key off the workflow file path). Enable **Go (test, vet, lint)** and **Docker build & compose smoke** from workflow **CI** (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
 ### Actions and GHCR (**T13**)
 

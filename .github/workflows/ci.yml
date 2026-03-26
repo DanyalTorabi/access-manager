@@ -14,10 +14,6 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  # golang/go#75031 — match Makefile / go.mod minimum
-  GOTOOLCHAIN: go1.25.0+auto
-
 jobs:
   go:
     name: Go (test, vet, lint)
@@ -27,6 +23,11 @@ jobs:
         working-directory: go
     steps:
       - uses: actions/checkout@v4
+
+      # Same idea as root Makefile: derive minimum from go.mod (golang/go#75031 covdata).
+      - name: Set GOTOOLCHAIN from go.mod
+        working-directory: ${{ github.workspace }}
+        run: echo "GOTOOLCHAIN=go$(sed -n 's/^go //p' go/go.mod | head -1)+auto" >> "$GITHUB_ENV"
 
       - uses: actions/setup-go@v5
         with:
@@ -54,9 +55,18 @@ jobs:
       - name: Compose smoke (health)
         run: |
           docker compose up -d
-          sleep 3
-          curl -fsS http://127.0.0.1:8080/health
-          docker compose down
+          for attempt in $(seq 1 30); do
+            if curl -fsS --max-time 5 http://127.0.0.1:8080/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Health check failed after ~60s"
+          exit 1
+
+      - name: Compose teardown
+        if: always()
+        run: docker compose down --remove-orphans
 
   publish:
     name: Publish image to GHCR
