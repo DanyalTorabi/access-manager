@@ -14,8 +14,8 @@ Adopt **[Keep a Changelog](https://keepachangelog.com/)** format and a **semver*
 
 ## Deliverables
 
-- **`CHANGELOG.md`** at repo root.
-- Process note in README: when to add `## [Unreleased]` entries.
+- [x] **`CHANGELOG.md`** at repo root.
+- [x] Process note in README: when to add `## [Unreleased]` entries.
 
 ## Steps
 

@@ -94,6 +94,11 @@ See **[CONTRIBUTING.md](CONTRIBUTING.md)** for local setup, PR expectations, **`
 - [CONTRIBUTING.md](CONTRIBUTING.md) — contributor guide and GitHub hygiene (**T6**)  
 - [AGENTS.md](AGENTS.md) — contributor rules for humans and AI  
 - [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — CI + GHCR (**T13**)  
+- [CHANGELOG.md](CHANGELOG.md) — release notes (**T15**); see below  
+
+### Changelog (**T15**)
+
+User-facing or notable changes belong under **`## [Unreleased]`** in [CHANGELOG.md](CHANGELOG.md), using [Keep a Changelog](https://keepachangelog.com/) sections (**Added**, **Changed**, **Fixed**, **Removed**, **Security**). Merge each PR that needs a note before release; when you cut a release, move the bullets into a new `## [x.y.z] - YYYY-MM-DD` section and create a matching Git tag (`v0.1.0`, etc.).
 
 ## License
 
