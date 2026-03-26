@@ -43,7 +43,7 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 
 | id | title | status | notes |
 |----|-------|--------|-------|
-| T15 | CHANGELOG | open | Keep a Changelog, semver, tags/releases |
+| T15 | CHANGELOG | done | [CHANGELOG.md](CHANGELOG.md) + README process; semver tags on release (**T6**) |
 | T16 | E2E / smoke tests | open | Full API journeys; optional Newman in CI |
 | T17 | API docs & contract testing | open | OpenAPI/Swagger + Postman collection |
 | T18 | Developer AI / editor tooling | done | `.cursor/rules`, `AGENTS.md`, tech stack doc |
