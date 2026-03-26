@@ -124,3 +124,63 @@ api_bearer_token: "from-file"
 		t.Fatalf("api bearer: env should override file, got %q", c.APIBearerToken)
 	}
 }
+
+func TestLoad_apiBearerTokenYAMLTrimmed(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cfg.yaml")
+	content := `
+database_driver: sqlite
+database_url: "file::memory:"
+http_addr: "127.0.0.1:8080"
+migrations_dir: migrations/sqlite
+api_bearer_token: "  yaml-token  "
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(envConfigPath, path)
+	t.Setenv(envDatabaseDriver, "")
+	t.Setenv(envDatabaseURL, "")
+	t.Setenv(envHTTPAddr, "")
+	t.Setenv(envMigrationsDir, "")
+	t.Setenv(envShutdownTimeoutSec, "")
+	t.Setenv(envAPIBearerToken, "")
+
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.APIBearerToken != "yaml-token" {
+		t.Fatalf("api bearer should be trimmed from YAML, got %q", c.APIBearerToken)
+	}
+}
+
+func TestLoad_apiBearerTokenYAMLWhitespaceOnlySkipped(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cfg.yaml")
+	content := `
+database_driver: sqlite
+database_url: "file::memory:"
+http_addr: "127.0.0.1:8080"
+migrations_dir: migrations/sqlite
+api_bearer_token: "  	  "
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(envConfigPath, path)
+	t.Setenv(envDatabaseDriver, "")
+	t.Setenv(envDatabaseURL, "")
+	t.Setenv(envHTTPAddr, "")
+	t.Setenv(envMigrationsDir, "")
+	t.Setenv(envShutdownTimeoutSec, "")
+	t.Setenv(envAPIBearerToken, "")
+
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.APIBearerToken != "" {
+		t.Fatalf("whitespace-only YAML api_bearer_token should not apply, got %q", c.APIBearerToken)
+	}
+}

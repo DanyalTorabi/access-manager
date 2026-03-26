@@ -78,8 +78,8 @@ func Load() (Config, error) {
 		if f.ShutdownTimeoutSeconds != nil && *f.ShutdownTimeoutSeconds > 0 {
 			c.ShutdownTimeout = time.Duration(*f.ShutdownTimeoutSeconds) * time.Second
 		}
-		if f.APIBearerToken != "" {
-			c.APIBearerToken = f.APIBearerToken
+		if trimmed := strings.TrimSpace(f.APIBearerToken); trimmed != "" {
+			c.APIBearerToken = trimmed
 		}
 	}
 
