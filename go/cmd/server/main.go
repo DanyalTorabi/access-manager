@@ -3,12 +3,10 @@ package main
 import (
 	"context"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
@@ -76,23 +74,7 @@ func main() {
 
 // maybeWarnAPIAuth logs once if the API may be reachable beyond loopback without Bearer protection.
 func maybeWarnAPIAuth(cfg config.Config) {
-	if strings.TrimSpace(cfg.APIBearerToken) != "" {
-		return
+	if msg := config.APIAuthStartupWarning(cfg); msg != "" {
+		log.Printf("warning: %s", msg)
 	}
-	addr := strings.TrimSpace(cfg.HTTPAddr)
-	host, _, err := net.SplitHostPort(addr)
-	if err != nil {
-		// e.g. ":8080" listens on all interfaces
-		if strings.HasPrefix(addr, ":") {
-			log.Printf("warning: API_BEARER_TOKEN is unset but HTTP_ADDR %q listens on all interfaces; set API_BEARER_TOKEN (or bind to 127.0.0.1) before exposing this service", addr)
-		}
-		return
-	}
-	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
-		return
-	}
-	if strings.EqualFold(host, "localhost") {
-		return
-	}
-	log.Printf("warning: API_BEARER_TOKEN is unset but http_addr host %q is not loopback; set API_BEARER_TOKEN (or bind to 127.0.0.1) before exposing this service", host)
 }

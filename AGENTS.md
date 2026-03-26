@@ -44,9 +44,13 @@ Treat the **access model** (`internal/access`, `internal/store` contracts) as a 
 Match effort to change size.
 
 1. **Docs** — If behavior or setup changed: update **[`go/README.md`](go/README.md)** and root **[README.md](README.md)** if layout/entrypoints changed. If [CHANGELOG.md](CHANGELOG.md) exists and the change is user-visible, add an **Unreleased** entry; otherwise skip.
-2. **Tests** — `go test -race ./...` from **`go/`** on affected packages, or **`make test`** from repo root (T9).
+2. **Tests** — Add or extend **unit/integration tests** for behavioral changes in the same change set (T10). Run `go test -race ./...` from **`go/`** on affected packages, or **`make test`** from repo root (T9).
 3. **Lint** — `golangci-lint run ./...` from **`go/`** or **`make lint`** from root (T28/T9).
 4. **Coverage** — Optional for tiny edits; use **`make cover`** for larger or risky changes (T12).
+
+## Commits
+
+Do **not** add **“made with Cursor”** (or similar editor/AI attribution) to commit messages or trailers unless the author explicitly requests it.
 
 ## GitHub
 

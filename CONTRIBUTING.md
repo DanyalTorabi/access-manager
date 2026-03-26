@@ -30,6 +30,11 @@ make docker-down
 
 See the root [**README** — Docker (T19)](README.md#docker-t19) for image layout and port binding.
 
+## Commits
+
+- Do **not** add **“made with Cursor”** (or similar tool/AI attribution) to commit messages or trailers unless the author explicitly asks for it.
+- Include **tests** for behavioral changes when practical; see [AGENTS.md](AGENTS.md).
+
 ## Pull requests
 
 - Open PRs **into `main`**; follow [docs/branching.md](docs/branching.md).

@@ -65,6 +65,7 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 | T3 | Resource hierarchy | open | Flat resources in v1 |
 | T4 | Materialized `user_resource_mask` for hot path | open | If profiling requires |
 | T5 | Authz benchmarks / load tests | open | k6 etc.; pairs **T4** |
+| T30 | Go coverage above 90% | open | Raise **`go/`** statement coverage past **90%** (see **`make cover`**); add tests for thin **`cmd/`** wiring and edge paths; optional CI gate |
 
 ---
 
@@ -75,7 +76,7 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 | Curriculum map | Table at top of this file |
 | Docs & process | T8, T14, T15 |
 | Build & local dev | T9, T19, T26, T28, T29 |
-| Testing & quality | T10, T11, T12, T16, T17, T27, T5 |
+| Testing & quality | T10, T11, T12, T16, T17, T27, T5, T30 |
 | Platform & delivery | T6, T13, T19, T21, T22, T29 |
 | Security & access | T7, T20 |
 | Product / data model | T1–T4 |
