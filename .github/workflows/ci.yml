@@ -1,0 +1,100 @@
+# T13 — curriculum-aligned CI: Go test/vet/lint, Docker + compose smoke, GHCR on main.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: Go (test, vet, lint)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same idea as root Makefile: derive minimum from go.mod (golang/go#75031 covdata).
+      - name: Set GOTOOLCHAIN from go.mod
+        working-directory: ${{ github.workspace }}
+        run: echo "GOTOOLCHAIN=go$(sed -n 's/^go //p' go/go.mod | head -1)+auto" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      - name: Test
+        run: go test -race ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Lint
+        run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4 run ./...
+
+  docker:
+    name: Docker build & compose smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image (compose)
+        run: docker compose build
+
+      - name: Compose smoke (health)
+        run: |
+          docker compose up -d
+          for attempt in $(seq 1 30); do
+            if curl -fsS --max-time 5 http://127.0.0.1:8080/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Health check failed after ~60s"
+          exit 1
+
+      - name: Compose teardown
+        if: always()
+        run: docker compose down --remove-orphans
+
+  publish:
+    name: Publish image to GHCR
+    runs-on: ubuntu-latest
+    needs: [go, docker]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image name (lowercase for GHCR)
+        id: image
+        run: echo "name=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.image.outputs.name }}:latest
+            ${{ steps.image.outputs.name }}:sha-${{ github.sha }}

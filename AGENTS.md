@@ -50,7 +50,7 @@ Match effort to change size.
 
 ## GitHub
 
-AI agents and contributors automating GitHub should prefer the **`gh`** CLI (`gh issue`, `gh pr`, `gh run`, `gh api`, etc.) over raw REST `curl` when possible. Requires [GitHub CLI](https://cli.github.com/) and a logged-in session (`gh auth login` / `gh auth status`). Maintainer-facing steps: [CONTRIBUTING.md](CONTRIBUTING.md) (**T6**).
+AI agents and contributors automating GitHub should prefer the **`gh`** CLI (`gh issue`, `gh pr`, `gh run`, `gh api`, etc.) over raw REST `curl` when possible. Requires [GitHub CLI](https://cli.github.com/) and a logged-in session (`gh auth login` / `gh auth status`). Maintainer-facing steps: [CONTRIBUTING.md](CONTRIBUTING.md) (**T6**). CI status: [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (**T13**); use **`gh run list`** / **`gh pr checks`** to inspect runs.
 
 ## Commands
 

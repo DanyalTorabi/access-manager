@@ -33,8 +33,30 @@ See the root [**README** — Docker (T19)](README.md#docker-t19) for image layou
 ## Pull requests
 
 - Open PRs **into `main`**; follow [docs/branching.md](docs/branching.md).
+- Use the repo **[pull request template](.github/pull_request_template.md)** (GitHub fills it when you open a PR from the UI): **Summary**, **Ticket**, **Checklist**.
 - Reference a ticket from [TICKETS.md](TICKETS.md) when it applies (e.g. `T19`).
 - Keep **`make test`** and **`make lint`** green for Go changes.
+
+### Create a PR with `gh`
+
+After `git push -u origin <branch>`:
+
+```bash
+gh pr create --base main \
+  --title "ci: GitHub Actions, Docker smoke, GHCR on main" \
+  --body "## Summary
+Adds \`.github/workflows/ci.yml\`: Go test/vet/lint in \`go/\`, Docker compose health smoke, and GHCR publish on pushes to \`main\`.
+
+## Ticket
+T13
+
+## Checklist
+- [x] \`make test\` / \`make lint\` locally
+- [x] Docs updated (README, CONTRIBUTING, AGENTS, TICKETS)
+"
+```
+
+Match the **same three sections** as the template; swap the title and body for your change.
 
 ## GitHub CLI
 
@@ -68,12 +90,12 @@ In GitHub: **Settings → Branches → Branch protection rules** for `main`:
 
 - Require a **pull request** before merging (disable direct pushes to `main`).
 - Optionally require **approvals**.
-- After **T13** adds Actions: require **status checks** to pass before merge.
+- After the first green CI run on **`main`**, add **required status checks** by **check / job name** (GitHub does not key off the workflow file path). Enable **Go (test, vet, lint)** and **Docker build & compose smoke** from workflow **CI** (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
 ### Actions and GHCR (**T13**)
 
 - **Settings → Actions → General:** enable Actions as appropriate for the org.
-- To **push images to GHCR** from a workflow, grant **`packages: write`** to `GITHUB_TOKEN` in that workflow (e.g. top-level `permissions:`). Details belong in the **T13** workflow file when it exists.
+- CI workflow: **[`.github/workflows/ci.yml`](.github/workflows/ci.yml)** — the **Publish image to GHCR** job sets **`packages: write`** on `GITHUB_TOKEN` and pushes **`ghcr.io/<lowercase-owner>/access-manager`** on every push to **`main`**.
 
 ### Go module path
 

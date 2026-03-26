@@ -23,7 +23,7 @@ Optional: include a ticket id (`feature/T19-docker`).
 ## Pull requests
 
 1. Branch from up-to-date **`main`**.
-2. Open a PR **into `main`** with a clear title and summary.
+2. Open a PR **into `main`** with a clear title and the **[pull request template](../.github/pull_request_template.md)** (**Summary**, **Ticket**, **Checklist**). From the CLI: **`gh pr create --base main`** — see **[CONTRIBUTING.md](../CONTRIBUTING.md)**.
 3. **Squash merge** is the suggested default on GitHub (repo setting) if you want a linear history; merge commit is fine if the team prefers.
 4. After **T13**, fix failing checks before merge.
 

@@ -29,7 +29,7 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 | T10 | Unit tests (expand) | done | Handlers, store edge cases; table-driven |
 | T11 | Integration tests | done | HTTP + real DB; **compose-backed** in **T13** |
 | T12 | Test coverage | done | `go test -cover` / profile; optional CI gate |
-| T13 | CI/CD (curriculum-aligned) | open | **Ubuntu**; on **PR**: unit + **integration (compose)**, **`go vet`**, **golangci-lint**; build Docker image; on **merge to main**: **publish `ghcr.io`**; run Go jobs from **`go/`**; requires **T29**; GitHub **branch protection** / **GHCR** per [CONTRIBUTING.md](CONTRIBUTING.md) when you wire CI |
+| T13 | CI/CD (curriculum-aligned) | done | [.github/workflows/ci.yml](.github/workflows/ci.yml): **`go/`** test/vet/lint; Docker build + compose **health** smoke; push **`main`** → **GHCR** `latest` + `sha-<full>`; branch protection: require job checks **Go (test, vet, lint)** + **Docker build & compose smoke** ([CONTRIBUTING.md](CONTRIBUTING.md)) |
 | T14 | Branching strategy | done | [docs/branching.md](docs/branching.md); [README.md](README.md) section (**T14**) |
 | T26 | Config: file + env | done | File for ports, DSN, URLs, toggles; **env overrides**; no secrets in repo |
 | T27 | Graceful shutdown & concurrency safety | done | **SIGINT/SIGTERM** → `Server.Shutdown`, drain in-flight; **context** on store/API; **`-race`** in Makefile/CI |
