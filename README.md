@@ -35,6 +35,8 @@ go run ./cmd/server
 
 Details: **[go/README.md](go/README.md)** (config, env, API overview, `make` targets).
 
+**API auth (T7):** optional static Bearer token via **`API_BEARER_TOKEN`** / **`api_bearer_token`** protects **`/api/v1/*`**; **`/health`** stays public. If you listen on a non-loopback address without a token, the process logs a startup warning—set a token before any real exposure.
+
 ## Docker (T19)
 
 Multi-stage image (distroless, non-root, `CGO_ENABLED=0` / `modernc.org/sqlite`) built from repo root; SQLite data uses a **tmpfs** mount (ephemeral) in the default compose file.

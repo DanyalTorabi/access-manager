@@ -45,6 +45,7 @@ From the **repository root** (not `go/`): **`make docker-build`**, **`make docke
 | `HTTP_ADDR` | `127.0.0.1:8080` | Listen address (**use loopback in dev**; see [AGENTS.md](../AGENTS.md)) |
 | `MIGRATIONS_DIR` | `migrations/sqlite` | Migration `.up.sql` directory (relative paths are resolved from the **process working directory** — run from `go/` or set an absolute path) |
 | `SHUTDOWN_TIMEOUT_SECONDS` | `30` | Max seconds to wait for graceful shutdown after **SIGINT** / **SIGTERM** |
+| `API_BEARER_TOKEN` | _(empty)_ | If set, all **`/api/v1/*`** routes require `Authorization: Bearer <token>`. **`/health`** stays public. Use a strong random value in production; never commit it. |
 
 Copy [`.env.example`](.env.example) to `.env` for local overrides; do **not** commit real secrets.
 
@@ -81,6 +82,14 @@ REST routes live under **`/api/v1`** with domain-scoped segments, for example:
 - `GET /api/v1/domains`
 - `POST /api/v1/domains`
 - `GET /api/v1/domains/{domainID}/authz/check?user_id=&resource_id=&access_bit=`
+
+### Authentication (**T7**)
+
+When **`API_BEARER_TOKEN`** (or YAML **`api_bearer_token`**) is non-empty, clients must send:
+
+`Authorization: Bearer <token>`
+
+on **`/api/v1/*`** requests. **`/health`** is not protected. If the token is unset and **`HTTP_ADDR`** binds beyond loopback (for example **`0.0.0.0:8080`** or **`:8080`**), the server logs a one-time warning at startup. JWT/JWKS validation is out of scope for this ticket.
 
 Full contract documentation is **T17** (OpenAPI / Postman).
 

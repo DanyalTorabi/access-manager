@@ -16,8 +16,9 @@ const (
 	envDatabaseDriver    = "DATABASE_DRIVER"
 	envDatabaseURL       = "DATABASE_URL"
 	envHTTPAddr          = "HTTP_ADDR"
-	envMigrationsDir     = "MIGRATIONS_DIR"
+	envMigrationsDir      = "MIGRATIONS_DIR"
 	envShutdownTimeoutSec = "SHUTDOWN_TIMEOUT_SECONDS"
+	envAPIBearerToken     = "API_BEARER_TOKEN"
 )
 
 // fileShape matches config.example.yaml (snake_case keys).
@@ -27,6 +28,7 @@ type fileShape struct {
 	HTTPAddr                string `yaml:"http_addr"`
 	MigrationsDir           string `yaml:"migrations_dir"`
 	ShutdownTimeoutSeconds  *int   `yaml:"shutdown_timeout_seconds"`
+	APIBearerToken          string `yaml:"api_bearer_token"`
 }
 
 // Config is resolved runtime configuration after defaults, optional file, and env overrides.
@@ -36,6 +38,8 @@ type Config struct {
 	HTTPAddr         string
 	MigrationsDir    string
 	ShutdownTimeout  time.Duration
+	// APIBearerToken protects /api/v1/* when non-empty (Bearer scheme). Optional; see README.
+	APIBearerToken string
 }
 
 // Load builds configuration: defaults → optional YAML file (CONFIG_PATH) → environment overrides.
@@ -74,6 +78,9 @@ func Load() (Config, error) {
 		if f.ShutdownTimeoutSeconds != nil && *f.ShutdownTimeoutSeconds > 0 {
 			c.ShutdownTimeout = time.Duration(*f.ShutdownTimeoutSeconds) * time.Second
 		}
+		if f.APIBearerToken != "" {
+			c.APIBearerToken = f.APIBearerToken
+		}
 	}
 
 	if v := os.Getenv(envDatabaseDriver); v != "" {
@@ -94,6 +101,9 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("config: %s must be a positive integer (seconds)", envShutdownTimeoutSec)
 		}
 		c.ShutdownTimeout = time.Duration(sec) * time.Second
+	}
+	if v := strings.TrimSpace(os.Getenv(envAPIBearerToken)); v != "" {
+		c.APIBearerToken = v
 	}
 
 	if err := validate(c); err != nil {

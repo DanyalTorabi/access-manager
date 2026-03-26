@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/dtorabi/access-manager/internal/access"
 	"github.com/dtorabi/access-manager/internal/store"
@@ -15,6 +16,9 @@ import (
 // Server exposes HTTP handlers for the access manager.
 type Server struct {
 	Store store.Store
+	// APIBearerToken, if non-empty, requires Authorization: Bearer <token> on /api/v1/*.
+	// /health stays public. Empty means no auth on API (local dev / loopback only — document in README).
+	APIBearerToken string
 }
 
 func (s *Server) Router() chi.Router {
@@ -22,6 +26,9 @@ func (s *Server) Router() chi.Router {
 	r.Get("/health", s.health)
 
 	r.Route("/api/v1", func(r chi.Router) {
+		if tok := strings.TrimSpace(s.APIBearerToken); tok != "" {
+			r.Use(BearerAuth(tok))
+		}
 		r.Post("/domains", s.domainCreate)
 		r.Get("/domains", s.domainList)
 

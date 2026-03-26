@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -21,6 +23,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("config: %v", err)
 	}
+	maybeWarnAPIAuth(cfg)
 
 	db, _, err := database.Open(cfg.DatabaseDriver, cfg.DatabaseURL)
 	if err != nil {
@@ -39,7 +42,7 @@ func main() {
 	}
 
 	st := sqlstore.New(db)
-	srv := &api.Server{Store: st}
+	srv := &api.Server{Store: st, APIBearerToken: cfg.APIBearerToken}
 
 	httpSrv := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -69,4 +72,27 @@ func main() {
 		log.Printf("shutdown: %v", err)
 	}
 	log.Printf("server stopped")
+}
+
+// maybeWarnAPIAuth logs once if the API may be reachable beyond loopback without Bearer protection.
+func maybeWarnAPIAuth(cfg config.Config) {
+	if strings.TrimSpace(cfg.APIBearerToken) != "" {
+		return
+	}
+	addr := strings.TrimSpace(cfg.HTTPAddr)
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		// e.g. ":8080" listens on all interfaces
+		if strings.HasPrefix(addr, ":") {
+			log.Printf("warning: API_BEARER_TOKEN is unset but HTTP_ADDR %q listens on all interfaces; set API_BEARER_TOKEN (or bind to 127.0.0.1) before exposing this service", addr)
+		}
+		return
+	}
+	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+		return
+	}
+	if strings.EqualFold(host, "localhost") {
+		return
+	}
+	log.Printf("warning: API_BEARER_TOKEN is unset but http_addr host %q is not loopback; set API_BEARER_TOKEN (or bind to 127.0.0.1) before exposing this service", host)
 }
