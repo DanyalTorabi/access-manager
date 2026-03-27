@@ -95,3 +95,72 @@ func TestEffectiveMask_directUserPermission(t *testing.T) {
 		t.Fatalf("mask = %#x", m)
 	}
 }
+
+func TestEffectiveMask_noGrants(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	uid := uuid.NewString()
+	rid := uuid.NewString()
+	if err := s.UserCreate(ctx, &store.User{ID: uid, DomainID: domainID, Title: "u"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	m, err := s.EffectiveMask(ctx, domainID, uid, rid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m != 0 {
+		t.Fatalf("want 0 without grants, got %#x", m)
+	}
+}
+
+func TestEffectiveMask_userPlusGroupOR(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	uid := uuid.NewString()
+	gid := uuid.NewString()
+	rid := uuid.NewString()
+	pUser := uuid.NewString()
+	pGroup := uuid.NewString()
+	if err := s.UserCreate(ctx, &store.User{ID: uid, DomainID: domainID, Title: "u"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GroupCreate(ctx, &store.Group{ID: gid, DomainID: domainID, Title: "g"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: pUser, DomainID: domainID, Title: "pu", ResourceID: rid, AccessMask: 0x1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: pGroup, DomainID: domainID, Title: "pg", ResourceID: rid, AccessMask: 0x2}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GrantUserPermission(ctx, domainID, uid, pUser); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddUserToGroup(ctx, domainID, uid, gid); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GrantGroupPermission(ctx, domainID, gid, pGroup); err != nil {
+		t.Fatal(err)
+	}
+	m, err := s.EffectiveMask(ctx, domainID, uid, rid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m != 0x3 {
+		t.Fatalf("want OR of user 0x1 and group 0x2 => 0x3, got %#x", m)
+	}
+}

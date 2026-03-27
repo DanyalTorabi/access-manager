@@ -101,6 +101,19 @@ type entityID struct {
 	ID string `json:"ID"`
 }
 
+// mustEntityID decodes a JSON body with an "ID" field and fails fast if it is missing or empty.
+func mustEntityID(t *testing.T, what string, body []byte) string {
+	t.Helper()
+	var e entityID
+	if err := json.Unmarshal(body, &e); err != nil {
+		t.Fatalf("%s: json: %v body=%s", what, err, body)
+	}
+	if e.ID == "" {
+		t.Fatalf("%s: empty ID in response: %s", what, body)
+	}
+	return e.ID
+}
+
 type healthOK struct {
 	Status string `json:"status"`
 }
@@ -122,33 +135,19 @@ func TestSmoke_fullJourney(t *testing.T) {
 		t.Fatalf("health: %+v", h)
 	}
 
-	var dom entityID
-	if err := json.Unmarshal(mustPostJSON(t, c, base+"/api/v1/domains", `{"title":"e2e-domain"}`, http.StatusCreated), &dom); err != nil {
-		t.Fatal(err)
-	}
-	did := dom.ID
+	did := mustEntityID(t, "create domain", mustPostJSON(t, c, base+"/api/v1/domains", `{"title":"e2e-domain"}`, http.StatusCreated))
 
-	var user, grp, res entityID
-	if err := json.Unmarshal(mustPostJSON(t, c, base+"/api/v1/domains/"+did+"/users", `{"title":"e2e-user"}`, http.StatusCreated), &user); err != nil {
-		t.Fatal(err)
-	}
-	if err := json.Unmarshal(mustPostJSON(t, c, base+"/api/v1/domains/"+did+"/groups", `{"title":"e2e-group"}`, http.StatusCreated), &grp); err != nil {
-		t.Fatal(err)
-	}
-	if err := json.Unmarshal(mustPostJSON(t, c, base+"/api/v1/domains/"+did+"/resources", `{"title":"e2e-resource"}`, http.StatusCreated), &res); err != nil {
-		t.Fatal(err)
-	}
+	uid := mustEntityID(t, "create user", mustPostJSON(t, c, base+"/api/v1/domains/"+did+"/users", `{"title":"e2e-user"}`, http.StatusCreated))
+	gid := mustEntityID(t, "create group", mustPostJSON(t, c, base+"/api/v1/domains/"+did+"/groups", `{"title":"e2e-group"}`, http.StatusCreated))
+	rid := mustEntityID(t, "create resource", mustPostJSON(t, c, base+"/api/v1/domains/"+did+"/resources", `{"title":"e2e-resource"}`, http.StatusCreated))
 
-	permBody := `{"title":"e2e-perm","resource_id":"` + res.ID + `","access_mask":"0x3"}`
-	var perm entityID
-	if err := json.Unmarshal(mustPostJSON(t, c, base+"/api/v1/domains/"+did+"/permissions", permBody, http.StatusCreated), &perm); err != nil {
-		t.Fatal(err)
-	}
+	permBody := `{"title":"e2e-perm","resource_id":"` + rid + `","access_mask":"0x3"}`
+	pid := mustEntityID(t, "create permission", mustPostJSON(t, c, base+"/api/v1/domains/"+did+"/permissions", permBody, http.StatusCreated))
 
-	mustPostNoBody(t, c, base+"/api/v1/domains/"+did+"/users/"+user.ID+"/groups/"+grp.ID, http.StatusNoContent)
-	mustPostNoBody(t, c, base+"/api/v1/domains/"+did+"/groups/"+grp.ID+"/permissions/"+perm.ID, http.StatusNoContent)
+	mustPostNoBody(t, c, base+"/api/v1/domains/"+did+"/users/"+uid+"/groups/"+gid, http.StatusNoContent)
+	mustPostNoBody(t, c, base+"/api/v1/domains/"+did+"/groups/"+gid+"/permissions/"+pid, http.StatusNoContent)
 
-	checkURL := base + "/api/v1/domains/" + did + "/authz/check?user_id=" + user.ID + "&resource_id=" + res.ID + "&access_bit=0x1"
+	checkURL := base + "/api/v1/domains/" + did + "/authz/check?user_id=" + uid + "&resource_id=" + rid + "&access_bit=0x1"
 	var out authzCheck
 	if err := json.Unmarshal(mustGET(t, c, checkURL, http.StatusOK), &out); err != nil {
 		t.Fatal(err)

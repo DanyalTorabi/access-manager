@@ -52,6 +52,21 @@ http_get_expect() {
 	fi
 }
 
+# Read .ID from last response in $tmp; jq -e fails on null/absent; we also reject empty strings.
+json_id() {
+	local label=$1
+	local id
+	id="$(jq -er '.ID' "$tmp")" || {
+		echo "e2e: failed to read $label ID (.ID missing or null); body: $(cat "$tmp")" >&2
+		exit 1
+	}
+	if [[ -z "$id" ]]; then
+		echo "e2e: empty $label ID; body: $(cat "$tmp")" >&2
+		exit 1
+	fi
+	printf '%s' "$id"
+}
+
 echo "e2e: health"
 http_get_expect "${BASE_URL}/health" 200
 jq -e '.status == "ok"' "$tmp" >/dev/null || {
@@ -61,20 +76,20 @@ jq -e '.status == "ok"' "$tmp" >/dev/null || {
 
 echo "e2e: create domain"
 http_post_json "${BASE_URL}/api/v1/domains" '{"title":"e2e-domain"}' 201
-domain_id="$(jq -r '.ID' "$tmp")"
+domain_id="$(json_id domain)"
 
 echo "e2e: create user, group, resource"
 http_post_json "${BASE_URL}/api/v1/domains/${domain_id}/users" '{"title":"e2e-user"}' 201
-user_id="$(jq -r '.ID' "$tmp")"
+user_id="$(json_id user)"
 http_post_json "${BASE_URL}/api/v1/domains/${domain_id}/groups" '{"title":"e2e-group"}' 201
-group_id="$(jq -r '.ID' "$tmp")"
+group_id="$(json_id group)"
 http_post_json "${BASE_URL}/api/v1/domains/${domain_id}/resources" '{"title":"e2e-resource"}' 201
-resource_id="$(jq -r '.ID' "$tmp")"
+resource_id="$(json_id resource)"
 
 echo "e2e: permission with mask 0x3 (bits 0 and 1)"
 http_post_json "${BASE_URL}/api/v1/domains/${domain_id}/permissions" \
 	"{\"title\":\"e2e-perm\",\"resource_id\":\"${resource_id}\",\"access_mask\":\"0x3\"}" 201
-perm_id="$(jq -r '.ID' "$tmp")"
+perm_id="$(json_id permission)"
 
 echo "e2e: membership + group grant"
 code="$(curl_e2e -o "$tmp" -w "%{http_code}" -X POST \

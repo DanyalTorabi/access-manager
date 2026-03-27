@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -172,5 +173,213 @@ func TestAPI_authzCheck_viaGroup_integration(t *testing.T) {
 	}
 	if !out.Allowed {
 		t.Fatalf("expected allowed, got %+v", out)
+	}
+}
+
+func TestAPI_domainCreate_invalidJSON(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(`{"title":`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusBadRequest {
+		body, _ := io.ReadAll(res.Body)
+		t.Fatalf("want 400, got %d: %s", res.StatusCode, body)
+	}
+}
+
+func TestAPI_domainCreate_unknownField(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(`{"title":"x","extra":1}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusBadRequest {
+		body, _ := io.ReadAll(res.Body)
+		t.Fatalf("want 400 unknown field, got %d: %s", res.StatusCode, body)
+	}
+}
+
+func TestAPI_permissionCreate_invalidMask(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(`{"title":"d"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var dom store.Domain
+	if err := json.NewDecoder(res.Body).Decode(&dom); err != nil {
+		_ = res.Body.Close()
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if dom.ID == "" {
+		t.Fatal("empty domain id")
+	}
+
+	res2, err := http.Post(ts.URL+"/api/v1/domains/"+dom.ID+"/resources", "application/json", strings.NewReader(`{"title":"r"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var resource store.Resource
+	if err := json.NewDecoder(res2.Body).Decode(&resource); err != nil {
+		_ = res2.Body.Close()
+		t.Fatal(err)
+	}
+	_ = res2.Body.Close()
+	if resource.ID == "" {
+		t.Fatal("empty resource id")
+	}
+
+	body := fmt.Sprintf(`{"title":"p","resource_id":"%s","access_mask":"not-a-number"}`, resource.ID)
+	res3, err := http.Post(ts.URL+"/api/v1/domains/"+dom.ID+"/permissions", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res3.Body.Close() }()
+	if res3.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(res3.Body)
+		t.Fatalf("want 400 invalid mask, got %d: %s", res3.StatusCode, b)
+	}
+}
+
+func TestAPI_authzCheck_invalidAccessBit(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	did := uuid.NewString()
+	url := fmt.Sprintf("%s/api/v1/domains/%s/authz/check?user_id=u&resource_id=r&access_bit=xyz", ts.URL, did)
+	res, err := http.Get(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusBadRequest {
+		body, _ := io.ReadAll(res.Body)
+		t.Fatalf("want 400 invalid access_bit, got %d: %s", res.StatusCode, body)
+	}
+}
+
+func TestAPI_authzCheck_deniedWithoutGrants(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(`{"title":"d"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var dom store.Domain
+	if err := json.NewDecoder(res.Body).Decode(&dom); err != nil {
+		_ = res.Body.Close()
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+
+	res2, err := http.Post(ts.URL+"/api/v1/domains/"+dom.ID+"/users", "application/json", strings.NewReader(`{"title":"u"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var user store.User
+	if err := json.NewDecoder(res2.Body).Decode(&user); err != nil {
+		_ = res2.Body.Close()
+		t.Fatal(err)
+	}
+	_ = res2.Body.Close()
+
+	res3, err := http.Post(ts.URL+"/api/v1/domains/"+dom.ID+"/resources", "application/json", strings.NewReader(`{"title":"r"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var resource store.Resource
+	if err := json.NewDecoder(res3.Body).Decode(&resource); err != nil {
+		_ = res3.Body.Close()
+		t.Fatal(err)
+	}
+	_ = res3.Body.Close()
+
+	q := fmt.Sprintf("%s/api/v1/domains/%s/authz/check?user_id=%s&resource_id=%s&access_bit=0x1",
+		ts.URL, dom.ID, user.ID, resource.ID)
+	res4, err := http.Get(q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res4.Body.Close() }()
+	if res4.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(res4.Body)
+		t.Fatalf("status %d: %s", res4.StatusCode, body)
+	}
+	var out struct {
+		Allowed bool `json:"allowed"`
+	}
+	if err := json.NewDecoder(res4.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out.Allowed {
+		t.Fatalf("expected denied without grants, got %+v", out)
+	}
+}
+
+func TestAPI_authzMasks_validation(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	did := uuid.NewString()
+	res, err := http.Get(ts.URL + "/api/v1/domains/" + did + "/authz/masks?user_id=u")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("want 400 missing resource_id, got %d", res.StatusCode)
+	}
+}
+
+func TestAPI_userList_empty(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(`{"title":"d"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var dom store.Domain
+	if err := json.NewDecoder(res.Body).Decode(&dom); err != nil {
+		_ = res.Body.Close()
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+
+	res2, err := http.Get(ts.URL + "/api/v1/domains/" + dom.ID + "/users")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res2.Body.Close() }()
+	if res2.StatusCode != http.StatusOK {
+		t.Fatalf("list status %d", res2.StatusCode)
+	}
+	var list []store.User
+	if err := json.NewDecoder(res2.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 0 {
+		t.Fatalf("want empty list, got %+v", list)
+	}
+}
+
+func TestAPI_health_publicWhenAPIUsesBearer(t *testing.T) {
+	db, err := sqlstore.Open("file:" + filepath.Join(t.TempDir(), "api.db") + "?_pragma=foreign_keys(1)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sqlstore.MigrateUp(db, testutil.SQLiteMigrationsDir(t)); err != nil {
+		_ = db.Close()
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	st := sqlstore.New(db)
+	srv := &Server{Store: st, APIBearerToken: "secret-token"}
+	ts := httptest.NewServer(srv.Router())
+	t.Cleanup(ts.Close)
+
+	res, err := http.Get(ts.URL + "/health")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("health should stay public, got %d", res.StatusCode)
 	}
 }
