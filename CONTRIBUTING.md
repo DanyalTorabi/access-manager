@@ -42,6 +42,15 @@ Provide **proposed** commit message and PR description text only. Do **not** run
 
 ## Pull requests
 
+### Before you open a PR (self-review)
+
+Do a quick **reviewer pass** on your own diff (humans and AI assistants) before pushing or asking for review:
+
+1. **Automated checks** — From repo root: **`make test`** and **`make lint`**. If you changed **`go/e2e/`** (build tags, package layout), also from **`go/`**: **`go test -tags=e2e -count=1 -run '^$' ./e2e/...`** so the tagged package **compiles** (no need to hit a live server for this step).
+2. **Docs and CI match implementation** — If you changed E2E or CI, confirm the **same** command appears where it matters: root **README**, **go/README**, **test/e2e/README**, **`go/Makefile`**, and **`.github/workflows/ci.yml`** (flags such as **`-race`**, **`-count=1`**, **`-tags=e2e`**).
+3. **Secrets** — No API tokens, passwords, or real `.env` values in commits; use env vars and **`.env.example`**-style placeholders only.
+4. **Common review nits** — Skim for: **`//go:build`** mistakes (e2e package must not be “tests only” under `-tags=e2e`), **assert HTTP status before `json.Decode` / Unmarshal** in tests when setup requests can fail, and **strict checks** for IDs / booleans in smoke scripts (e.g. `jq -e`) where loose parsing hides bugs.
+
 - Deferring a valid review comment to a **later ticket**: reply on the PR with the ticket id (**Txx**) and add a short tracking note to that ticket’s **`plan/...`** spec so it is not forgotten (see [AGENTS.md](AGENTS.md)).
 - Open PRs **into `main`**; follow [docs/branching.md](docs/branching.md).
 - Use the repo **[pull request template](.github/pull_request_template.md)** (GitHub fills it when you open a PR from the UI): **Summary**, **Ticket**, **Checklist**.

@@ -107,9 +107,8 @@ code="$(curl_e2e -o "$tmp" -w "%{http_code}" -X POST \
 
 echo "e2e: authz check (bit 0x1)"
 http_get_expect "${BASE_URL}/api/v1/domains/${domain_id}/authz/check?user_id=${user_id}&resource_id=${resource_id}&access_bit=0x1" 200
-allowed="$(jq -r '.allowed' "$tmp")"
-[[ "$allowed" == "true" ]] || {
-	echo "e2e: expected allowed=true, got $(cat "$tmp")" >&2
+jq -e '.allowed == true' "$tmp" >/dev/null || {
+	echo "e2e: expected .allowed == true, got $(cat "$tmp")" >&2
 	exit 1
 }
 

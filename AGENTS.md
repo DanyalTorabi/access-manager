@@ -43,6 +43,10 @@ Treat the **access model** (`internal/access`, `internal/store` contracts) as a 
 
 If a review comment is correct but **out of scope for the current PR**, say on the thread that it will be handled in **Txx** (specific ticket id), and add a **note** to that ticket’s [plan/](plan/) file (e.g. under Steps or Deliverables) so the item is scheduled and traceable.
 
+## Before you open a PR (self-review)
+
+Run a short **reviewer-style pass** on your diff before opening the PR. Checklist: **[CONTRIBUTING.md — Before you open a PR (self-review)](CONTRIBUTING.md#before-you-open-a-pr-self-review)** (tests, e2e compile-check, docs/CI alignment, secrets, build tags and test rigor).
+
 ## After you finish a task (lightweight)
 
 Match effort to change size.
