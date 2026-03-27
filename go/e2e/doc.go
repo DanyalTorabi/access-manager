@@ -1,5 +1,3 @@
-//go:build !e2e
-
 // Package e2e holds black-box HTTP smoke tests.
 //
 // Run against a live server (default BASE_URL http://127.0.0.1:8080):

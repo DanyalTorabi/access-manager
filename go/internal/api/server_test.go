@@ -57,6 +57,24 @@ func newTestAPI(t *testing.T) (*httptest.Server, store.Store) {
 	return ts, st
 }
 
+// mustPostJSON201 POSTs JSON and returns the body after asserting http.StatusCreated.
+func mustPostJSON201(t *testing.T, urlStr, body string) []byte {
+	t.Helper()
+	res, err := http.Post(urlStr, "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	b, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != http.StatusCreated {
+		t.Fatalf("POST %s want 201 got %d: %s", urlStr, res.StatusCode, b)
+	}
+	return b
+}
+
 func TestAPI_domainCreateAndList(t *testing.T) {
 	ts, _ := newTestAPI(t)
 
@@ -204,30 +222,18 @@ func TestAPI_domainCreate_unknownField(t *testing.T) {
 
 func TestAPI_permissionCreate_invalidMask(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(`{"title":"d"}`))
-	if err != nil {
-		t.Fatal(err)
-	}
 	var dom store.Domain
-	if err := json.NewDecoder(res.Body).Decode(&dom); err != nil {
-		_ = res.Body.Close()
+	if err := json.Unmarshal(mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"d"}`), &dom); err != nil {
 		t.Fatal(err)
 	}
-	_ = res.Body.Close()
 	if dom.ID == "" {
 		t.Fatal("empty domain id")
 	}
 
-	res2, err := http.Post(ts.URL+"/api/v1/domains/"+dom.ID+"/resources", "application/json", strings.NewReader(`{"title":"r"}`))
-	if err != nil {
-		t.Fatal(err)
-	}
 	var resource store.Resource
-	if err := json.NewDecoder(res2.Body).Decode(&resource); err != nil {
-		_ = res2.Body.Close()
+	if err := json.Unmarshal(mustPostJSON201(t, ts.URL+"/api/v1/domains/"+dom.ID+"/resources", `{"title":"r"}`), &resource); err != nil {
 		t.Fatal(err)
 	}
-	_ = res2.Body.Close()
 	if resource.ID == "" {
 		t.Fatal("empty resource id")
 	}
@@ -261,38 +267,29 @@ func TestAPI_authzCheck_invalidAccessBit(t *testing.T) {
 
 func TestAPI_authzCheck_deniedWithoutGrants(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(`{"title":"d"}`))
-	if err != nil {
-		t.Fatal(err)
-	}
 	var dom store.Domain
-	if err := json.NewDecoder(res.Body).Decode(&dom); err != nil {
-		_ = res.Body.Close()
+	if err := json.Unmarshal(mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"d"}`), &dom); err != nil {
 		t.Fatal(err)
 	}
-	_ = res.Body.Close()
+	if dom.ID == "" {
+		t.Fatal("empty domain id")
+	}
 
-	res2, err := http.Post(ts.URL+"/api/v1/domains/"+dom.ID+"/users", "application/json", strings.NewReader(`{"title":"u"}`))
-	if err != nil {
-		t.Fatal(err)
-	}
 	var user store.User
-	if err := json.NewDecoder(res2.Body).Decode(&user); err != nil {
-		_ = res2.Body.Close()
+	if err := json.Unmarshal(mustPostJSON201(t, ts.URL+"/api/v1/domains/"+dom.ID+"/users", `{"title":"u"}`), &user); err != nil {
 		t.Fatal(err)
 	}
-	_ = res2.Body.Close()
+	if user.ID == "" {
+		t.Fatal("empty user id")
+	}
 
-	res3, err := http.Post(ts.URL+"/api/v1/domains/"+dom.ID+"/resources", "application/json", strings.NewReader(`{"title":"r"}`))
-	if err != nil {
-		t.Fatal(err)
-	}
 	var resource store.Resource
-	if err := json.NewDecoder(res3.Body).Decode(&resource); err != nil {
-		_ = res3.Body.Close()
+	if err := json.Unmarshal(mustPostJSON201(t, ts.URL+"/api/v1/domains/"+dom.ID+"/resources", `{"title":"r"}`), &resource); err != nil {
 		t.Fatal(err)
 	}
-	_ = res3.Body.Close()
+	if resource.ID == "" {
+		t.Fatal("empty resource id")
+	}
 
 	q := fmt.Sprintf("%s/api/v1/domains/%s/authz/check?user_id=%s&resource_id=%s&access_bit=0x1",
 		ts.URL, dom.ID, user.ID, resource.ID)
@@ -331,16 +328,13 @@ func TestAPI_authzMasks_validation(t *testing.T) {
 
 func TestAPI_userList_empty(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(`{"title":"d"}`))
-	if err != nil {
-		t.Fatal(err)
-	}
 	var dom store.Domain
-	if err := json.NewDecoder(res.Body).Decode(&dom); err != nil {
-		_ = res.Body.Close()
+	if err := json.Unmarshal(mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"d"}`), &dom); err != nil {
 		t.Fatal(err)
 	}
-	_ = res.Body.Close()
+	if dom.ID == "" {
+		t.Fatal("empty domain id")
+	}
 
 	res2, err := http.Get(ts.URL + "/api/v1/domains/" + dom.ID + "/users")
 	if err != nil {
