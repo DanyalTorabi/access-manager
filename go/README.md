@@ -68,6 +68,7 @@ Run **`make`** from the **repository root** (`make test`, `make lint`, …) or f
 | Coverage profile | `make cover` → `coverage.out`, prints total statement coverage; HTML: `go tool cover -html=coverage.out` |
 | Coverage by function | `make cover-func` |
 | Run server | `make run` |
+| E2E smoke (**T16**) | From **repo root**: `make e2e` → `go test -race -count=1 -tags=e2e ./e2e/...` (running server; optional **`API_BEARER_TOKEN`**). Optional curl script: **`make e2e-bash`**. See **[test/e2e/README.md](../test/e2e/README.md)**. |
 | Lint | `make lint` |
 | Tidy modules | `make tidy` |
 

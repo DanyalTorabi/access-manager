@@ -64,6 +64,20 @@ jobs:
           echo "Health check failed after ~60s"
           exit 1
 
+      - name: Set GOTOOLCHAIN from go.mod (e2e)
+        run: echo "GOTOOLCHAIN=go$(sed -n 's/^go //p' go/go.mod | head -1)+auto" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      - name: E2E smoke (T16)
+        working-directory: go
+        env:
+          BASE_URL: http://127.0.0.1:8080
+        run: go test -tags=e2e -race -count=1 ./e2e/...
+
       - name: Compose teardown
         if: always()
         run: docker compose down --remove-orphans

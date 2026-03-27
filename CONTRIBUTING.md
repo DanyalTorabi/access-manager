@@ -16,6 +16,8 @@ make test
 make lint
 ```
 
+End-to-end smoke (**T16**): with the server reachable (default `http://127.0.0.1:8080`), run **`make e2e`** (`go test -race -count=1 -tags=e2e ./e2e/...` from **`go/`**). Optional **`make e2e-bash`** uses **curl** + **jq**. Set **`API_BEARER_TOKEN`** when Bearer auth is enabled. See **[test/e2e/README.md](test/e2e/README.md)**.
+
 See [**go/README.md**](go/README.md) for config, environment variables, and the HTTP API.
 
 ### Docker (**T19**)
@@ -39,6 +41,15 @@ See the root [**README** — Docker (T19)](README.md#docker-t19) for image layou
 Provide **proposed** commit message and PR description text only. Do **not** run `git commit`, `git push`, or `gh pr create` unless the contributor explicitly asks. The contributor runs git and GitHub CLI locally.
 
 ## Pull requests
+
+### Before you open a PR (self-review)
+
+Do a quick **reviewer pass** on your own diff (humans and AI assistants) before pushing or asking for review:
+
+1. **Automated checks** — From repo root: **`make test`** and **`make lint`**. If you changed **`go/e2e/`** (build tags, package layout), also from **`go/`**: **`go test -tags=e2e -count=1 -run '^$' ./e2e/...`** so the tagged package **compiles** (no need to hit a live server for this step).
+2. **Docs and CI match implementation** — If you changed E2E or CI, confirm the **same** command appears where it matters: root **README**, **go/README**, **test/e2e/README**, **`go/Makefile`**, and **`.github/workflows/ci.yml`** (flags such as **`-race`**, **`-count=1`**, **`-tags=e2e`**).
+3. **Secrets** — No API tokens, passwords, or real `.env` values in commits; use env vars and **`.env.example`**-style placeholders only.
+4. **Common review nits** — Skim for: **`//go:build`** mistakes (e2e package must not be “tests only” under `-tags=e2e`), **assert HTTP status before `json.Decode` / Unmarshal** in tests when setup requests can fail, and **strict checks** for IDs / booleans in smoke scripts (e.g. `jq -e`) where loose parsing hides bugs.
 
 - Deferring a valid review comment to a **later ticket**: reply on the PR with the ticket id (**Txx**) and add a short tracking note to that ticket’s **`plan/...`** spec so it is not forgotten (see [AGENTS.md](AGENTS.md)).
 - Open PRs **into `main`**; follow [docs/branching.md](docs/branching.md).

@@ -14,18 +14,18 @@ Run **full user journeys** against a live server (local or CI): create domain â†
 
 ## Deliverables
 
-- Script or Go test that assumes server is up (or starts it via `exec` in test with caution).
-- Optional: dedicated `make e2e` target.
+- [x] Script or Go test that assumes server is up (or starts it via `exec` in test with caution).
+- [x] Optional: dedicated `make e2e` target.
 
 ## Steps
 
-1. Reuse OpenAPI/Postman from **T17** or write shell with `curl`.
-2. Capture exit codes for CI.
-3. Wire optional job in **T13** after integration tests.
+1. [x] Reuse OpenAPI/Postman from **T17** or write shell with `curl`.
+2. [x] Capture exit codes for CI.
+3. [x] Wire optional job in **T13** after integration tests.
 
 ## Files / paths
 
-- **Create:** `test/e2e/run.sh` or `test/e2e/e2e_test.go`
+- **Create:** `test/e2e/bash/run.sh` (optional) and/or `go/e2e/*` with `go test -race -count=1 -tags=e2e ./e2e/...`
 
 ## Acceptance criteria
 

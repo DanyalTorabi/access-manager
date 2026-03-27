@@ -33,6 +33,12 @@ func TestHasAccess(t *testing.T) {
 	if HasAccess(0x1, 0x2) {
 		t.Fatal("missing bit should deny")
 	}
+	if HasAccess(0x1, 0x3) {
+		t.Fatal("partial overlap should deny when not all required bits set")
+	}
+	if !HasAccess(0xff, 0xff) {
+		t.Fatal("full match")
+	}
 }
 
 func TestHasBit(t *testing.T) {
@@ -44,5 +50,11 @@ func TestHasBit(t *testing.T) {
 	}
 	if HasBit(0x1, 0x2) {
 		t.Fatal("wrong bit")
+	}
+	if HasBit(0x3, 0) {
+		t.Fatal("required bit 0 is invalid and should be false")
+	}
+	if !HasBit(0x3, 0x1) {
+		t.Fatal("low bit set in mask")
 	}
 }
