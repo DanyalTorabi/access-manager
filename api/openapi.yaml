@@ -4,9 +4,13 @@ info:
   description: |
     Domain-scoped access control (users, groups, resources, permissions, authorization checks).
 
-    **Responses** use Go struct field names as serialized by `encoding/json` (e.g. `ID`, `DomainID`, `AccessMask`).
+    **CRUD JSON responses** (domains, users, groups, resources, access types, permissions) use Go struct field names as serialized by `encoding/json` (e.g. `ID`, `DomainID`, `AccessMask`).
+
+    **Authz JSON responses** (`/authz/check`, `/authz/masks`) use **snake_case** keys in `map[string]any` payloads (e.g. `allowed`, `effective_mask`, `masks`).
 
     **Request bodies** use explicit `json` struct tags, mostly **snake_case** (e.g. `title`, `resource_id`, `access_mask`, `parent_group_id`).
+
+    **Numeric masks and bits:** The API uses `uint64` in Go; SQLite stores `access_types.bit` and `permissions.access_mask` as **signed INTEGER** (64-bit). Values are safe in **`[0, 2^63-1]`** in practice.
 
     **Bearer auth:** The server applies `Authorization: Bearer <token>` only when `API_BEARER_TOKEN` / `api_bearer_token` is set. This spec models that as **optional** Bearer (see root `security`).
   version: 0.1.0
@@ -184,7 +188,10 @@ components:
         Bit:
           type: integer
           format: int64
-          description: Bit flag as JSON number (uint64 on server).
+          minimum: 0
+          maximum: 9223372036854775807
+          description: |
+            Non-negative bit flag as JSON number (`uint64` in Go). Stored as SQLite INTEGER (signed); use range [0, 2^63−1].
 
     AccessTypeCreateBody:
       type: object
@@ -214,6 +221,10 @@ components:
         AccessMask:
           type: integer
           format: int64
+          minimum: 0
+          maximum: 9223372036854775807
+          description: |
+            Permission mask as JSON number (`uint64` in Go). Stored as SQLite INTEGER (signed); use range [0, 2^63−1].
 
     PermissionCreateBody:
       type: object
@@ -247,6 +258,9 @@ components:
           items:
             type: integer
             format: int64
+            minimum: 0
+            maximum: 9223372036854775807
+          description: Individual permission masks (uint64); JSON numbers in SQLite-safe non-negative range.
 
 paths:
   /health:

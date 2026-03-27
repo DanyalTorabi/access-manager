@@ -18,7 +18,11 @@
     "bearer": [{"key": "token", "value": "{{bearerToken}}", "type": "string"}]
   },
   "item": [
-    {"name": "Health", "request": {"method": "GET", "url": "{{baseUrl}}/health"}},
+    {
+      "name": "Health",
+      "request": {"method": "GET", "url": "{{baseUrl}}/health"},
+      "auth": {"type": "noauth"}
+    },
     {"name": "List domains", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains"}},
     {
       "name": "Create domain",
