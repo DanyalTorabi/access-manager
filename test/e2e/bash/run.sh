@@ -16,16 +16,17 @@ if ! command -v jq >/dev/null 2>&1; then
 	exit 1
 fi
 
-# Run curl, adding Authorization only when API_BEARER_TOKEN is set.
+# Run curl; with API_BEARER_TOKEN, send Authorization via curl -K stdin so the token is not in curl's argv
+# (still in this script's environment). Tokens containing " or newlines are not supported for this path.
 curl_e2e() {
 	if [[ -n "${API_BEARER_TOKEN:-}" ]]; then
-		curl -sS -H "Authorization: Bearer ${API_BEARER_TOKEN}" "$@"
+		printf 'header = "Authorization: Bearer %s"\n' "$API_BEARER_TOKEN" | curl -sS -K - "$@"
 	else
 		curl -sS "$@"
 	fi
 }
 
-tmp="$(mktemp)"
+tmp="$(mktemp "${TMPDIR:-/tmp}/e2e.XXXXXX")"
 trap 'rm -f "$tmp"' EXIT
 
 http_post_json() {
