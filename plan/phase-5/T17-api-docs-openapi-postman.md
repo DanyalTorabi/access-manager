@@ -14,9 +14,9 @@ Publish **OpenAPI 3** (YAML/JSON) for REST routes and a **Postman collection** (
 
 ## Deliverables
 
-- `api/openapi.yaml` (or `docs/openapi.yaml`) generated or hand-maintained.
-- Postman collection under `api/postman/` or linked export.
-- README section: how to import collection and set `baseUrl`.
+- [x] `api/openapi.yaml` (or `docs/openapi.yaml`) generated or hand-maintained.
+- [x] Postman collection under `api/postman/` or linked export.
+- [x] README section: how to import collection and set `baseUrl`.
 
 ## Steps
 

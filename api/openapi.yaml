@@ -1,0 +1,901 @@
+openapi: 3.0.3
+info:
+  title: access-manager HTTP API
+  description: |
+    Domain-scoped access control (users, groups, resources, permissions, authorization checks).
+
+    **CRUD JSON responses** (domains, users, groups, resources, access types, permissions) use Go struct field names as serialized by `encoding/json` (e.g. `ID`, `DomainID`, `AccessMask`).
+
+    **Authz JSON responses** (`/authz/check`, `/authz/masks`) use **snake_case** keys in `map[string]any` payloads (e.g. `allowed`, `effective_mask`, `masks`).
+
+    **Request bodies** use explicit `json` struct tags, mostly **snake_case** (e.g. `title`, `resource_id`, `access_mask`, `parent_group_id`).
+
+    **Numeric masks and bits:** The API uses `uint64` in Go; SQLite stores `access_types.bit` and `permissions.access_mask` as **signed INTEGER** (64-bit). Values are safe in **`[0, 2^63-1]`** in practice.
+
+    **Bearer auth:** The server applies `Authorization: Bearer <token>` only when `API_BEARER_TOKEN` / `api_bearer_token` is set. This spec models that as **optional** Bearer (see root `security`).
+  version: 0.1.0
+
+servers:
+  - url: http://127.0.0.1:8080
+    description: Default local listen address
+
+tags:
+  - name: Health
+  - name: Domains
+  - name: Users
+  - name: Groups
+  - name: Resources
+  - name: AccessTypes
+  - name: Permissions
+  - name: Memberships
+  - name: Grants
+  - name: Authz
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: |
+        When the server is configured with `API_BEARER_TOKEN`, valid `Authorization: Bearer <token>` is required on `/api/v1/*`.
+        When unset, the server does not enforce this scheme (see root `security` — optional auth).
+
+  parameters:
+    domainID:
+      name: domainID
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    userID:
+      name: userID
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    groupID:
+      name: groupID
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    resourceID:
+      name: resourceID
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    permissionID:
+      name: permissionID
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    ErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          example: ok
+
+    Domain:
+      type: object
+      required: [ID, Title]
+      properties:
+        ID:
+          type: string
+          format: uuid
+        Title:
+          type: string
+
+    TitleBody:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+
+    User:
+      type: object
+      required: [ID, DomainID, Title]
+      properties:
+        ID:
+          type: string
+          format: uuid
+        DomainID:
+          type: string
+          format: uuid
+        Title:
+          type: string
+
+    Group:
+      type: object
+      required: [ID, DomainID, Title]
+      properties:
+        ID:
+          type: string
+          format: uuid
+        DomainID:
+          type: string
+          format: uuid
+        Title:
+          type: string
+        ParentGroupID:
+          type: string
+          format: uuid
+          nullable: true
+
+    GroupCreateBody:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+        parent_group_id:
+          type: string
+          format: uuid
+          nullable: true
+
+    ParentBody:
+      type: object
+      properties:
+        parent_group_id:
+          type: string
+          format: uuid
+          nullable: true
+
+    Resource:
+      type: object
+      required: [ID, DomainID, Title]
+      properties:
+        ID:
+          type: string
+          format: uuid
+        DomainID:
+          type: string
+          format: uuid
+        Title:
+          type: string
+
+    AccessType:
+      type: object
+      required: [ID, DomainID, Title, Bit]
+      properties:
+        ID:
+          type: string
+          format: uuid
+        DomainID:
+          type: string
+          format: uuid
+        Title:
+          type: string
+        Bit:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9223372036854775807
+          description: |
+            Non-negative bit flag as JSON number (`uint64` in Go). Stored as SQLite INTEGER (signed); use range [0, 2^63−1].
+
+    AccessTypeCreateBody:
+      type: object
+      required: [title, bit]
+      properties:
+        title:
+          type: string
+        bit:
+          type: string
+          description: Decimal or `0x` hex (parsed server-side).
+
+    Permission:
+      type: object
+      required: [ID, DomainID, Title, ResourceID, AccessMask]
+      properties:
+        ID:
+          type: string
+          format: uuid
+        DomainID:
+          type: string
+          format: uuid
+        Title:
+          type: string
+        ResourceID:
+          type: string
+          format: uuid
+        AccessMask:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9223372036854775807
+          description: |
+            Permission mask as JSON number (`uint64` in Go). Stored as SQLite INTEGER (signed); use range [0, 2^63−1].
+
+    PermissionCreateBody:
+      type: object
+      required: [title, resource_id, access_mask]
+      properties:
+        title:
+          type: string
+        resource_id:
+          type: string
+          format: uuid
+        access_mask:
+          type: string
+          description: Decimal or `0x` hex.
+
+    AuthzCheckResponse:
+      type: object
+      required: [allowed, effective_mask]
+      properties:
+        allowed:
+          type: boolean
+        effective_mask:
+          type: string
+          description: Effective mask as decimal string.
+
+    AuthzMasksResponse:
+      type: object
+      required: [masks]
+      properties:
+        masks:
+          type: array
+          items:
+            type: integer
+            format: int64
+            minimum: 0
+            maximum: 9223372036854775807
+          description: Individual permission masks (uint64); JSON numbers in SQLite-safe non-negative range.
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness / readiness
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/v1/domains:
+    get:
+      tags: [Domains]
+      summary: List domains
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Domain"
+        "401":
+          description: Unauthorized (when bearer required)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: [Domains]
+      summary: Create domain
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TitleBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Domain"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v1/domains/{domainID}/users:
+    parameters:
+      - $ref: "#/components/parameters/domainID"
+    get:
+      tags: [Users]
+      summary: List users in domain
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: [Users]
+      summary: Create user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TitleBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v1/domains/{domainID}/users/{userID}:
+    parameters:
+      - $ref: "#/components/parameters/domainID"
+      - $ref: "#/components/parameters/userID"
+    get:
+      tags: [Users]
+      summary: Get user
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          description: Not found
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v1/domains/{domainID}/groups:
+    parameters:
+      - $ref: "#/components/parameters/domainID"
+    get:
+      tags: [Groups]
+      summary: List groups
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Group"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: [Groups]
+      summary: Create group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupCreateBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v1/domains/{domainID}/groups/{groupID}:
+    parameters:
+      - $ref: "#/components/parameters/domainID"
+      - $ref: "#/components/parameters/groupID"
+    get:
+      tags: [Groups]
+      summary: Get group
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "404":
+          description: Not found
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v1/domains/{domainID}/groups/{groupID}/parent:
+    parameters:
+      - $ref: "#/components/parameters/domainID"
+      - $ref: "#/components/parameters/groupID"
+    patch:
+      tags: [Groups]
+      summary: Set group parent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParentBody"
+      responses:
+        "204":
+          description: No content
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v1/domains/{domainID}/resources:
+    parameters:
+      - $ref: "#/components/parameters/domainID"
+    get:
+      tags: [Resources]
+      summary: List resources
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Resource"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: [Resources]
+      summary: Create resource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TitleBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Resource"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v1/domains/{domainID}/resources/{resourceID}:
+    parameters:
+      - $ref: "#/components/parameters/domainID"
+      - $ref: "#/components/parameters/resourceID"
+    get:
+      tags: [Resources]
+      summary: Get resource
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Resource"
+        "404":
+          description: Not found
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v1/domains/{domainID}/access-types:
+    parameters:
+      - $ref: "#/components/parameters/domainID"
+    get:
+      tags: [AccessTypes]
+      summary: List access types
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AccessType"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: [AccessTypes]
+      summary: Create access type
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccessTypeCreateBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessType"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v1/domains/{domainID}/permissions:
+    parameters:
+      - $ref: "#/components/parameters/domainID"
+    get:
+      tags: [Permissions]
+      summary: List permissions
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Permission"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      tags: [Permissions]
+      summary: Create permission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PermissionCreateBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Permission"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v1/domains/{domainID}/permissions/{permissionID}:
+    parameters:
+      - $ref: "#/components/parameters/domainID"
+      - $ref: "#/components/parameters/permissionID"
+    get:
+      tags: [Permissions]
+      summary: Get permission
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Permission"
+        "404":
+          description: Not found
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v1/domains/{domainID}/users/{userID}/groups/{groupID}:
+    parameters:
+      - $ref: "#/components/parameters/domainID"
+      - $ref: "#/components/parameters/userID"
+      - $ref: "#/components/parameters/groupID"
+    post:
+      tags: [Memberships]
+      summary: Add user to group
+      responses:
+        "204":
+          description: No content
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    delete:
+      tags: [Memberships]
+      summary: Remove user from group
+      responses:
+        "204":
+          description: No content
+        "404":
+          description: Not found
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v1/domains/{domainID}/users/{userID}/permissions/{permissionID}:
+    parameters:
+      - $ref: "#/components/parameters/domainID"
+      - $ref: "#/components/parameters/userID"
+      - $ref: "#/components/parameters/permissionID"
+    post:
+      tags: [Grants]
+      summary: Grant permission to user
+      responses:
+        "204":
+          description: No content
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    delete:
+      tags: [Grants]
+      summary: Revoke permission from user
+      responses:
+        "204":
+          description: No content
+        "404":
+          description: Not found
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v1/domains/{domainID}/groups/{groupID}/permissions/{permissionID}:
+    parameters:
+      - $ref: "#/components/parameters/domainID"
+      - $ref: "#/components/parameters/groupID"
+      - $ref: "#/components/parameters/permissionID"
+    post:
+      tags: [Grants]
+      summary: Grant permission to group
+      responses:
+        "204":
+          description: No content
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    delete:
+      tags: [Grants]
+      summary: Revoke permission from group
+      responses:
+        "204":
+          description: No content
+        "404":
+          description: Not found
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v1/domains/{domainID}/authz/check:
+    parameters:
+      - $ref: "#/components/parameters/domainID"
+      - name: user_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: resource_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: access_bit
+        in: query
+        required: true
+        schema:
+          type: string
+          description: Decimal or `0x` hex access bit to test.
+    get:
+      tags: [Authz]
+      summary: Check if user has access bit on resource
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthzCheckResponse"
+        "400":
+          description: |
+            Missing required query parameters (`text/plain` from `http.Error`), or invalid `access_bit` (`application/json` from `writeErr` / parse error).
+          content:
+            text/plain:
+              schema:
+                type: string
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v1/domains/{domainID}/authz/masks:
+    parameters:
+      - $ref: "#/components/parameters/domainID"
+      - name: user_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: resource_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Authz]
+      summary: List permission masks for user on resource
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthzMasksResponse"
+        "400":
+          description: Missing query parameters
+          content:
+            text/plain:
+              schema:
+                type: string
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+# Optional Bearer: matches runtime when `API_BEARER_TOKEN` is unset (no middleware) or set (require valid token).
+security:
+  - {}
+  - bearerAuth: []

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- OpenAPI 3 spec and Postman collection under **`api/`** with README for **`baseUrl`** and Bearer token variables (**T17**)
+
+### Fixed
+
+- OpenAPI: optional Bearer security, `authz/check` **400** documents both `text/plain` and JSON error body, clarify request vs response JSON field naming (review feedback)
+- OpenAPI: distinguish CRUD vs authz response shapes; document mask/bit SQLite-safe range; Postman **Health** uses **noauth**; **api/README** wording (Copilot follow-up)
+
+### Changed
+
+- Contributor docs: defer valid PR review follow-ups to a named ticket (**Txx**) with a tracking note in **`plan/`** (AGENTS, CONTRIBUTING, Cursor rules)
+
 ## [0.1.0] - 2026-03-27
 
 ### Added

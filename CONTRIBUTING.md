@@ -40,6 +40,7 @@ Provide **proposed** commit message and PR description text only. Do **not** run
 
 ## Pull requests
 
+- Deferring a valid review comment to a **later ticket**: reply on the PR with the ticket id (**Txx**) and add a short tracking note to that ticket’s **`plan/...`** spec so it is not forgotten (see [AGENTS.md](AGENTS.md)).
 - Open PRs **into `main`**; follow [docs/branching.md](docs/branching.md).
 - Use the repo **[pull request template](.github/pull_request_template.md)** (GitHub fills it when you open a PR from the UI): **Summary**, **Ticket**, **Checklist**.
 - Reference a ticket from [TICKETS.md](TICKETS.md) when it applies (e.g. `T19`).

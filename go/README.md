@@ -91,7 +91,7 @@ When **`API_BEARER_TOKEN`** (or YAML **`api_bearer_token`**) is non-empty, clien
 
 on **`/api/v1/*`** requests. **`/health`** is not protected. The service compares the presented token to the configured secret using **SHA-256** digests and a **constant-time** equality check (you still send the plain token in the header). If the token is unset and **`HTTP_ADDR`** binds beyond loopback (for example **`0.0.0.0:8080`** or **`:8080`**), the server logs a one-time warning at startup. JWT/JWKS validation is out of scope for this ticket.
 
-Full contract documentation is **T17** (OpenAPI / Postman).
+Full HTTP contract: **[`api/openapi.yaml`](../api/openapi.yaml)** (OpenAPI 3) and **[`api/postman/access-manager.postman_collection.json`](../api/postman/access-manager.postman_collection.json)**. Import steps and **`baseUrl`** / **`bearerToken`** variables: **[`api/README.md`](../api/README.md)** (**T17**).
 
 ## Package layout
 

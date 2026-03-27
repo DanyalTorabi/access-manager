@@ -39,6 +39,10 @@ Treat the **access model** (`internal/access`, `internal/store` contracts) as a 
 - In code or docs, reference the ticket explicitly, e.g. `// TODO(T14): ...` or `See TICKETS.md T23`.
 - **Prefer updating an existing open ticket** when the follow-up fits that scope; avoid spinning a new ticket for every micro-item unless it is genuinely separate work.
 
+### Pull request / Copilot follow-ups
+
+If a review comment is correct but **out of scope for the current PR**, say on the thread that it will be handled in **Txx** (specific ticket id), and add a **note** to that ticket’s [plan/](plan/) file (e.g. under Steps or Deliverables) so the item is scheduled and traceable.
+
 ## After you finish a task (lightweight)
 
 Match effort to change size.
@@ -48,15 +52,9 @@ Match effort to change size.
 3. **Lint** — `golangci-lint run ./...` from **`go/`** or **`make lint`** from root (T28/T9).
 4. **Coverage** — Optional for tiny edits; use **`make cover`** for larger or risky changes (T12).
 
-<<<<<<< danyal/t7-api-authentication-middleware-rules-correction
 ## Commits and pull requests (AI assistants)
 
 By default, **do not** run `git commit`, `git push`, or `gh pr create`. Provide a **proposed commit message** and **PR body** (Summary, Ticket, Checklist per [`.github/pull_request_template.md`](.github/pull_request_template.md)) for the human to paste. Run those git/`gh` commands only when the human **explicitly** asks you to.
-=======
-## Commits
-
-Do **not** add **“made with Cursor”** (or similar editor/AI attribution) to commit messages or trailers unless the author explicitly requests it.
->>>>>>> main
 
 ## GitHub
 
