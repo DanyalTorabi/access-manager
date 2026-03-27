@@ -25,7 +25,7 @@ Run **full user journeys** against a live server (local or CI): create domain â†
 
 ## Files / paths
 
-- **Create:** `test/e2e/bash/run.sh` (optional) and/or `go/e2e/*` with `go test -tags=e2e`
+- **Create:** `test/e2e/bash/run.sh` (optional) and/or `go/e2e/*` with `go test -race -count=1 -tags=e2e ./e2e/...`
 
 ## Acceptance criteria
 

@@ -50,7 +50,7 @@ From the **repository root**, use **`make`** (same idea as `make test` / `make r
 | `make docker-up` | `docker compose up -d` (detached) |
 | `make docker-logs` | `docker compose logs -f` (follow app logs) |
 | `make docker-down` | `docker compose down` |
-| `make e2e` | **[T16]** — `go test -tags=e2e` against **`BASE_URL`** (server must be up; optional **`make e2e-bash`**) |
+| `make e2e` | **[T16]** — `go test -race -count=1 -tags=e2e ./e2e/...` against **`BASE_URL`** (server must be up; optional **`make e2e-bash`**) |
 
 ```bash
 make docker-build
@@ -74,7 +74,7 @@ Workflow: **[`.github/workflows/ci.yml`](.github/workflows/ci.yml)** runs on **p
 | Job | What it does |
 |-----|----------------|
 | **Go** | From **`go/`**: `go test -race ./...`, `go vet ./...`, **golangci-lint** (same pin as `go/Makefile`) |
-| **Docker** | `docker compose build`, `compose up`, **`curl /health`**, **Go E2E** (`go test -tags=e2e ./e2e/...`), `compose down` |
+| **Docker** | `docker compose build`, `compose up`, **`curl /health`**, **Go E2E** (`go test -race -count=1 -tags=e2e ./e2e/...`), `compose down` |
 | **Publish** | On **`push` to `main`** only: push image to **`ghcr.io/<owner>/access-manager`** as **`latest`** and **`sha-<commit>`** (`packages: write` on `GITHUB_TOKEN`) |
 
 Enable **Actions** for the repo; for **branch protection**, add required checks matching the workflow **job** names after the first green run (e.g. **Go (test, vet, lint)** and **Docker build & compose smoke**) — see [CONTRIBUTING.md](CONTRIBUTING.md).

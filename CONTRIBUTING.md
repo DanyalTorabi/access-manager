@@ -16,7 +16,7 @@ make test
 make lint
 ```
 
-End-to-end smoke (**T16**): with the server reachable (default `http://127.0.0.1:8080`), run **`make e2e`** (`go test -tags=e2e` from **`go/`**). Optional **`make e2e-bash`** uses **curl** + **jq**. Set **`API_BEARER_TOKEN`** when Bearer auth is enabled. See **[test/e2e/README.md](test/e2e/README.md)**.
+End-to-end smoke (**T16**): with the server reachable (default `http://127.0.0.1:8080`), run **`make e2e`** (`go test -race -count=1 -tags=e2e ./e2e/...` from **`go/`**). Optional **`make e2e-bash`** uses **curl** + **jq**. Set **`API_BEARER_TOKEN`** when Bearer auth is enabled. See **[test/e2e/README.md](test/e2e/README.md)**.
 
 See [**go/README.md**](go/README.md) for config, environment variables, and the HTTP API.
 

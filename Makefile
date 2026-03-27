@@ -5,13 +5,13 @@
 build test cover cover-func run tidy lint:
 	$(MAKE) -C go $@
 
-# T16 — `go test -tags=e2e` against BASE_URL (default http://127.0.0.1:8080).
+# T16 — same as go/Makefile e2e: go test -race -count=1 -tags=e2e ./e2e/... (BASE_URL default http://127.0.0.1:8080).
 e2e:
 	$(MAKE) -C go e2e
 
 # Same journey as e2e, using curl+jq (optional; pick one long-term).
 e2e-bash:
-	./test/e2e/bash/run.sh
+	bash ./test/e2e/bash/run.sh
 
 docker-build:
 	docker compose build

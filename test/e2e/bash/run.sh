@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# T16 — optional curl+jq smoke (same journey as `go test -tags=e2e ./e2e`).
+# T16 — optional curl+jq smoke (same journey as `go test -race -count=1 -tags=e2e ./e2e/...`).
 # Prerequisites: curl, jq (https://jqlang.org).
-# Usage: BASE_URL=http://127.0.0.1:8080 [API_BEARER_TOKEN=...] ./test/e2e/bash/run.sh
+# Usage: BASE_URL=http://127.0.0.1:8080 [API_BEARER_TOKEN=...] bash test/e2e/bash/run.sh
 set -eo pipefail
 
 BASE_URL="${BASE_URL:-http://127.0.0.1:8080}"
@@ -16,7 +16,7 @@ if ! command -v jq >/dev/null 2>&1; then
 	exit 1
 fi
 
-# Avoid `set -u` + empty array expansion for optional Bearer (bash treats empty AUTH[@] as unset).
+# Run curl, adding Authorization only when API_BEARER_TOKEN is set.
 curl_e2e() {
 	if [[ -n "${API_BEARER_TOKEN:-}" ]]; then
 		curl -sS -H "Authorization: Bearer ${API_BEARER_TOKEN}" "$@"
