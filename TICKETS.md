@@ -44,7 +44,7 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 | id | title | status | notes |
 |----|-------|--------|-------|
 | T15 | CHANGELOG | done | [CHANGELOG.md](CHANGELOG.md) + README process; semver tags on release (**T6**) |
-| T16 | E2E / smoke tests | open | Full API journeys; optional Newman in CI |
+| T16 | E2E / smoke tests | done | **`go test -tags=e2e`** ([`go/e2e/`](go/e2e/)); optional [`test/e2e/bash/run.sh`](test/e2e/bash/run.sh); **`make e2e`** / **`make e2e-bash`**; CI (**T13**) |
 | T17 | API docs & contract testing | done | [`api/openapi.yaml`](api/openapi.yaml), [`api/postman/`](api/postman/), [`api/README.md`](api/README.md) |
 | T18 | Developer AI / editor tooling | done | `.cursor/rules`, `AGENTS.md`, tech stack doc |
 | T19 | Docker | done | [Dockerfile](Dockerfile), [docker-compose.yml](docker-compose.yml), [.dockerignore](.dockerignore); distroless non-root + SQLite tmpfs; **T13** can reuse compose |

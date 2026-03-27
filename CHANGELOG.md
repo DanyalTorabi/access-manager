@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- E2E smoke: **`go test -tags=e2e ./e2e/...`** (**T16**); optional bash twin under **`test/e2e/bash/`**; Docker CI runs Go e2e
 - OpenAPI 3 spec and Postman collection under **`api/`** with README for **`baseUrl`** and Bearer token variables (**T17**)
 
 ### Fixed
