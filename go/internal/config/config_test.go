@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -199,6 +200,9 @@ func TestLoad_invalidShutdownTimeout(t *testing.T) {
 	if err == nil {
 		t.Fatal("want error for non-integer shutdown timeout")
 	}
+	if !strings.Contains(err.Error(), envShutdownTimeoutSec) {
+		t.Fatalf("error should mention %s, got: %v", envShutdownTimeoutSec, err)
+	}
 }
 
 func TestLoad_negativeShutdownTimeout(t *testing.T) {
@@ -208,6 +212,9 @@ func TestLoad_negativeShutdownTimeout(t *testing.T) {
 	if err == nil {
 		t.Fatal("want error for negative shutdown timeout")
 	}
+	if !strings.Contains(err.Error(), "positive integer") {
+		t.Fatalf("error should mention 'positive integer', got: %v", err)
+	}
 }
 
 func TestLoad_missingConfigFile(t *testing.T) {
@@ -216,6 +223,9 @@ func TestLoad_missingConfigFile(t *testing.T) {
 	_, err := Load()
 	if err == nil {
 		t.Fatal("want error for missing config file")
+	}
+	if !strings.Contains(err.Error(), "config") {
+		t.Fatalf("error should mention config, got: %v", err)
 	}
 }
 
@@ -240,6 +250,9 @@ func TestValidate_emptyDriver(t *testing.T) {
 	if err == nil {
 		t.Fatal("want error for empty driver")
 	}
+	if !strings.Contains(err.Error(), "database_driver") {
+		t.Fatalf("error should mention database_driver, got: %v", err)
+	}
 }
 
 func TestValidate_emptyDatabaseURL(t *testing.T) {
@@ -248,6 +261,9 @@ func TestValidate_emptyDatabaseURL(t *testing.T) {
 	_, err := Load()
 	if err == nil {
 		t.Fatal("want error for empty database url")
+	}
+	if !strings.Contains(err.Error(), "database_url") {
+		t.Fatalf("error should mention database_url, got: %v", err)
 	}
 }
 
@@ -258,6 +274,9 @@ func TestValidate_emptyHTTPAddr(t *testing.T) {
 	if err == nil {
 		t.Fatal("want error for empty http addr")
 	}
+	if !strings.Contains(err.Error(), "http_addr") {
+		t.Fatalf("error should mention http_addr, got: %v", err)
+	}
 }
 
 func TestValidate_emptyMigrationsDir(t *testing.T) {
@@ -266,5 +285,8 @@ func TestValidate_emptyMigrationsDir(t *testing.T) {
 	_, err := Load()
 	if err == nil {
 		t.Fatal("want error for empty migrations dir")
+	}
+	if !strings.Contains(err.Error(), "migrations_dir") {
+		t.Fatalf("error should mention migrations_dir, got: %v", err)
 	}
 }

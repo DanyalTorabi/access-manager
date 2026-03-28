@@ -1,0 +1,24 @@
+---
+description: When reviewing PRs or diffs
+globs: []
+alwaysApply: false
+---
+
+# Code Review Mode
+
+When asked to review a PR or diff:
+
+- Review every changed file **line by line**. Do not skim.
+- Flag every issue regardless of severity. Do not dismiss issues as 
+  "acceptable" or "pragmatic" — suggest the fix and let the author decide.
+- For each issue, state: (1) the file and line, (2) what's wrong, 
+  (3) the concrete fix.
+- Check the diff against `.github/copilot-instructions.md` and
+  `.github/instructions/` as a review checklist.
+- Verify tests match the documented/intended behavior, not just the 
+  current behavior.
+- Look for: TOCTOU races, error classification (400 vs 404 vs 500),
+  test determinism (sleep vs poll, hardcoded paths vs t.TempDir),
+  goroutine synchronization, resource leaks.
+- After the review, list any open Copilot review comments from the PR
+  and state whether each is addressed or still open.

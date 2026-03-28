@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -63,7 +64,7 @@ func serve(httpSrv *http.Server, ln net.Listener, timeout time.Duration, stop <-
 	errCh := make(chan error, 1)
 	go func() {
 		err := httpSrv.Serve(ln)
-		if err != nil && err != http.ErrServerClosed {
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		} else {
 			errCh <- nil
@@ -120,7 +121,6 @@ func setup(cfg config.Config) (*http.Server, *sql.DB, error) {
 	srv := &api.Server{Store: st, APIBearerToken: cfg.APIBearerToken}
 
 	httpSrv := &http.Server{
-		Addr:              cfg.HTTPAddr,
 		Handler:           srv.Router(),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       60 * time.Second,

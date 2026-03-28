@@ -693,6 +693,35 @@ func TestAPI_groupSetParent_unknownGroup(t *testing.T) {
 	}
 }
 
+func TestAPI_groupSetParent_unknownParent(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	var dom store.Domain
+	if err := json.Unmarshal(mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"d"}`), &dom); err != nil {
+		t.Fatal(err)
+	}
+	base := ts.URL + "/api/v1/domains/" + dom.ID
+	var g store.Group
+	if err := json.Unmarshal(mustPostJSON201(t, base+"/groups", `{"title":"child"}`), &g); err != nil {
+		t.Fatal(err)
+	}
+	patchURL := base + "/groups/" + g.ID + "/parent"
+	body := fmt.Sprintf(`{"parent_group_id":%q}`, uuid.NewString())
+	req, err := http.NewRequest(http.MethodPatch, patchURL, strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusNotFound {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("want 404 unknown parent, got %d: %s", res.StatusCode, b)
+	}
+}
+
 func TestAPI_resourceListGet_notFound(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	var dom store.Domain
@@ -1302,7 +1331,7 @@ func TestAPI_domainList_empty(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("status %d", res.StatusCode)
 	}
-	var list []json.RawMessage
+	var list []store.Domain
 	if err := json.NewDecoder(res.Body).Decode(&list); err != nil {
 		t.Fatal(err)
 	}
@@ -1322,7 +1351,7 @@ func TestAPI_groupList_empty(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("status %d", res.StatusCode)
 	}
-	var list []json.RawMessage
+	var list []store.Group
 	if err := json.NewDecoder(res.Body).Decode(&list); err != nil {
 		t.Fatal(err)
 	}
@@ -1342,7 +1371,7 @@ func TestAPI_resourceList_empty(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("status %d", res.StatusCode)
 	}
-	var list []json.RawMessage
+	var list []store.Resource
 	if err := json.NewDecoder(res.Body).Decode(&list); err != nil {
 		t.Fatal(err)
 	}
@@ -1362,7 +1391,7 @@ func TestAPI_permissionList_empty(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("status %d", res.StatusCode)
 	}
-	var list []json.RawMessage
+	var list []store.Permission
 	if err := json.NewDecoder(res.Body).Decode(&list); err != nil {
 		t.Fatal(err)
 	}
@@ -1382,7 +1411,7 @@ func TestAPI_accessTypeList_empty(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("status %d", res.StatusCode)
 	}
-	var list []json.RawMessage
+	var list []store.AccessType
 	if err := json.NewDecoder(res.Body).Decode(&list); err != nil {
 		t.Fatal(err)
 	}
@@ -1477,6 +1506,7 @@ func TestAPI_storeErrors(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			_, _ = io.Copy(io.Discard, res.Body)
 			_ = res.Body.Close()
 			if res.StatusCode != tt.want {
 				t.Fatalf("want %d, got %d", tt.want, res.StatusCode)

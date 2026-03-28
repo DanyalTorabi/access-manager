@@ -42,6 +42,7 @@ jobs:
         with:
           files: go/coverage.out
           token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
 
       - name: Vet
         run: go vet ./...

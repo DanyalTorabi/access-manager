@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"log"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -13,16 +16,39 @@ import (
 	"github.com/dtorabi/access-manager/internal/testutil"
 )
 
+func captureLog(fn func()) string {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	defer log.SetOutput(os.Stderr)
+	fn()
+	return buf.String()
+}
+
 func TestMaybeWarnAPIAuth_loopback(t *testing.T) {
-	maybeWarnAPIAuth(config.Config{HTTPAddr: "127.0.0.1:8080"})
+	out := captureLog(func() {
+		maybeWarnAPIAuth(config.Config{HTTPAddr: "127.0.0.1:8080"})
+	})
+	if out != "" {
+		t.Fatalf("loopback should not warn, got: %s", out)
+	}
 }
 
 func TestMaybeWarnAPIAuth_nonLoopbackNoToken(t *testing.T) {
-	maybeWarnAPIAuth(config.Config{HTTPAddr: "0.0.0.0:8080"})
+	out := captureLog(func() {
+		maybeWarnAPIAuth(config.Config{HTTPAddr: "0.0.0.0:8080"})
+	})
+	if !strings.Contains(out, "API_BEARER_TOKEN") {
+		t.Fatalf("non-loopback without token should warn, got: %q", out)
+	}
 }
 
 func TestMaybeWarnAPIAuth_withToken(t *testing.T) {
-	maybeWarnAPIAuth(config.Config{HTTPAddr: "0.0.0.0:8080", APIBearerToken: "secret"})
+	out := captureLog(func() {
+		maybeWarnAPIAuth(config.Config{HTTPAddr: "0.0.0.0:8080", APIBearerToken: "test-token"})
+	})
+	if out != "" {
+		t.Fatalf("with token should not warn, got: %s", out)
+	}
 }
 
 func testCfg(t *testing.T) config.Config {
@@ -198,16 +224,25 @@ func pollHealth(t *testing.T, url string) {
 	t.Helper()
 	client := &http.Client{Timeout: 500 * time.Millisecond}
 	deadline := time.Now().Add(3 * time.Second)
+	var lastErr error
+	var lastStatus int
 	for {
 		resp, err := client.Get(url)
-		if err == nil {
+		if err != nil {
+			lastErr = err
+		} else {
+			lastStatus = resp.StatusCode
 			_ = resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
 				return
 			}
+			lastErr = nil
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("server not ready within 3s: %v", err)
+			if lastErr != nil {
+				t.Fatalf("server not ready within 3s: %v", lastErr)
+			}
+			t.Fatalf("server not ready within 3s: last status %d", lastStatus)
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
