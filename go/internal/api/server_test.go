@@ -552,6 +552,23 @@ func TestAPI_groupSetParent_toParentAndClear(t *testing.T) {
 		b, _ := io.ReadAll(res2.Body)
 		t.Fatalf("PATCH clear parent want 204, got %d: %s", res2.StatusCode, b)
 	}
+
+	resCleared, err := http.Get(base + "/groups/" + child.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resCleared.Body.Close() }()
+	if resCleared.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resCleared.Body)
+		t.Fatalf("GET after clear want 200, got %d: %s", resCleared.StatusCode, b)
+	}
+	var cleared store.Group
+	if err := json.NewDecoder(resCleared.Body).Decode(&cleared); err != nil {
+		t.Fatal(err)
+	}
+	if cleared.ParentGroupID != nil {
+		t.Fatalf("parent should be nil after clear, got %v", *cleared.ParentGroupID)
+	}
 }
 
 func TestAPI_groupSetParent_selfParent(t *testing.T) {
