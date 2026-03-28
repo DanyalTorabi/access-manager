@@ -3,7 +3,9 @@ package main
 import (
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 
@@ -12,38 +14,32 @@ import (
 )
 
 func TestMaybeWarnAPIAuth_loopback(t *testing.T) {
-	cfg := config.Config{
-		HTTPAddr:       "127.0.0.1:8080",
-		APIBearerToken: "",
-	}
-	maybeWarnAPIAuth(cfg)
+	maybeWarnAPIAuth(config.Config{HTTPAddr: "127.0.0.1:8080"})
 }
 
 func TestMaybeWarnAPIAuth_nonLoopbackNoToken(t *testing.T) {
-	cfg := config.Config{
-		HTTPAddr:       "0.0.0.0:8080",
-		APIBearerToken: "",
-	}
-	maybeWarnAPIAuth(cfg)
+	maybeWarnAPIAuth(config.Config{HTTPAddr: "0.0.0.0:8080"})
 }
 
 func TestMaybeWarnAPIAuth_withToken(t *testing.T) {
-	cfg := config.Config{
-		HTTPAddr:       "0.0.0.0:8080",
-		APIBearerToken: "secret",
-	}
-	maybeWarnAPIAuth(cfg)
+	maybeWarnAPIAuth(config.Config{HTTPAddr: "0.0.0.0:8080", APIBearerToken: "secret"})
 }
 
-func TestSetup_success(t *testing.T) {
-	dbPath := filepath.Join(t.TempDir(), "test.db")
-	cfg := config.Config{
+func testCfg(t *testing.T) config.Config {
+	t.Helper()
+	return config.Config{
 		DatabaseDriver:  "sqlite",
-		DatabaseURL:     "file:" + dbPath + "?_pragma=foreign_keys(1)",
+		DatabaseURL:     "file:" + filepath.Join(t.TempDir(), "test.db") + "?_pragma=foreign_keys(1)",
 		HTTPAddr:        "127.0.0.1:0",
 		MigrationsDir:   filepath.Join(testutil.RepoRoot(t), "migrations", "sqlite"),
 		ShutdownTimeout: 5 * time.Second,
 	}
+}
+
+// --- setup tests ---
+
+func TestSetup_success(t *testing.T) {
+	cfg := testCfg(t)
 	httpSrv, db, err := setup(cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -51,9 +47,6 @@ func TestSetup_success(t *testing.T) {
 	defer func() { _ = db.Close() }()
 	if httpSrv == nil {
 		t.Fatal("nil http server")
-	}
-	if httpSrv.Addr != "127.0.0.1:0" {
-		t.Fatalf("addr = %q", httpSrv.Addr)
 	}
 }
 
@@ -65,36 +58,69 @@ func TestSetup_badDriver(t *testing.T) {
 		MigrationsDir:   "migrations/sqlite",
 		ShutdownTimeout: 5 * time.Second,
 	}
-	_, _, err := setup(cfg)
-	if err == nil {
+	if _, _, err := setup(cfg); err == nil {
 		t.Fatal("want error for unsupported driver")
 	}
 }
 
 func TestSetup_badMigrations(t *testing.T) {
-	dbPath := filepath.Join(t.TempDir(), "test.db")
-	cfg := config.Config{
-		DatabaseDriver:  "sqlite",
-		DatabaseURL:     "file:" + dbPath + "?_pragma=foreign_keys(1)",
-		HTTPAddr:        "127.0.0.1:0",
-		MigrationsDir:   filepath.Join(t.TempDir(), "nonexistent-migrations"),
-		ShutdownTimeout: 5 * time.Second,
-	}
-	_, _, err := setup(cfg)
-	if err == nil {
+	cfg := testCfg(t)
+	cfg.MigrationsDir = filepath.Join(t.TempDir(), "nonexistent-migrations")
+	if _, _, err := setup(cfg); err == nil {
 		t.Fatal("want error for bad migrations dir")
 	}
 }
 
-func TestSetup_healthEndpoint(t *testing.T) {
-	dbPath := filepath.Join(t.TempDir(), "test.db")
+// --- run tests ---
+
+func TestRun_success(t *testing.T) {
+	cfg := testCfg(t)
+	stop := make(chan os.Signal, 1)
+	done := make(chan error, 1)
+	go func() {
+		done <- run(cfg, stop)
+	}()
+
+	time.Sleep(200 * time.Millisecond)
+	stop <- syscall.SIGINT
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("run did not return after signal")
+	}
+}
+
+func TestRun_badDriver(t *testing.T) {
 	cfg := config.Config{
-		DatabaseDriver:  "sqlite",
-		DatabaseURL:     "file:" + dbPath + "?_pragma=foreign_keys(1)",
+		DatabaseDriver:  "unknown",
+		DatabaseURL:     "noop",
 		HTTPAddr:        "127.0.0.1:0",
-		MigrationsDir:   filepath.Join(testutil.RepoRoot(t), "migrations", "sqlite"),
+		MigrationsDir:   "migrations/sqlite",
 		ShutdownTimeout: 5 * time.Second,
 	}
+	stop := make(chan os.Signal, 1)
+	if err := run(cfg, stop); err == nil {
+		t.Fatal("want error for bad driver")
+	}
+}
+
+func TestRun_badListenAddr(t *testing.T) {
+	cfg := testCfg(t)
+	cfg.HTTPAddr = "999.999.999.999:0"
+	stop := make(chan os.Signal, 1)
+	if err := run(cfg, stop); err == nil {
+		t.Fatal("want error for bad listen address")
+	}
+}
+
+// --- serve tests ---
+
+func TestServe_cleanShutdown(t *testing.T) {
+	cfg := testCfg(t)
 	httpSrv, db, err := setup(cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -105,15 +131,67 @@ func TestSetup_healthEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	go func() { _ = httpSrv.Serve(ln) }()
-	t.Cleanup(func() { _ = httpSrv.Close() })
+
+	stop := make(chan os.Signal, 1)
+	done := make(chan error, 1)
+	go func() {
+		done <- serve(httpSrv, ln, 5*time.Second, stop)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
 
 	resp, err := http.Get("http://" + ln.Addr().String() + "/health")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("health status %d", resp.StatusCode)
+		t.Fatalf("health: %d", resp.StatusCode)
+	}
+
+	stop <- syscall.SIGINT
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("serve did not return after signal")
+	}
+}
+
+func TestServe_listenerError(t *testing.T) {
+	httpSrv := &http.Server{}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = ln.Close()
+
+	stop := make(chan os.Signal, 1)
+	if err := serve(httpSrv, ln, 5*time.Second, stop); err == nil {
+		t.Fatal("want error for closed listener")
+	}
+}
+
+// --- runMain tests ---
+
+func TestRunMain_badConfig(t *testing.T) {
+	clearCfgEnv(t)
+	t.Setenv("DATABASE_DRIVER", " ")
+	if err := runMain(); err == nil {
+		t.Fatal("want error for invalid config")
+	}
+}
+
+func clearCfgEnv(t *testing.T) {
+	t.Helper()
+	for _, k := range []string{
+		"CONFIG_PATH", "DATABASE_DRIVER", "DATABASE_URL",
+		"HTTP_ADDR", "MIGRATIONS_DIR", "SHUTDOWN_TIMEOUT_SECONDS",
+		"API_BEARER_TOKEN",
+	} {
+		t.Setenv(k, "")
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -19,36 +20,62 @@ import (
 )
 
 func main() {
+	if err := runMain(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func runMain() error {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("config: %v", err)
+		return fmt.Errorf("config: %w", err)
 	}
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
+	return run(cfg, sigCh)
+}
 
+func run(cfg config.Config, stop <-chan os.Signal) error {
 	httpSrv, db, err := setup(cfg)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer func() { _ = db.Close() }()
 
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	ln, err := net.Listen("tcp", cfg.HTTPAddr)
+	if err != nil {
+		return fmt.Errorf("listen %s: %w", cfg.HTTPAddr, err)
+	}
 
+	log.Printf("listening on http://%s", ln.Addr())
+	return serve(httpSrv, ln, cfg.ShutdownTimeout, stop)
+}
+
+// serve starts the HTTP server on ln and blocks until a signal arrives on stop,
+// then gracefully shuts down within timeout.
+func serve(httpSrv *http.Server, ln net.Listener, timeout time.Duration, stop <-chan os.Signal) error {
+	errCh := make(chan error, 1)
 	go func() {
-		log.Printf("listening on http://%s", cfg.HTTPAddr)
-		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen: %v", err)
+		if err := httpSrv.Serve(ln); err != nil && err != http.ErrServerClosed {
+			errCh <- err
 		}
 	}()
 
-	sig := <-sigCh
-	log.Printf("signal received: %v, shutting down", sig)
+	select {
+	case err := <-errCh:
+		return fmt.Errorf("serve: %w", err)
+	case sig := <-stop:
+		log.Printf("signal received: %v, shutting down", sig)
+	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	if err := httpSrv.Shutdown(ctx); err != nil {
-		log.Printf("shutdown: %v", err)
+		return fmt.Errorf("shutdown: %w", err)
 	}
 	log.Printf("server stopped")
+	return nil
 }
 
 // setup wires config → DB → migrations → HTTP server and returns the server and DB handle.
