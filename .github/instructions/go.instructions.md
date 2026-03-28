@@ -6,9 +6,10 @@ applyTo: "go/**/*.go"
 
 ## Error Handling
 
-- HTTP handlers: return 400 for validation/client errors, 500 for unexpected/internal errors. Do not map all store errors to 400.
-- Grant/membership handlers that call store INSERT: FK violations are client errors (400), but closed-DB or unexpected errors should be 500.
-- `store.ErrNotFound` → 404, not 400 or 500.
+- HTTP handlers: return 400 for validation/client errors, 500 for unexpected/internal errors.
+- `store.ErrNotFound` → 404 (used in get, list, delete, and `groupSetParent` handlers).
+- `groupSetParent`: returns 404 when the group or parent is not found, 400 for self-parent/cycle/domain-mismatch validation errors. Other store errors currently also fall through to 400 — see TODO(T31).
+- `addUserToGroup`, `grantUserPermission`, `grantGroupPermission`: currently map **all** store errors to 400 (FK violations are client errors, but closed-DB or unexpected errors should be 500). Tracked in TODO(T31) — requires typed errors in the store layer.
 
 ## Concurrency
 

@@ -687,9 +687,9 @@ func TestAPI_groupSetParent_unknownGroup(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = res.Body.Close() }()
-	if res.StatusCode != http.StatusBadRequest {
+	if res.StatusCode != http.StatusNotFound {
 		b, _ := io.ReadAll(res.Body)
-		t.Fatalf("want 400 unknown group, got %d: %s", res.StatusCode, b)
+		t.Fatalf("want 404 unknown group, got %d: %s", res.StatusCode, b)
 	}
 }
 
