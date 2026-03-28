@@ -76,22 +76,18 @@ func TestSetup_badMigrations(t *testing.T) {
 func TestRun_success(t *testing.T) {
 	cfg := testCfg(t)
 
-	// Grab the port run() will listen on so we can poll readiness.
-	ln, err := net.Listen("tcp", cfg.HTTPAddr)
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	addr := ln.Addr().String()
-	_ = ln.Close()
-	cfg.HTTPAddr = addr
 
 	stop := make(chan os.Signal, 1)
 	done := make(chan error, 1)
 	go func() {
-		done <- run(cfg, stop)
+		done <- run(cfg, ln, stop)
 	}()
 
-	pollHealth(t, "http://"+addr+"/health")
+	pollHealth(t, "http://"+ln.Addr().String()+"/health")
 	stop <- syscall.SIGINT
 
 	select {
@@ -113,7 +109,7 @@ func TestRun_badDriver(t *testing.T) {
 		ShutdownTimeout: 5 * time.Second,
 	}
 	stop := make(chan os.Signal, 1)
-	if err := run(cfg, stop); err == nil {
+	if err := run(cfg, nil, stop); err == nil {
 		t.Fatal("want error for bad driver")
 	}
 }
@@ -122,7 +118,7 @@ func TestRun_badListenAddr(t *testing.T) {
 	cfg := testCfg(t)
 	cfg.HTTPAddr = "999.999.999.999:0"
 	stop := make(chan os.Signal, 1)
-	if err := run(cfg, stop); err == nil {
+	if err := run(cfg, nil, stop); err == nil {
 		t.Fatal("want error for bad listen address")
 	}
 }

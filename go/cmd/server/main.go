@@ -33,19 +33,24 @@ func runMain() error {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(sigCh)
-	return run(cfg, sigCh)
+	return run(cfg, nil, sigCh)
 }
 
-func run(cfg config.Config, stop <-chan os.Signal) error {
+// run wires setup → listen → serve. If ln is non-nil it is used directly
+// (useful for tests that need a deterministic port); otherwise a new
+// listener is created from cfg.HTTPAddr.
+func run(cfg config.Config, ln net.Listener, stop <-chan os.Signal) error {
 	httpSrv, db, err := setup(cfg)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = db.Close() }()
 
-	ln, err := net.Listen("tcp", cfg.HTTPAddr)
-	if err != nil {
-		return fmt.Errorf("listen %s: %w", cfg.HTTPAddr, err)
+	if ln == nil {
+		ln, err = net.Listen("tcp", cfg.HTTPAddr)
+		if err != nil {
+			return fmt.Errorf("listen %s: %w", cfg.HTTPAddr, err)
+		}
 	}
 
 	log.Printf("listening on http://%s", ln.Addr())
