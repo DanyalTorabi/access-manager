@@ -1,6 +1,7 @@
 # access-manager
 
 [![CI](https://github.com/DanyalTorabi/access-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/DanyalTorabi/access-manager/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/DanyalTorabi/access-manager/graph/badge.svg)](https://codecov.io/gh/DanyalTorabi/access-manager)
 
 Educational / product repo for **domain-scoped** access control (users, groups, resources, access-type bits, permissions). Implementations can live side by side: the **Go** HTTP service is under **[`go/`](go/)**; the HTTP contract lives under **[`api/`](api/)** (**T17** — OpenAPI + Postman).
 
