@@ -212,6 +212,10 @@ func (s *Server) groupSetParent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Store.GroupSetParent(r.Context(), domainID, groupID, b.ParentGroupID); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}

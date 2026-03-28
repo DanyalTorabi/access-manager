@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -182,5 +183,110 @@ api_bearer_token: "  	  "
 	}
 	if c.APIBearerToken != "" {
 		t.Fatalf("whitespace-only YAML api_bearer_token should not apply, got %q", c.APIBearerToken)
+	}
+}
+
+func clearEnv(t *testing.T) {
+	t.Helper()
+	for _, k := range []string{envConfigPath, envDatabaseDriver, envDatabaseURL, envHTTPAddr, envMigrationsDir, envShutdownTimeoutSec, envAPIBearerToken} {
+		t.Setenv(k, "")
+	}
+}
+
+func TestLoad_invalidShutdownTimeout(t *testing.T) {
+	clearEnv(t)
+	t.Setenv(envShutdownTimeoutSec, "abc")
+	_, err := Load()
+	if err == nil {
+		t.Fatal("want error for non-integer shutdown timeout")
+	}
+	if !strings.Contains(err.Error(), envShutdownTimeoutSec) {
+		t.Fatalf("error should mention %s, got: %v", envShutdownTimeoutSec, err)
+	}
+}
+
+func TestLoad_negativeShutdownTimeout(t *testing.T) {
+	clearEnv(t)
+	t.Setenv(envShutdownTimeoutSec, "-1")
+	_, err := Load()
+	if err == nil {
+		t.Fatal("want error for negative shutdown timeout")
+	}
+	if !strings.Contains(err.Error(), "positive integer") {
+		t.Fatalf("error should mention 'positive integer', got: %v", err)
+	}
+}
+
+func TestLoad_missingConfigFile(t *testing.T) {
+	clearEnv(t)
+	t.Setenv(envConfigPath, filepath.Join(t.TempDir(), "nonexistent-cfg.yaml"))
+	_, err := Load()
+	if err == nil {
+		t.Fatal("want error for missing config file")
+	}
+	if !strings.Contains(err.Error(), "config") {
+		t.Fatalf("error should mention config, got: %v", err)
+	}
+}
+
+func TestLoad_invalidYAML(t *testing.T) {
+	clearEnv(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bad.yaml")
+	if err := os.WriteFile(path, []byte(":::not yaml"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(envConfigPath, path)
+	_, err := Load()
+	if err == nil {
+		t.Fatal("want error for invalid yaml")
+	}
+}
+
+func TestValidate_emptyDriver(t *testing.T) {
+	clearEnv(t)
+	t.Setenv(envDatabaseDriver, " ")
+	_, err := Load()
+	if err == nil {
+		t.Fatal("want error for empty driver")
+	}
+	if !strings.Contains(err.Error(), "database_driver") {
+		t.Fatalf("error should mention database_driver, got: %v", err)
+	}
+}
+
+func TestValidate_emptyDatabaseURL(t *testing.T) {
+	clearEnv(t)
+	t.Setenv(envDatabaseURL, " ")
+	_, err := Load()
+	if err == nil {
+		t.Fatal("want error for empty database url")
+	}
+	if !strings.Contains(err.Error(), "database_url") {
+		t.Fatalf("error should mention database_url, got: %v", err)
+	}
+}
+
+func TestValidate_emptyHTTPAddr(t *testing.T) {
+	clearEnv(t)
+	t.Setenv(envHTTPAddr, " ")
+	_, err := Load()
+	if err == nil {
+		t.Fatal("want error for empty http addr")
+	}
+	if !strings.Contains(err.Error(), "http_addr") {
+		t.Fatalf("error should mention http_addr, got: %v", err)
+	}
+}
+
+func TestValidate_emptyMigrationsDir(t *testing.T) {
+	clearEnv(t)
+	t.Setenv(envMigrationsDir, " ")
+	_, err := Load()
+	if err == nil {
+		t.Fatal("want error for empty migrations dir")
+	}
+	if !strings.Contains(err.Error(), "migrations_dir") {
+		t.Fatalf("error should mention migrations_dir, got: %v", err)
 	}
 }

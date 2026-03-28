@@ -2,7 +2,11 @@ package main
 
 import (
 	"context"
+	"database/sql"
+	"errors"
+	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,17 +21,90 @@ import (
 )
 
 func main() {
+	if err := runMain(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func runMain() error {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("config: %v", err)
+		return err
 	}
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
+	return run(cfg, nil, sigCh)
+}
+
+// run wires setup → listen → serve. If ln is non-nil it is used directly
+// (useful for tests that need a deterministic port); otherwise a new
+// listener is created from cfg.HTTPAddr.
+func run(cfg config.Config, ln net.Listener, stop <-chan os.Signal) error {
+	httpSrv, db, err := setup(cfg)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = db.Close() }()
+
+	if ln == nil {
+		ln, err = net.Listen("tcp", cfg.HTTPAddr)
+		if err != nil {
+			return fmt.Errorf("listen %s: %w", cfg.HTTPAddr, err)
+		}
+	}
+
+	log.Printf("listening on http://%s", ln.Addr())
+	return serve(httpSrv, ln, cfg.ShutdownTimeout, stop)
+}
+
+// serve starts the HTTP server on ln and blocks until a signal arrives on stop,
+// then gracefully shuts down within timeout.
+func serve(httpSrv *http.Server, ln net.Listener, timeout time.Duration, stop <-chan os.Signal) error {
+	errCh := make(chan error, 1)
+	go func() {
+		err := httpSrv.Serve(ln)
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		} else {
+			errCh <- nil
+		}
+	}()
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			return fmt.Errorf("serve: %w", err)
+		}
+		return nil
+	case sig := <-stop:
+		log.Printf("signal received: %v, shutting down", sig)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	shutdownErr := httpSrv.Shutdown(ctx)
+
+	// Block until Serve goroutine exits so we never miss an error.
+	if err := <-errCh; err != nil {
+		return fmt.Errorf("serve: %w", err)
+	}
+
+	if shutdownErr != nil {
+		return fmt.Errorf("shutdown: %w", shutdownErr)
+	}
+	log.Printf("server stopped")
+	return nil
+}
+
+// setup wires config → DB → migrations → HTTP server and returns the server and DB handle.
+func setup(cfg config.Config) (*http.Server, *sql.DB, error) {
 	maybeWarnAPIAuth(cfg)
 
 	db, _, err := database.Open(cfg.DatabaseDriver, cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("open database: %v", err)
+		return nil, nil, fmt.Errorf("open database: %w", err)
 	}
-	defer func() { _ = db.Close() }()
 
 	migDir := cfg.MigrationsDir
 	if !filepath.IsAbs(migDir) {
@@ -36,40 +113,21 @@ func main() {
 		}
 	}
 	if err := database.MigrateUp(db, migDir); err != nil {
-		log.Fatalf("migrate: %v", err)
+		_ = db.Close()
+		return nil, nil, fmt.Errorf("migrate: %w", err)
 	}
 
 	st := sqlstore.New(db)
 	srv := &api.Server{Store: st, APIBearerToken: cfg.APIBearerToken}
 
 	httpSrv := &http.Server{
-		Addr:              cfg.HTTPAddr,
 		Handler:           srv.Router(),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       60 * time.Second,
 		WriteTimeout:      60 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
-
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		log.Printf("listening on http://%s", cfg.HTTPAddr)
-		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen: %v", err)
-		}
-	}()
-
-	sig := <-sigCh
-	log.Printf("signal received: %v, shutting down", sig)
-
-	ctx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
-	defer cancel()
-	if err := httpSrv.Shutdown(ctx); err != nil {
-		log.Printf("shutdown: %v", err)
-	}
-	log.Printf("server stopped")
+	return httpSrv, db, nil
 }
 
 // maybeWarnAPIAuth logs once if the API may be reachable beyond loopback without Bearer protection.
