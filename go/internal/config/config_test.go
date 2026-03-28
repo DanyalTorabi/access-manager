@@ -184,3 +184,87 @@ api_bearer_token: "  	  "
 		t.Fatalf("whitespace-only YAML api_bearer_token should not apply, got %q", c.APIBearerToken)
 	}
 }
+
+func clearEnv(t *testing.T) {
+	t.Helper()
+	for _, k := range []string{envConfigPath, envDatabaseDriver, envDatabaseURL, envHTTPAddr, envMigrationsDir, envShutdownTimeoutSec, envAPIBearerToken} {
+		t.Setenv(k, "")
+	}
+}
+
+func TestLoad_invalidShutdownTimeout(t *testing.T) {
+	clearEnv(t)
+	t.Setenv(envShutdownTimeoutSec, "abc")
+	_, err := Load()
+	if err == nil {
+		t.Fatal("want error for non-integer shutdown timeout")
+	}
+}
+
+func TestLoad_negativeShutdownTimeout(t *testing.T) {
+	clearEnv(t)
+	t.Setenv(envShutdownTimeoutSec, "-1")
+	_, err := Load()
+	if err == nil {
+		t.Fatal("want error for negative shutdown timeout")
+	}
+}
+
+func TestLoad_missingConfigFile(t *testing.T) {
+	clearEnv(t)
+	t.Setenv(envConfigPath, "/tmp/nonexistent-cfg-"+t.Name()+".yaml")
+	_, err := Load()
+	if err == nil {
+		t.Fatal("want error for missing config file")
+	}
+}
+
+func TestLoad_invalidYAML(t *testing.T) {
+	clearEnv(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bad.yaml")
+	if err := os.WriteFile(path, []byte(":::not yaml"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(envConfigPath, path)
+	_, err := Load()
+	if err == nil {
+		t.Fatal("want error for invalid yaml")
+	}
+}
+
+func TestValidate_emptyDriver(t *testing.T) {
+	clearEnv(t)
+	t.Setenv(envDatabaseDriver, " ")
+	_, err := Load()
+	if err == nil {
+		t.Fatal("want error for empty driver")
+	}
+}
+
+func TestValidate_emptyDatabaseURL(t *testing.T) {
+	clearEnv(t)
+	t.Setenv(envDatabaseURL, " ")
+	_, err := Load()
+	if err == nil {
+		t.Fatal("want error for empty database url")
+	}
+}
+
+func TestValidate_emptyHTTPAddr(t *testing.T) {
+	clearEnv(t)
+	t.Setenv(envHTTPAddr, " ")
+	_, err := Load()
+	if err == nil {
+		t.Fatal("want error for empty http addr")
+	}
+}
+
+func TestValidate_emptyMigrationsDir(t *testing.T) {
+	clearEnv(t)
+	t.Setenv(envMigrationsDir, " ")
+	_, err := Load()
+	if err == nil {
+		t.Fatal("want error for empty migrations dir")
+	}
+}

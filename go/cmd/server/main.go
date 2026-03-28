@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -21,35 +23,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("config: %v", err)
 	}
-	maybeWarnAPIAuth(cfg)
 
-	db, _, err := database.Open(cfg.DatabaseDriver, cfg.DatabaseURL)
+	httpSrv, db, err := setup(cfg)
 	if err != nil {
-		log.Fatalf("open database: %v", err)
+		log.Fatal(err)
 	}
 	defer func() { _ = db.Close() }()
-
-	migDir := cfg.MigrationsDir
-	if !filepath.IsAbs(migDir) {
-		if wd, err := os.Getwd(); err == nil {
-			migDir = filepath.Join(wd, migDir)
-		}
-	}
-	if err := database.MigrateUp(db, migDir); err != nil {
-		log.Fatalf("migrate: %v", err)
-	}
-
-	st := sqlstore.New(db)
-	srv := &api.Server{Store: st, APIBearerToken: cfg.APIBearerToken}
-
-	httpSrv := &http.Server{
-		Addr:              cfg.HTTPAddr,
-		Handler:           srv.Router(),
-		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       60 * time.Second,
-		WriteTimeout:      60 * time.Second,
-		IdleTimeout:       120 * time.Second,
-	}
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -70,6 +49,40 @@ func main() {
 		log.Printf("shutdown: %v", err)
 	}
 	log.Printf("server stopped")
+}
+
+// setup wires config → DB → migrations → HTTP server and returns the server and DB handle.
+func setup(cfg config.Config) (*http.Server, *sql.DB, error) {
+	maybeWarnAPIAuth(cfg)
+
+	db, _, err := database.Open(cfg.DatabaseDriver, cfg.DatabaseURL)
+	if err != nil {
+		return nil, nil, fmt.Errorf("open database: %w", err)
+	}
+
+	migDir := cfg.MigrationsDir
+	if !filepath.IsAbs(migDir) {
+		if wd, err := os.Getwd(); err == nil {
+			migDir = filepath.Join(wd, migDir)
+		}
+	}
+	if err := database.MigrateUp(db, migDir); err != nil {
+		_ = db.Close()
+		return nil, nil, fmt.Errorf("migrate: %w", err)
+	}
+
+	st := sqlstore.New(db)
+	srv := &api.Server{Store: st, APIBearerToken: cfg.APIBearerToken}
+
+	httpSrv := &http.Server{
+		Addr:              cfg.HTTPAddr,
+		Handler:           srv.Router(),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	return httpSrv, db, nil
 }
 
 // maybeWarnAPIAuth logs once if the API may be reachable beyond loopback without Bearer protection.
