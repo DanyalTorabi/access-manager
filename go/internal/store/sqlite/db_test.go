@@ -23,7 +23,8 @@ func TestOpen_success(t *testing.T) {
 }
 
 func TestOpen_invalidDSN(t *testing.T) {
-	_, err := Open("file:/dev/null/nonexistent/path.db")
+	dsn := "file:" + filepath.Join(t.TempDir(), "no-such-dir", "nested", "bad.db")
+	_, err := Open(dsn)
 	if err == nil {
 		t.Fatal("want error for invalid DSN")
 	}

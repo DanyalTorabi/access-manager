@@ -48,7 +48,7 @@ func TestMigrateUp_badDir(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = db.Close() }()
-	if err := MigrateUp(db, "/tmp/nonexistent-mig-dir-"+t.Name()); err == nil {
+	if err := MigrateUp(db, filepath.Join(t.TempDir(), "nonexistent-mig-dir")); err == nil {
 		t.Fatal("want error for missing dir")
 	}
 }

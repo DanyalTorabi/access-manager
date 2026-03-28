@@ -212,7 +212,7 @@ func TestLoad_negativeShutdownTimeout(t *testing.T) {
 
 func TestLoad_missingConfigFile(t *testing.T) {
 	clearEnv(t)
-	t.Setenv(envConfigPath, "/tmp/nonexistent-cfg-"+t.Name()+".yaml")
+	t.Setenv(envConfigPath, filepath.Join(t.TempDir(), "nonexistent-cfg.yaml"))
 	_, err := Load()
 	if err == nil {
 		t.Fatal("want error for missing config file")

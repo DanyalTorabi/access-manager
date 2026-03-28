@@ -77,7 +77,7 @@ func TestSetup_badMigrations(t *testing.T) {
 		DatabaseDriver:  "sqlite",
 		DatabaseURL:     "file:" + dbPath + "?_pragma=foreign_keys(1)",
 		HTTPAddr:        "127.0.0.1:0",
-		MigrationsDir:   "/tmp/nonexistent-mig-" + t.Name(),
+		MigrationsDir:   filepath.Join(t.TempDir(), "nonexistent-migrations"),
 		ShutdownTimeout: 5 * time.Second,
 	}
 	_, _, err := setup(cfg)
