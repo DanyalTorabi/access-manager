@@ -75,13 +75,23 @@ func TestSetup_badMigrations(t *testing.T) {
 
 func TestRun_success(t *testing.T) {
 	cfg := testCfg(t)
+
+	// Grab the port run() will listen on so we can poll readiness.
+	ln, err := net.Listen("tcp", cfg.HTTPAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := ln.Addr().String()
+	_ = ln.Close()
+	cfg.HTTPAddr = addr
+
 	stop := make(chan os.Signal, 1)
 	done := make(chan error, 1)
 	go func() {
 		done <- run(cfg, stop)
 	}()
 
-	time.Sleep(200 * time.Millisecond)
+	pollHealth(t, "http://"+addr+"/health")
 	stop <- syscall.SIGINT
 
 	select {
@@ -138,21 +148,7 @@ func TestServe_cleanShutdown(t *testing.T) {
 		done <- serve(httpSrv, ln, 5*time.Second, stop)
 	}()
 
-	addr := "http://" + ln.Addr().String() + "/health"
-	deadline := time.Now().Add(3 * time.Second)
-	for {
-		resp, err := http.Get(addr)
-		if err == nil {
-			_ = resp.Body.Close()
-			if resp.StatusCode == http.StatusOK {
-				break
-			}
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("server not ready within 3s: %v", err)
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+	pollHealth(t, "http://"+ln.Addr().String()+"/health")
 
 	stop <- syscall.SIGINT
 
@@ -198,5 +194,25 @@ func clearCfgEnv(t *testing.T) {
 		"API_BEARER_TOKEN",
 	} {
 		t.Setenv(k, "")
+	}
+}
+
+// pollHealth retries GET url until 200 OK or 3 s deadline, with per-request timeout.
+func pollHealth(t *testing.T, url string) {
+	t.Helper()
+	client := &http.Client{Timeout: 500 * time.Millisecond}
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		resp, err := client.Get(url)
+		if err == nil {
+			_ = resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				return
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("server not ready within 3s: %v", err)
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }
