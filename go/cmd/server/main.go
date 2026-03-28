@@ -71,8 +71,17 @@ func serve(httpSrv *http.Server, ln net.Listener, timeout time.Duration, stop <-
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	if err := httpSrv.Shutdown(ctx); err != nil {
-		return fmt.Errorf("shutdown: %w", err)
+	shutdownErr := httpSrv.Shutdown(ctx)
+
+	// Drain any Serve error that arrived during shutdown.
+	select {
+	case err := <-errCh:
+		return fmt.Errorf("serve: %w", err)
+	default:
+	}
+
+	if shutdownErr != nil {
+		return fmt.Errorf("shutdown: %w", shutdownErr)
 	}
 	log.Printf("server stopped")
 	return nil

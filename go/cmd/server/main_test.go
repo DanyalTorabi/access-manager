@@ -138,15 +138,20 @@ func TestServe_cleanShutdown(t *testing.T) {
 		done <- serve(httpSrv, ln, 5*time.Second, stop)
 	}()
 
-	time.Sleep(100 * time.Millisecond)
-
-	resp, err := http.Get("http://" + ln.Addr().String() + "/health")
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("health: %d", resp.StatusCode)
+	addr := "http://" + ln.Addr().String() + "/health"
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		resp, err := http.Get(addr)
+		if err == nil {
+			_ = resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				break
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("server not ready within 3s: %v", err)
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 
 	stop <- syscall.SIGINT
