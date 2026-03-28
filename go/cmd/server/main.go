@@ -57,14 +57,20 @@ func run(cfg config.Config, stop <-chan os.Signal) error {
 func serve(httpSrv *http.Server, ln net.Listener, timeout time.Duration, stop <-chan os.Signal) error {
 	errCh := make(chan error, 1)
 	go func() {
-		if err := httpSrv.Serve(ln); err != nil && err != http.ErrServerClosed {
+		err := httpSrv.Serve(ln)
+		if err != nil && err != http.ErrServerClosed {
 			errCh <- err
+		} else {
+			errCh <- nil
 		}
 	}()
 
 	select {
 	case err := <-errCh:
-		return fmt.Errorf("serve: %w", err)
+		if err != nil {
+			return fmt.Errorf("serve: %w", err)
+		}
+		return nil
 	case sig := <-stop:
 		log.Printf("signal received: %v, shutting down", sig)
 	}
@@ -73,11 +79,9 @@ func serve(httpSrv *http.Server, ln net.Listener, timeout time.Duration, stop <-
 	defer cancel()
 	shutdownErr := httpSrv.Shutdown(ctx)
 
-	// Drain any Serve error that arrived during shutdown.
-	select {
-	case err := <-errCh:
+	// Block until Serve goroutine exits so we never miss an error.
+	if err := <-errCh; err != nil {
 		return fmt.Errorf("serve: %w", err)
-	default:
 	}
 
 	if shutdownErr != nil {
