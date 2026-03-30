@@ -28,7 +28,7 @@ func isFKViolation(err error) bool {
 
 func wrapFKError(err error) error {
 	if isFKViolation(err) {
-		return fmt.Errorf("%w: %v", store.ErrFKViolation, err)
+		return errors.Join(store.ErrFKViolation, err)
 	}
 	return err
 }
@@ -168,7 +168,7 @@ func (s *Store) GroupSetParent(ctx context.Context, domainID, groupID string, pa
 			return err
 		}
 		if p.DomainID != domainID {
-			return fmt.Errorf("parent group wrong domain")
+			return fmt.Errorf("%w: parent group wrong domain", store.ErrInvalidInput)
 		}
 		walk := *parentID
 		const maxSteps = 1_000_000
