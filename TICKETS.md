@@ -66,7 +66,7 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 | T4 | Materialized `user_resource_mask` for hot path | open | If profiling requires |
 | T5 | Authz benchmarks / load tests | open | k6 etc.; pairs **T4** |
 | T30 | Go coverage above 90% | done | Raise **`go/`** statement coverage past **90%** (see **`make cover`**); add tests for thin **`cmd/`** wiring and edge paths; optional CI gate |
-| T31 | Handler error classification | open | `addUserToGroup`, `grantUserPermission`, `grantGroupPermission` map **all** store errors to 400; closed-DB / unexpected errors should be 500. Requires typed errors in store layer (e.g. `store.ErrConflict`, `store.ErrFKViolation`). `groupSetParent` partial fix done (ErrNotFound → 404); remaining non-validation errors still 400 |
+| T31 | Handler error classification | open | `addUserToGroup`, `grantUserPermission`, `grantGroupPermission` map **all** store errors to 400; closed-DB / unexpected errors should be 500. Requires typed errors in store layer (e.g. `store.ErrConflict`, `store.ErrFKViolation`). `groupSetParent` partial fix done (ErrNotFound → 404); remaining non-validation errors still 400. Plan: [plan/phase-6/T31-handler-error-classification.md](plan/phase-6/T31-handler-error-classification.md) |
 
 ---
 
