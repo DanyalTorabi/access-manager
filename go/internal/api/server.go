@@ -149,11 +149,7 @@ func (s *Server) userGet(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "userID")
 	u, err := s.Store.UserGet(r.Context(), domainID, id)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			http.NotFound(w, r)
-			return
-		}
-		writeErr(w, http.StatusInternalServerError, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, u)
@@ -194,11 +190,7 @@ func (s *Server) groupGet(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "groupID")
 	g, err := s.Store.GroupGet(r.Context(), domainID, id)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			http.NotFound(w, r)
-			return
-		}
-		writeErr(w, http.StatusInternalServerError, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, g)
@@ -212,11 +204,7 @@ func (s *Server) groupSetParent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Store.GroupSetParent(r.Context(), domainID, groupID, b.ParentGroupID); err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			http.NotFound(w, r)
-			return
-		}
-		writeErr(w, http.StatusBadRequest, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -254,11 +242,7 @@ func (s *Server) resourceGet(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "resourceID")
 	res, err := s.Store.ResourceGet(r.Context(), domainID, id)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			http.NotFound(w, r)
-			return
-		}
-		writeErr(w, http.StatusInternalServerError, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, res)
@@ -336,11 +320,7 @@ func (s *Server) permissionGet(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "permissionID")
 	p, err := s.Store.PermissionGet(r.Context(), domainID, id)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			http.NotFound(w, r)
-			return
-		}
-		writeErr(w, http.StatusInternalServerError, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, p)
@@ -351,7 +331,7 @@ func (s *Server) addUserToGroup(w http.ResponseWriter, r *http.Request) {
 	uid := chi.URLParam(r, "userID")
 	gid := chi.URLParam(r, "groupID")
 	if err := s.Store.AddUserToGroup(r.Context(), domainID, uid, gid); err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -362,11 +342,7 @@ func (s *Server) removeUserFromGroup(w http.ResponseWriter, r *http.Request) {
 	uid := chi.URLParam(r, "userID")
 	gid := chi.URLParam(r, "groupID")
 	if err := s.Store.RemoveUserFromGroup(r.Context(), domainID, uid, gid); err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			http.NotFound(w, r)
-			return
-		}
-		writeErr(w, http.StatusInternalServerError, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -377,7 +353,7 @@ func (s *Server) grantUserPermission(w http.ResponseWriter, r *http.Request) {
 	uid := chi.URLParam(r, "userID")
 	pid := chi.URLParam(r, "permissionID")
 	if err := s.Store.GrantUserPermission(r.Context(), domainID, uid, pid); err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -388,11 +364,7 @@ func (s *Server) revokeUserPermission(w http.ResponseWriter, r *http.Request) {
 	uid := chi.URLParam(r, "userID")
 	pid := chi.URLParam(r, "permissionID")
 	if err := s.Store.RevokeUserPermission(r.Context(), domainID, uid, pid); err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			http.NotFound(w, r)
-			return
-		}
-		writeErr(w, http.StatusInternalServerError, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -403,7 +375,7 @@ func (s *Server) grantGroupPermission(w http.ResponseWriter, r *http.Request) {
 	gid := chi.URLParam(r, "groupID")
 	pid := chi.URLParam(r, "permissionID")
 	if err := s.Store.GrantGroupPermission(r.Context(), domainID, gid, pid); err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -414,11 +386,7 @@ func (s *Server) revokeGroupPermission(w http.ResponseWriter, r *http.Request) {
 	gid := chi.URLParam(r, "groupID")
 	pid := chi.URLParam(r, "permissionID")
 	if err := s.Store.RevokeGroupPermission(r.Context(), domainID, gid, pid); err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			http.NotFound(w, r)
-			return
-		}
-		writeErr(w, http.StatusInternalServerError, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -476,6 +444,21 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeErr(w http.ResponseWriter, status int, err error) {
 	writeJSON(w, status, map[string]string{"error": err.Error()})
+}
+
+// writeStoreErr classifies a store-layer error into the correct HTTP status:
+// ErrNotFound → 404, ErrFKViolation/ErrInvalidInput → 400, everything else → 500.
+func writeStoreErr(w http.ResponseWriter, _ *http.Request, err error) {
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		writeErr(w, http.StatusNotFound, err)
+	case errors.Is(err, store.ErrFKViolation):
+		writeErr(w, http.StatusBadRequest, err)
+	case errors.Is(err, store.ErrInvalidInput):
+		writeErr(w, http.StatusBadRequest, err)
+	default:
+		writeErr(w, http.StatusInternalServerError, err)
+	}
 }
 
 func readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {

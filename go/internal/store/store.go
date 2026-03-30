@@ -5,7 +5,11 @@ import (
 	"errors"
 )
 
-var ErrNotFound = errors.New("store: not found")
+var (
+	ErrNotFound     = errors.New("store: not found")
+	ErrFKViolation  = errors.New("store: foreign key constraint violation")
+	ErrInvalidInput = errors.New("store: invalid input")
+)
 
 type Domain struct {
 	ID    string

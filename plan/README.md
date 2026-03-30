@@ -12,7 +12,7 @@ This directory holds **executable mini-specs** for umbrella tickets from [TICKET
 | 3 | GitHub, Docker, CI | T29, T14, T6, T19, T13 | [phase-3](phase-3/) |
 | 4 | API hardening | T7 | [phase-4](phase-4/) |
 | 5 | P2 polish and multi-DB | T15, T17, T16, T1 | [phase-5](phase-5/) |
-| 6 | P3 scale, prod, product options | T23, T20, T22, T21, T2, T3, T4, T5 | [phase-6](phase-6/) |
+| 6 | P3 scale, prod, product options | T23, T20, T31, T32, T22, T21, T2, T3, T4, T5 | [phase-6](phase-6/) |
 
 **Within phase 3**, prefer ticket order **T29 → T14 → T6 → T19 → T13** (`go/` layout first; Docker/compose before CI integration tests that need it).
 
