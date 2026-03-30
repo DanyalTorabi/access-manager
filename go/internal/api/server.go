@@ -447,7 +447,8 @@ func writeErr(w http.ResponseWriter, status int, err error) {
 }
 
 // writeStoreErr classifies a store-layer error into the correct HTTP status:
-// ErrNotFound → 404, ErrFKViolation/ErrInvalidInput → 400, everything else → 500.
+// ErrNotFound → 404, ErrFKViolation/ErrInvalidInput → 400, ErrConflict → 409,
+// everything else → 500.
 func writeStoreErr(w http.ResponseWriter, _ *http.Request, err error) {
 	switch {
 	case errors.Is(err, store.ErrNotFound):
@@ -456,6 +457,8 @@ func writeStoreErr(w http.ResponseWriter, _ *http.Request, err error) {
 		writeErr(w, http.StatusBadRequest, err)
 	case errors.Is(err, store.ErrInvalidInput):
 		writeErr(w, http.StatusBadRequest, err)
+	case errors.Is(err, store.ErrConflict):
+		writeErr(w, http.StatusConflict, err)
 	default:
 		writeErr(w, http.StatusInternalServerError, err)
 	}

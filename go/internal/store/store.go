@@ -9,6 +9,7 @@ var (
 	ErrNotFound     = errors.New("store: not found")
 	ErrFKViolation  = errors.New("store: foreign key constraint violation")
 	ErrInvalidInput = errors.New("store: invalid input")
+	ErrConflict     = errors.New("store: conflict")
 )
 
 type Domain struct {
