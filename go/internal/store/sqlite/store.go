@@ -26,6 +26,7 @@ func isFKViolation(err error) bool {
 	return errors.As(err, &e) && e.Code() == sqlite3.SQLITE_CONSTRAINT_FOREIGNKEY
 }
 
+// TODO(T32): also detect SQLITE_CONSTRAINT_PRIMARYKEY / _UNIQUE and wrap as store.ErrConflict.
 func wrapFKError(err error) error {
 	if isFKViolation(err) {
 		return errors.Join(store.ErrFKViolation, err)

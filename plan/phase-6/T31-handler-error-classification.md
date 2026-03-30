@@ -48,7 +48,7 @@ Handlers that mutate relationships (`addUserToGroup`, `grantUserPermission`, `gr
 
 ## Out of scope
 
-- `ErrConflict` / duplicate-key handling (no current use case).
+- `ErrConflict` / duplicate-key handling (deferred to **T32**).
 - Changing the `*Create` handlers (they already handle JSON decode errors as `400`).
 - Postgres/MySQL store implementations (T1 deferred).
 

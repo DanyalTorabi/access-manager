@@ -67,6 +67,7 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 | T5 | Authz benchmarks / load tests | open | k6 etc.; pairs **T4** |
 | T30 | Go coverage above 90% | done | Raise **`go/`** statement coverage past **90%** (see **`make cover`**); add tests for thin **`cmd/`** wiring and edge paths; optional CI gate |
 | T31 | Handler error classification | open | `addUserToGroup`, `grantUserPermission`, `grantGroupPermission` map **all** store errors to 400; closed-DB / unexpected errors should be 500. Requires typed errors in store layer (e.g. `store.ErrConflict`, `store.ErrFKViolation`). `groupSetParent` partial fix done (ErrNotFound → 404); remaining non-validation errors still 400. Plan: [plan/phase-6/T31-handler-error-classification.md](plan/phase-6/T31-handler-error-classification.md) |
+| T32 | Duplicate constraint handling (ErrConflict) | open | Duplicate membership/grant inserts hit UNIQUE/PK constraint → currently 500; should be `409 Conflict`. Add `store.ErrConflict`, detect `SQLITE_CONSTRAINT_PRIMARYKEY`/`UNIQUE`, map in `writeStoreErr`. Plan: [plan/phase-6/T32-duplicate-constraint-handling.md](plan/phase-6/T32-duplicate-constraint-handling.md) |
 
 ---
 
