@@ -8,6 +8,8 @@ import (
 
 	"github.com/dtorabi/access-manager/internal/access"
 	"github.com/dtorabi/access-manager/internal/store"
+	sqlite "modernc.org/sqlite"
+	sqlite3 "modernc.org/sqlite/lib"
 )
 
 // Store implements store.Store for SQLite.
@@ -17,6 +19,18 @@ type Store struct {
 
 func New(db *sql.DB) *Store {
 	return &Store{db: db}
+}
+
+func isFKViolation(err error) bool {
+	var e *sqlite.Error
+	return errors.As(err, &e) && e.Code() == sqlite3.SQLITE_CONSTRAINT_FOREIGNKEY
+}
+
+func wrapFKError(err error) error {
+	if isFKViolation(err) {
+		return fmt.Errorf("%w: %v", store.ErrFKViolation, err)
+	}
+	return err
 }
 
 func maskToSQL(m uint64) int64 { return int64(m) }
@@ -143,7 +157,7 @@ func (s *Store) GroupList(ctx context.Context, domainID string) ([]store.Group, 
 
 func (s *Store) GroupSetParent(ctx context.Context, domainID, groupID string, parentID *string) error {
 	if parentID != nil && *parentID == groupID {
-		return fmt.Errorf("group cannot be its own parent")
+		return fmt.Errorf("%w: group cannot be its own parent", store.ErrInvalidInput)
 	}
 	if _, err := s.GroupGet(ctx, domainID, groupID); err != nil {
 		return err
@@ -160,7 +174,7 @@ func (s *Store) GroupSetParent(ctx context.Context, domainID, groupID string, pa
 		const maxSteps = 1_000_000
 		for i := 0; i < maxSteps; i++ {
 			if walk == groupID {
-				return fmt.Errorf("cycle detected in group parent chain")
+				return fmt.Errorf("%w: cycle detected in group parent chain", store.ErrInvalidInput)
 			}
 			pg, err := s.GroupGet(ctx, domainID, walk)
 			if err != nil {
@@ -282,7 +296,7 @@ func (s *Store) PermissionList(ctx context.Context, domainID string) ([]store.Pe
 func (s *Store) AddUserToGroup(ctx context.Context, domainID, userID, groupID string) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO group_members (domain_id, user_id, group_id) VALUES (?, ?, ?)`,
 		domainID, userID, groupID)
-	return err
+	return wrapFKError(err)
 }
 
 func (s *Store) RemoveUserFromGroup(ctx context.Context, domainID, userID, groupID string) error {
@@ -301,7 +315,7 @@ func (s *Store) RemoveUserFromGroup(ctx context.Context, domainID, userID, group
 func (s *Store) GrantUserPermission(ctx context.Context, domainID, userID, permissionID string) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO user_permissions (domain_id, user_id, permission_id) VALUES (?, ?, ?)`,
 		domainID, userID, permissionID)
-	return err
+	return wrapFKError(err)
 }
 
 func (s *Store) RevokeUserPermission(ctx context.Context, domainID, userID, permissionID string) error {
@@ -320,7 +334,7 @@ func (s *Store) RevokeUserPermission(ctx context.Context, domainID, userID, perm
 func (s *Store) GrantGroupPermission(ctx context.Context, domainID, groupID, permissionID string) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO group_permissions (domain_id, group_id, permission_id) VALUES (?, ?, ?)`,
 		domainID, groupID, permissionID)
-	return err
+	return wrapFKError(err)
 }
 
 func (s *Store) RevokeGroupPermission(ctx context.Context, domainID, groupID, permissionID string) error {

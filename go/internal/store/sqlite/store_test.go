@@ -428,8 +428,8 @@ func TestGroupSetParent(t *testing.T) {
 			t.Fatal(err)
 		}
 		err := s.GroupSetParent(ctx, domainID, gid, &gid)
-		if err == nil {
-			t.Fatal("want error for self-parent")
+		if !errors.Is(err, store.ErrInvalidInput) {
+			t.Fatalf("want ErrInvalidInput, got %v", err)
 		}
 		if !strings.Contains(err.Error(), "own parent") {
 			t.Fatalf("unexpected error: %v", err)
@@ -456,8 +456,8 @@ func TestGroupSetParent(t *testing.T) {
 		}
 		// g1 -> g2 -> g3; setting g1's parent to g3 closes the cycle.
 		err := s.GroupSetParent(ctx, domainID, g1, &g3)
-		if err == nil {
-			t.Fatal("want cycle error")
+		if !errors.Is(err, store.ErrInvalidInput) {
+			t.Fatalf("want ErrInvalidInput, got %v", err)
 		}
 		if !strings.Contains(err.Error(), "cycle") {
 			t.Fatalf("unexpected error: %v", err)
@@ -672,6 +672,57 @@ func TestPermissionList_emptyAndWithItems(t *testing.T) {
 	}
 	if list[0].Title != "apple" || list[1].Title != "zebra" {
 		t.Fatalf("order by title: got %+v", list)
+	}
+}
+
+func TestAddUserToGroup_fkViolation(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	gid := uuid.NewString()
+	if err := s.GroupCreate(ctx, &store.Group{ID: gid, DomainID: domainID, Title: "g"}); err != nil {
+		t.Fatal(err)
+	}
+	err := s.AddUserToGroup(ctx, domainID, uuid.NewString(), gid)
+	if !errors.Is(err, store.ErrFKViolation) {
+		t.Fatalf("want ErrFKViolation, got %v", err)
+	}
+}
+
+func TestGrantUserPermission_fkViolation(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	uid := uuid.NewString()
+	if err := s.UserCreate(ctx, &store.User{ID: uid, DomainID: domainID, Title: "u"}); err != nil {
+		t.Fatal(err)
+	}
+	err := s.GrantUserPermission(ctx, domainID, uid, uuid.NewString())
+	if !errors.Is(err, store.ErrFKViolation) {
+		t.Fatalf("want ErrFKViolation, got %v", err)
+	}
+}
+
+func TestGrantGroupPermission_fkViolation(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	gid := uuid.NewString()
+	if err := s.GroupCreate(ctx, &store.Group{ID: gid, DomainID: domainID, Title: "g"}); err != nil {
+		t.Fatal(err)
+	}
+	err := s.GrantGroupPermission(ctx, domainID, gid, uuid.NewString())
+	if !errors.Is(err, store.ErrFKViolation) {
+		t.Fatalf("want ErrFKViolation, got %v", err)
 	}
 }
 

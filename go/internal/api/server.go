@@ -212,11 +212,7 @@ func (s *Server) groupSetParent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Store.GroupSetParent(r.Context(), domainID, groupID, b.ParentGroupID); err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			http.NotFound(w, r)
-			return
-		}
-		writeErr(w, http.StatusBadRequest, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -351,7 +347,7 @@ func (s *Server) addUserToGroup(w http.ResponseWriter, r *http.Request) {
 	uid := chi.URLParam(r, "userID")
 	gid := chi.URLParam(r, "groupID")
 	if err := s.Store.AddUserToGroup(r.Context(), domainID, uid, gid); err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -377,7 +373,7 @@ func (s *Server) grantUserPermission(w http.ResponseWriter, r *http.Request) {
 	uid := chi.URLParam(r, "userID")
 	pid := chi.URLParam(r, "permissionID")
 	if err := s.Store.GrantUserPermission(r.Context(), domainID, uid, pid); err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -403,7 +399,7 @@ func (s *Server) grantGroupPermission(w http.ResponseWriter, r *http.Request) {
 	gid := chi.URLParam(r, "groupID")
 	pid := chi.URLParam(r, "permissionID")
 	if err := s.Store.GrantGroupPermission(r.Context(), domainID, gid, pid); err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -476,6 +472,21 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeErr(w http.ResponseWriter, status int, err error) {
 	writeJSON(w, status, map[string]string{"error": err.Error()})
+}
+
+// writeStoreErr classifies a store-layer error into the correct HTTP status:
+// ErrNotFound → 404, ErrFKViolation → 400, everything else → 500.
+func writeStoreErr(w http.ResponseWriter, _ *http.Request, err error) {
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		writeErr(w, http.StatusNotFound, err)
+	case errors.Is(err, store.ErrFKViolation):
+		writeErr(w, http.StatusBadRequest, err)
+	case errors.Is(err, store.ErrInvalidInput):
+		writeErr(w, http.StatusBadRequest, err)
+	default:
+		writeErr(w, http.StatusInternalServerError, err)
+	}
 }
 
 func readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
