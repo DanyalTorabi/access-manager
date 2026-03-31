@@ -1206,6 +1206,142 @@ func TestAPI_grantGroupPermission_unknownPermission(t *testing.T) {
 	}
 }
 
+func TestAPI_addUserToGroup_duplicate(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	var dom store.Domain
+	if err := json.Unmarshal(mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"d"}`), &dom); err != nil {
+		t.Fatal(err)
+	}
+	base := ts.URL + "/api/v1/domains/" + dom.ID
+	var user store.User
+	if err := json.Unmarshal(mustPostJSON201(t, base+"/users", `{"title":"u"}`), &user); err != nil {
+		t.Fatal(err)
+	}
+	var group store.Group
+	if err := json.Unmarshal(mustPostJSON201(t, base+"/groups", `{"title":"g"}`), &group); err != nil {
+		t.Fatal(err)
+	}
+	addURL := base + "/users/" + user.ID + "/groups/" + group.ID
+	req1, err := http.NewRequest(http.MethodPost, addURL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res1, err := http.DefaultClient.Do(req1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res1.Body.Close()
+	if res1.StatusCode != http.StatusNoContent {
+		t.Fatalf("first add: want 204, got %d", res1.StatusCode)
+	}
+	req2, err := http.NewRequest(http.MethodPost, addURL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res2, err := http.DefaultClient.Do(req2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res2.Body.Close()
+	if res2.StatusCode != http.StatusConflict {
+		t.Fatalf("duplicate add: want 409, got %d", res2.StatusCode)
+	}
+}
+
+func TestAPI_grantUserPermission_duplicate(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	var dom store.Domain
+	if err := json.Unmarshal(mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"d"}`), &dom); err != nil {
+		t.Fatal(err)
+	}
+	base := ts.URL + "/api/v1/domains/" + dom.ID
+	var user store.User
+	if err := json.Unmarshal(mustPostJSON201(t, base+"/users", `{"title":"u"}`), &user); err != nil {
+		t.Fatal(err)
+	}
+	var resource store.Resource
+	if err := json.Unmarshal(mustPostJSON201(t, base+"/resources", `{"title":"r"}`), &resource); err != nil {
+		t.Fatal(err)
+	}
+	body := fmt.Sprintf(`{"title":"p","resource_id":%q,"access_mask":"0x1"}`, resource.ID)
+	var perm store.Permission
+	if err := json.Unmarshal(mustPostJSON201(t, base+"/permissions", body), &perm); err != nil {
+		t.Fatal(err)
+	}
+	grantURL := base + "/users/" + user.ID + "/permissions/" + perm.ID
+	req1, err := http.NewRequest(http.MethodPost, grantURL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res1, err := http.DefaultClient.Do(req1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res1.Body.Close()
+	if res1.StatusCode != http.StatusNoContent {
+		t.Fatalf("first grant: want 204, got %d", res1.StatusCode)
+	}
+	req2, err := http.NewRequest(http.MethodPost, grantURL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res2, err := http.DefaultClient.Do(req2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res2.Body.Close()
+	if res2.StatusCode != http.StatusConflict {
+		t.Fatalf("duplicate grant: want 409, got %d", res2.StatusCode)
+	}
+}
+
+func TestAPI_grantGroupPermission_duplicate(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	var dom store.Domain
+	if err := json.Unmarshal(mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"d"}`), &dom); err != nil {
+		t.Fatal(err)
+	}
+	base := ts.URL + "/api/v1/domains/" + dom.ID
+	var group store.Group
+	if err := json.Unmarshal(mustPostJSON201(t, base+"/groups", `{"title":"g"}`), &group); err != nil {
+		t.Fatal(err)
+	}
+	var resource store.Resource
+	if err := json.Unmarshal(mustPostJSON201(t, base+"/resources", `{"title":"r"}`), &resource); err != nil {
+		t.Fatal(err)
+	}
+	body := fmt.Sprintf(`{"title":"p","resource_id":%q,"access_mask":"0x1"}`, resource.ID)
+	var perm store.Permission
+	if err := json.Unmarshal(mustPostJSON201(t, base+"/permissions", body), &perm); err != nil {
+		t.Fatal(err)
+	}
+	grantURL := base + "/groups/" + group.ID + "/permissions/" + perm.ID
+	req1, err := http.NewRequest(http.MethodPost, grantURL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res1, err := http.DefaultClient.Do(req1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res1.Body.Close()
+	if res1.StatusCode != http.StatusNoContent {
+		t.Fatalf("first grant: want 204, got %d", res1.StatusCode)
+	}
+	req2, err := http.NewRequest(http.MethodPost, grantURL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res2, err := http.DefaultClient.Do(req2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res2.Body.Close()
+	if res2.StatusCode != http.StatusConflict {
+		t.Fatalf("duplicate grant: want 409, got %d", res2.StatusCode)
+	}
+}
+
 func TestAPI_authzMasks_happyPath(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	var dom store.Domain
