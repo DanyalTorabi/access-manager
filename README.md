@@ -80,7 +80,7 @@ make docker-up          # starts app + prometheus + grafana
 |---------|-----|
 | **App** | http://127.0.0.1:8080 |
 | **Prometheus** | http://127.0.0.1:9090 |
-| **Grafana** | http://127.0.0.1:3000 (anonymous admin) |
+| **Grafana** | http://127.0.0.1:3000 (anonymous viewer) |
 
 Grafana is provisioned with a Prometheus datasource and an **Access Manager** dashboard showing request rate, latency percentiles, error rate, and authz check volume.
 

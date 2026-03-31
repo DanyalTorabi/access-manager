@@ -34,6 +34,8 @@ func (s *Server) Router(reg prometheus.Registerer, gather prometheus.Gatherer) c
 	if reg != nil {
 		s.metrics = NewMetrics(reg)
 		r.Use(s.metrics.Middleware)
+	} else {
+		s.metrics = nil
 	}
 
 	r.Get("/health", s.health)
