@@ -36,10 +36,10 @@ func newTestAPIWithMetrics(t *testing.T) (*httptest.Server, store.Store, *promet
 	return ts, st, reg
 }
 
-func TestMetrics_healthIncrementsCounter(t *testing.T) {
+func TestMetrics_apiRouteIncrementsCounter(t *testing.T) {
 	ts, _, reg := newTestAPIWithMetrics(t)
 
-	res, err := http.Get(ts.URL + "/health")
+	res, err := http.Get(ts.URL + "/api/v1/domains")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,10 +54,33 @@ func TestMetrics_healthIncrementsCounter(t *testing.T) {
 	}
 }
 
-func TestMetrics_requestDurationRecorded(t *testing.T) {
+func TestMetrics_healthExcludedFromCounter(t *testing.T) {
 	ts, _, reg := newTestAPIWithMetrics(t)
 
 	res, err := http.Get(ts.URL + "/health")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("want 200, got %d", res.StatusCode)
+	}
+
+	mfs, err := reg.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mf := range mfs {
+		if mf.GetName() == "http_requests_total" {
+			t.Fatal("http_requests_total should not exist after only /health requests")
+		}
+	}
+}
+
+func TestMetrics_requestDurationRecorded(t *testing.T) {
+	ts, _, reg := newTestAPIWithMetrics(t)
+
+	res, err := http.Get(ts.URL + "/api/v1/domains")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,13 +98,13 @@ func TestMetrics_requestDurationRecorded(t *testing.T) {
 func TestMetrics_endpoint(t *testing.T) {
 	ts, _, _ := newTestAPIWithMetrics(t)
 
-	res, err := http.Get(ts.URL + "/health")
+	res, err := http.Get(ts.URL + "/api/v1/domains")
 	if err != nil {
 		t.Fatal(err)
 	}
 	_ = res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		t.Fatalf("/health want 200, got %d", res.StatusCode)
+		t.Fatalf("/api/v1/domains want 200, got %d", res.StatusCode)
 	}
 
 	res, err = http.Get(ts.URL + "/metrics")
