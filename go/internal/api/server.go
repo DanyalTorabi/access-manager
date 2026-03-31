@@ -122,7 +122,7 @@ func parentGroupAuditAttrs(parentID *string, explicitClear bool) []slog.Attr {
 		return []slog.Attr{slog.String("parent_group_id", *parentID)}
 	}
 	if explicitClear {
-		return []slog.Attr{slog.String("parent_group_id", ""), slog.Bool("parent_cleared", true)}
+		return []slog.Attr{slog.Bool("parent_cleared", true)}
 	}
 	return []slog.Attr{slog.Bool("parent_root", true)}
 }
@@ -311,7 +311,7 @@ func (s *Server) accessTypeCreate(w http.ResponseWriter, r *http.Request) {
 	logger.Audit(r.Context(), "access_type_create",
 		slog.String("domain_id", domainID),
 		slog.String("access_type_id", a.ID),
-		slog.String("bit", strconv.FormatUint(a.Bit, 10)),
+		slog.Uint64("bit", a.Bit),
 	)
 	writeJSON(w, http.StatusCreated, a)
 }
@@ -352,7 +352,7 @@ func (s *Server) permissionCreate(w http.ResponseWriter, r *http.Request) {
 		slog.String("domain_id", domainID),
 		slog.String("permission_id", p.ID),
 		slog.String("resource_id", p.ResourceID),
-		slog.String("access_mask", strconv.FormatUint(p.AccessMask, 10)),
+		slog.Uint64("access_mask", p.AccessMask),
 	)
 	writeJSON(w, http.StatusCreated, p)
 }

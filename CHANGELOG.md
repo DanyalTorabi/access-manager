@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Migrated `cmd/server` from `log.Printf` / `log.Fatal` to structured `internal/logger` calls (**T20**)
-- Bumped Go version in `go.mod` from 1.25.0 → 1.25.8 to pick up stdlib security patches (**T20**)
+- Pinned toolchain to **go1.25.8** via `toolchain` in `go/go.mod` (language `go 1.25.0`) for stdlib security patches (**T20**)
 - Contributor docs: defer valid PR review follow-ups to a named ticket (**Txx**) with a tracking note in **`plan/`** (AGENTS, CONTRIBUTING, Cursor rules)
 
 ## [0.1.0] - 2026-03-27
