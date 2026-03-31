@@ -106,7 +106,7 @@ func TestMetrics_endpoint(t *testing.T) {
 	}
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		t.Fatalf("failed to read /metrics body: %v", err)
+		t.Fatalf("read /metrics body: %v", err)
 	}
 	if !strings.Contains(string(body), "http_requests_total") {
 		t.Fatal("metrics body missing http_requests_total")

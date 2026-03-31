@@ -85,6 +85,37 @@ func mustPostJSON201(t *testing.T, urlStr, body string) []byte {
 	return b
 }
 
+// auditLogEntries returns each newline-delimited JSON object from buf that has audit=true.
+func auditLogEntries(t *testing.T, buf string) []map[string]any {
+	t.Helper()
+	var out []map[string]any
+	for _, rawLine := range strings.Split(buf, "\n") {
+		rawLine = strings.TrimSpace(rawLine)
+		if rawLine == "" {
+			continue
+		}
+		var m map[string]any
+		if err := json.Unmarshal([]byte(rawLine), &m); err != nil {
+			t.Fatalf("log line JSON: %v — line %q — full buf: %q", err, rawLine, buf)
+		}
+		if v, ok := m["audit"]; ok && v == true {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func auditLogEntriesWithAction(t *testing.T, buf, action string) []map[string]any {
+	t.Helper()
+	var out []map[string]any
+	for _, e := range auditLogEntries(t, buf) {
+		if e["action"] == action {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
 func TestAPI_auditLog_domainCreate(t *testing.T) {
 	var buf bytes.Buffer
 	logger.Init(slog.LevelInfo, &buf)
@@ -106,18 +137,13 @@ func TestAPI_auditLog_domainCreate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var line map[string]any
-	if err := json.Unmarshal(bytes.TrimSpace(buf.Bytes()), &line); err != nil {
-		t.Fatalf("audit log JSON: %v — raw: %q", err, buf.String())
+	domainAudits := auditLogEntriesWithAction(t, buf.String(), "domain_create")
+	if len(domainAudits) != 1 {
+		t.Fatalf("want 1 domain_create audit, got %d in %q", len(domainAudits), buf.String())
 	}
+	line := domainAudits[0]
 	if line["msg"] != "audit" {
 		t.Fatalf("want msg=audit, got %v", line["msg"])
-	}
-	if line["audit"] != true {
-		t.Fatalf("want audit=true, got %v", line["audit"])
-	}
-	if line["action"] != "domain_create" {
-		t.Fatalf("want action=domain_create, got %v", line["action"])
 	}
 	if line["domain_id"] != created.ID {
 		t.Fatalf("want domain_id=%q, got %v", created.ID, line["domain_id"])
@@ -137,17 +163,11 @@ func TestAPI_auditLog_groupCreate_parentFields(t *testing.T) {
 	base := ts.URL + "/api/v1/domains/" + dom.ID
 
 	mustPostJSON201(t, base+"/groups", `{"title":"rootg"}`)
-	lines := bytes.Split(bytes.TrimSpace(buf.Bytes()), []byte{'\n'})
-	if len(lines) != 2 {
-		t.Fatalf("want 2 audit lines, got %d: %q", len(lines), buf.String())
+	groups := auditLogEntriesWithAction(t, buf.String(), "group_create")
+	if len(groups) != 1 {
+		t.Fatalf("want 1 group_create audit after first group, got %d: %q", len(groups), buf.String())
 	}
-	var rootLine map[string]any
-	if err := json.Unmarshal(lines[1], &rootLine); err != nil {
-		t.Fatal(err)
-	}
-	if rootLine["action"] != "group_create" {
-		t.Fatalf("want group_create, got %v", rootLine["action"])
-	}
+	rootLine := groups[0]
 	if rootLine["parent_root"] != true {
 		t.Fatalf("want parent_root=true for root group, got %v", rootLine["parent_root"])
 	}
@@ -158,17 +178,11 @@ func TestAPI_auditLog_groupCreate_parentFields(t *testing.T) {
 	}
 	childBody := fmt.Sprintf(`{"title":"ch","parent_group_id":%q}`, parent.ID)
 	mustPostJSON201(t, base+"/groups", childBody)
-	lines = bytes.Split(bytes.TrimSpace(buf.Bytes()), []byte{'\n'})
-	if len(lines) != 4 {
-		t.Fatalf("want 4 audit lines (domain + 3 groups), got %d: %q", len(lines), buf.String())
+	groups = auditLogEntriesWithAction(t, buf.String(), "group_create")
+	if len(groups) != 3 {
+		t.Fatalf("want 3 group_create audits after domain + 3 groups, got %d: %q", len(groups), buf.String())
 	}
-	var childLine map[string]any
-	if err := json.Unmarshal(lines[3], &childLine); err != nil {
-		t.Fatal(err)
-	}
-	if childLine["action"] != "group_create" {
-		t.Fatalf("want group_create, got %v", childLine["action"])
-	}
+	childLine := groups[len(groups)-1]
 	if childLine["parent_group_id"] != parent.ID {
 		t.Fatalf("want parent_group_id=%q, got %v", parent.ID, childLine["parent_group_id"])
 	}

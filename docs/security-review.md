@@ -47,7 +47,7 @@ Short threat model and security posture for the access-manager service.
 |------|------------|
 | SQL injection | All queries use `?` parameterized placeholders; no string concatenation. |
 | Timing attacks on auth | Bearer token compared via SHA-256 digest + `subtle.ConstantTimeCompare`. |
-| Accidental public exposure | Default listen address `127.0.0.1:8080`; startup warning if non-loopback without token. |
+| Accidental public exposure | **Process default** (e.g. local `go run`, env unset): listen on loopback `127.0.0.1:8080`. **Container image / compose** often set `HTTP_ADDR=0.0.0.0:8080` inside the container so the port can be published; restrict **host** binding (e.g. `127.0.0.1:8080:8080`) and network policy. Startup warns if the process binds a non-loopback address without a Bearer token. |
 | Vulnerable dependencies | `govulncheck` in CI and `make vuln`; gosec linter enabled. |
 | Unaudited privilege changes | Structured audit log (`audit=true`) emitted for all 13 mutation endpoints. |
 | Container privilege | Distroless non-root image; SQLite on tmpfs. |
