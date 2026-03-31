@@ -435,6 +435,9 @@ func (s *Server) authzCheck(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err)
 		return
 	}
+	if s.metrics != nil {
+		s.metrics.AuthzTotal.WithLabelValues(domainID).Inc()
+	}
 	allowed := access.HasBit(mask, bit)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"allowed":        allowed,
@@ -458,6 +461,9 @@ func (s *Server) authzMasks(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err)
 		return
+	}
+	if s.metrics != nil {
+		s.metrics.AuthzTotal.WithLabelValues(domainID).Inc()
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"masks": masks})
 }
