@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -36,7 +37,15 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 			Help: "Total authorization check calls by domain.",
 		}, []string{"domain_id"}),
 	}
-	reg.MustRegister(m.ReqTotal, m.ReqDuration, m.AuthzTotal)
+	for _, c := range []prometheus.Collector{m.ReqTotal, m.ReqDuration, m.AuthzTotal} {
+		if err := reg.Register(c); err != nil {
+			var are prometheus.AlreadyRegisteredError
+			if errors.As(err, &are) {
+				continue
+			}
+			panic(err)
+		}
+	}
 	return m
 }
 

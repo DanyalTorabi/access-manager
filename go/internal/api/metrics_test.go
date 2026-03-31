@@ -11,7 +11,7 @@ import (
 
 	"github.com/dtorabi/access-manager/internal/store"
 	sqlstore "github.com/dtorabi/access-manager/internal/store/sqlite"
-	testutil2 "github.com/dtorabi/access-manager/internal/testutil"
+	"github.com/dtorabi/access-manager/internal/testutil"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -21,7 +21,7 @@ func newTestAPIWithMetrics(t *testing.T) (*httptest.Server, store.Store, *promet
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := sqlstore.MigrateUp(db, testutil2.SQLiteMigrationsDir(t)); err != nil {
+	if err := sqlstore.MigrateUp(db, testutil.SQLiteMigrationsDir(t)); err != nil {
 		_ = db.Close()
 		t.Fatal(err)
 	}
@@ -62,6 +62,9 @@ func TestMetrics_requestDurationRecorded(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("want 200, got %d", res.StatusCode)
+	}
 
 	count := findHistogramSampleCount(t, reg, "http_request_duration_seconds")
 	if count < 1 {
@@ -77,6 +80,9 @@ func TestMetrics_endpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("/health want 200, got %d", res.StatusCode)
+	}
 
 	res, err = http.Get(ts.URL + "/metrics")
 	if err != nil {
