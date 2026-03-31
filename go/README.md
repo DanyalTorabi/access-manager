@@ -74,6 +74,7 @@ Run **`make`** from the **repository root** (`make test`, `make lint`, …) or f
 | Run server | `make run` |
 | E2E smoke (**T16**) | From **repo root**: `make e2e` → `go test -race -count=1 -tags=e2e ./e2e/...` (running server; optional **`API_BEARER_TOKEN`**). Optional curl script: **`make e2e-bash`**. See **[test/e2e/README.md](../test/e2e/README.md)**. |
 | Lint | `make lint` |
+| Vuln check | `make vuln` → `govulncheck ./...` |
 | Tidy modules | `make tidy` |
 
 Docker (from **repo root** only): `make docker-build`, `make docker-up`, `make docker-logs`, `make docker-down` — see [root README](../README.md#docker-t19).
@@ -98,6 +99,14 @@ on **`/api/v1/*`** requests. **`/health`** is not protected. The service compare
 
 Full HTTP contract: **[`api/openapi.yaml`](../api/openapi.yaml)** (OpenAPI 3) and **[`api/postman/access-manager.postman_collection.json`](../api/postman/access-manager.postman_collection.json)**. Import steps and **`baseUrl`** / **`bearerToken`** variables: **[`api/README.md`](../api/README.md)** (**T17**).
 
+### Structured logging & audit (T20)
+
+Server output is structured JSON via `internal/logger` (wrapping `log/slog`). All 13 mutation handlers emit audit events with `audit=true`, the action name, and relevant entity IDs. Example:
+
+```json
+{"time":"...","level":"INFO","msg":"audit","audit":true,"action":"grant_user_permission","domain_id":"d1","user_id":"u1","permission_id":"p1"}
+```
+
 ## Package layout
 
 | Path | Purpose |
@@ -107,6 +116,7 @@ Full HTTP contract: **[`api/openapi.yaml`](../api/openapi.yaml)** (OpenAPI 3) an
 | `internal/access` | Access-mask helpers (library-oriented) |
 | `internal/store` | Store interfaces and types |
 | `internal/store/sqlite` | SQLite implementation |
+| `internal/logger` | Structured JSON logger wrapping `log/slog`; audit events |
 | `internal/database` | Driver open + migrations runner |
 | `migrations/sqlite` | SQL migrations |
 

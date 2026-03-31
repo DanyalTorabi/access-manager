@@ -3,11 +3,13 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/dtorabi/access-manager/internal/access"
+	"github.com/dtorabi/access-manager/internal/logger"
 	"github.com/dtorabi/access-manager/internal/store"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -122,6 +124,7 @@ func (s *Server) domainCreate(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "domain_create", slog.String("domain_id", d.ID))
 	writeJSON(w, http.StatusCreated, d)
 }
 
@@ -148,6 +151,7 @@ func (s *Server) userCreate(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "user_create", slog.String("domain_id", domainID), slog.String("user_id", u.ID))
 	writeJSON(w, http.StatusCreated, u)
 }
 
@@ -189,6 +193,7 @@ func (s *Server) groupCreate(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "group_create", slog.String("domain_id", domainID), slog.String("group_id", g.ID))
 	writeJSON(w, http.StatusCreated, g)
 }
 
@@ -227,6 +232,7 @@ func (s *Server) groupSetParent(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "group_set_parent", slog.String("domain_id", domainID), slog.String("group_id", groupID))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -241,6 +247,7 @@ func (s *Server) resourceCreate(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "resource_create", slog.String("domain_id", domainID), slog.String("resource_id", res.ID))
 	writeJSON(w, http.StatusCreated, res)
 }
 
@@ -284,6 +291,7 @@ func (s *Server) accessTypeCreate(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "access_type_create", slog.String("domain_id", domainID), slog.String("access_type_id", a.ID))
 	writeJSON(w, http.StatusCreated, a)
 }
 
@@ -319,6 +327,7 @@ func (s *Server) permissionCreate(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "permission_create", slog.String("domain_id", domainID), slog.String("permission_id", p.ID))
 	writeJSON(w, http.StatusCreated, p)
 }
 
@@ -354,6 +363,7 @@ func (s *Server) addUserToGroup(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "add_user_to_group", slog.String("domain_id", domainID), slog.String("user_id", uid), slog.String("group_id", gid))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -365,6 +375,7 @@ func (s *Server) removeUserFromGroup(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "remove_user_from_group", slog.String("domain_id", domainID), slog.String("user_id", uid), slog.String("group_id", gid))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -376,6 +387,7 @@ func (s *Server) grantUserPermission(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "grant_user_permission", slog.String("domain_id", domainID), slog.String("user_id", uid), slog.String("permission_id", pid))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -387,6 +399,7 @@ func (s *Server) revokeUserPermission(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "revoke_user_permission", slog.String("domain_id", domainID), slog.String("user_id", uid), slog.String("permission_id", pid))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -398,6 +411,7 @@ func (s *Server) grantGroupPermission(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "grant_group_permission", slog.String("domain_id", domainID), slog.String("group_id", gid), slog.String("permission_id", pid))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -409,6 +423,7 @@ func (s *Server) revokeGroupPermission(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "revoke_group_permission", slog.String("domain_id", domainID), slog.String("group_id", gid), slog.String("permission_id", pid))
 	w.WriteHeader(http.StatusNoContent)
 }
 

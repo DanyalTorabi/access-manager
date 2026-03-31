@@ -57,7 +57,7 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 
 | id | title | status | notes |
 |----|-------|--------|-------|
-| T20 | Security review | open | govulncheck, SAST, threat model, secrets |
+| T20 | Security review | done | govulncheck in CI + `make vuln`; gosec linter; `internal/logger` wrapping `log/slog` with structured audit logging on all 13 mutation handlers; threat model in [`docs/security-review.md`](docs/security-review.md); Go 1.25.8 stdlib patches |
 | T21 | Kubernetes | open | Deployments, probes, config from **T26**; ArgoCD/Terraform when org defines |
 | T22 | Environments: dev / PR / staging / prod | open | Promotion, secrets, DB per env |
 | T23 | Observability | done | **Prometheus** metrics (`/metrics`), **Grafana** dashboards, compose; middleware + authz counter; tests. Plan: [plan/phase-6/T23-observability-prometheus-grafana.md](plan/phase-6/T23-observability-prometheus-grafana.md) |

@@ -5,6 +5,8 @@ run:
 
 linters:
   default: standard
+  enable:
+    - gosec
   disable:
     # noisy or redundant with go vet for this small codebase; re-enable as needed
     - depguard
@@ -16,6 +18,14 @@ linters:
     - tagliatelle
     - varnamelen
     - wsl
+  settings:
+    gosec:
+      excludes:
+        - G107  # variable URLs in tests
+        - G101  # env var name constants
+        - G304  # config/migration file reads from configured paths
+        - G115  # intentional uint64↔int64 mask conversion
+        - G703  # config file path from env, not user input
 
 issues:
   max-same-issues: 10
