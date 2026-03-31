@@ -1222,7 +1222,10 @@ func TestAPI_addUserToGroup_duplicate(t *testing.T) {
 		t.Fatal(err)
 	}
 	addURL := base + "/users/" + user.ID + "/groups/" + group.ID
-	req1, _ := http.NewRequest(http.MethodPost, addURL, nil)
+	req1, err := http.NewRequest(http.MethodPost, addURL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	res1, err := http.DefaultClient.Do(req1)
 	if err != nil {
 		t.Fatal(err)
@@ -1231,7 +1234,10 @@ func TestAPI_addUserToGroup_duplicate(t *testing.T) {
 	if res1.StatusCode != http.StatusNoContent {
 		t.Fatalf("first add: want 204, got %d", res1.StatusCode)
 	}
-	req2, _ := http.NewRequest(http.MethodPost, addURL, nil)
+	req2, err := http.NewRequest(http.MethodPost, addURL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	res2, err := http.DefaultClient.Do(req2)
 	if err != nil {
 		t.Fatal(err)
@@ -1263,7 +1269,10 @@ func TestAPI_grantUserPermission_duplicate(t *testing.T) {
 		t.Fatal(err)
 	}
 	grantURL := base + "/users/" + user.ID + "/permissions/" + perm.ID
-	req1, _ := http.NewRequest(http.MethodPost, grantURL, nil)
+	req1, err := http.NewRequest(http.MethodPost, grantURL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	res1, err := http.DefaultClient.Do(req1)
 	if err != nil {
 		t.Fatal(err)
@@ -1272,7 +1281,10 @@ func TestAPI_grantUserPermission_duplicate(t *testing.T) {
 	if res1.StatusCode != http.StatusNoContent {
 		t.Fatalf("first grant: want 204, got %d", res1.StatusCode)
 	}
-	req2, _ := http.NewRequest(http.MethodPost, grantURL, nil)
+	req2, err := http.NewRequest(http.MethodPost, grantURL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	res2, err := http.DefaultClient.Do(req2)
 	if err != nil {
 		t.Fatal(err)
@@ -1304,7 +1316,10 @@ func TestAPI_grantGroupPermission_duplicate(t *testing.T) {
 		t.Fatal(err)
 	}
 	grantURL := base + "/groups/" + group.ID + "/permissions/" + perm.ID
-	req1, _ := http.NewRequest(http.MethodPost, grantURL, nil)
+	req1, err := http.NewRequest(http.MethodPost, grantURL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	res1, err := http.DefaultClient.Do(req1)
 	if err != nil {
 		t.Fatal(err)
@@ -1313,7 +1328,10 @@ func TestAPI_grantGroupPermission_duplicate(t *testing.T) {
 	if res1.StatusCode != http.StatusNoContent {
 		t.Fatalf("first grant: want 204, got %d", res1.StatusCode)
 	}
-	req2, _ := http.NewRequest(http.MethodPost, grantURL, nil)
+	req2, err := http.NewRequest(http.MethodPost, grantURL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	res2, err := http.DefaultClient.Do(req2)
 	if err != nil {
 		t.Fatal(err)
