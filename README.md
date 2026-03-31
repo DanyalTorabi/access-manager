@@ -68,6 +68,29 @@ make docker-down
 - **[docker-compose.yml](docker-compose.yml)** — `app` service  
 - **[.dockerignore](.dockerignore)**
 
+## Observability (T23)
+
+Prometheus metrics are exported at **`/metrics`** (outside bearer auth, like `/health`). Compose includes **Prometheus** and **Grafana** services bound to loopback:
+
+```bash
+make docker-up          # starts app + prometheus + grafana
+```
+
+| Service | URL |
+|---------|-----|
+| **App** | http://127.0.0.1:8080 |
+| **Prometheus** | http://127.0.0.1:9090 |
+| **Grafana** | http://127.0.0.1:3000 (anonymous admin) |
+
+Grafana is provisioned with a Prometheus datasource and an **Access Manager** dashboard showing request rate, latency percentiles, error rate, and authz check volume.
+
+Exported metrics:
+- `http_requests_total` — counter (labels: `method`, `route`, `code`)
+- `http_request_duration_seconds` — histogram (labels: `method`, `route`)
+- `authz_checks_total` — counter (label: `domain_id`)
+
+Config files live under **[`observability/`](observability/)**.
+
 ## CI / GitHub Actions (T13)
 
 Workflow: **[`.github/workflows/ci.yml`](.github/workflows/ci.yml)** runs on **pull requests** and **pushes** to **`main`**:

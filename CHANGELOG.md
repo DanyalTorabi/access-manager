@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Prometheus metrics middleware: `http_requests_total`, `http_request_duration_seconds`, `authz_checks_total`; `/metrics` endpoint (**T23**)
+- Grafana + Prometheus in `docker-compose.yml`; provisioned datasource and **Access Manager** dashboard under `observability/` (**T23**)
 - E2E smoke: **`go test -race -count=1 -tags=e2e ./e2e/...`** (**T16**); optional bash twin under **`test/e2e/bash/`**; Docker CI runs Go e2e
 - OpenAPI 3 spec and Postman collection under **`api/`** with README for **`baseUrl`** and Bearer token variables (**T17**)
 

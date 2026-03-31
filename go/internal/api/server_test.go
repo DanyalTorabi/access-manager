@@ -19,7 +19,7 @@ import (
 
 func TestHealth(t *testing.T) {
 	s := &Server{}
-	ts := httptest.NewServer(s.Router())
+	ts := httptest.NewServer(s.Router(nil, nil))
 	t.Cleanup(ts.Close)
 
 	res, err := http.Get(ts.URL + "/health")
@@ -49,7 +49,7 @@ func newTestAPI(t *testing.T) (*httptest.Server, store.Store) {
 	}
 	st := sqlstore.New(db)
 	srv := &Server{Store: st}
-	ts := httptest.NewServer(srv.Router())
+	ts := httptest.NewServer(srv.Router(nil, nil))
 	t.Cleanup(func() {
 		ts.Close()
 		_ = db.Close()
@@ -365,7 +365,7 @@ func TestAPI_health_publicWhenAPIUsesBearer(t *testing.T) {
 	defer func() { _ = db.Close() }()
 	st := sqlstore.New(db)
 	srv := &Server{Store: st, APIBearerToken: "secret-token"}
-	ts := httptest.NewServer(srv.Router())
+	ts := httptest.NewServer(srv.Router(nil, nil))
 	t.Cleanup(ts.Close)
 
 	res, err := http.Get(ts.URL + "/health")
@@ -1582,7 +1582,7 @@ func newBrokenTestAPI(t *testing.T) *httptest.Server {
 	st := sqlstore.New(db)
 	_ = db.Close()
 	srv := &Server{Store: st}
-	ts := httptest.NewServer(srv.Router())
+	ts := httptest.NewServer(srv.Router(nil, nil))
 	t.Cleanup(ts.Close)
 	return ts
 }

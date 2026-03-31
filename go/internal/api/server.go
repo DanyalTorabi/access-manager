@@ -11,6 +11,8 @@ import (
 	"github.com/dtorabi/access-manager/internal/store"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Server exposes HTTP handlers for the access manager.
@@ -19,11 +21,27 @@ type Server struct {
 	// APIBearerToken, if non-empty, requires Authorization: Bearer <token> on /api/v1/*.
 	// /health stays public. Empty means no auth on API (local dev / loopback only — document in README).
 	APIBearerToken string
+
+	metrics *Metrics
 }
 
-func (s *Server) Router() chi.Router {
+// Router builds the chi router. reg and gather supply the Prometheus registry
+// for metrics middleware and the /metrics endpoint. Pass nil for both to
+// disable instrumentation (e.g. in tests that don't care about metrics).
+func (s *Server) Router(reg prometheus.Registerer, gather prometheus.Gatherer) chi.Router {
 	r := chi.NewRouter()
+
+	if reg != nil {
+		s.metrics = NewMetrics(reg)
+		r.Use(s.metrics.Middleware)
+	}
+
 	r.Get("/health", s.health)
+	// /metrics is outside bearer auth so Prometheus can scrape without a token.
+	// Bind to loopback or use network policy when exposing beyond localhost.
+	if gather != nil {
+		r.Handle("/metrics", promhttp.HandlerFor(gather, promhttp.HandlerOpts{}))
+	}
 
 	r.Route("/api/v1", func(r chi.Router) {
 		if tok := strings.TrimSpace(s.APIBearerToken); tok != "" {
@@ -412,6 +430,9 @@ func (s *Server) authzCheck(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err)
 		return
 	}
+	if s.metrics != nil {
+		s.metrics.AuthzTotal.WithLabelValues(domainID).Inc()
+	}
 	allowed := access.HasBit(mask, bit)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"allowed":        allowed,
@@ -432,6 +453,9 @@ func (s *Server) authzMasks(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err)
 		return
+	}
+	if s.metrics != nil {
+		s.metrics.AuthzTotal.WithLabelValues(domainID).Inc()
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"masks": masks})
 }

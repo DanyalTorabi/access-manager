@@ -18,6 +18,8 @@ import (
 	"github.com/dtorabi/access-manager/internal/config"
 	"github.com/dtorabi/access-manager/internal/database"
 	sqlstore "github.com/dtorabi/access-manager/internal/store/sqlite"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 )
 
 func main() {
@@ -117,11 +119,15 @@ func setup(cfg config.Config) (*http.Server, *sql.DB, error) {
 		return nil, nil, fmt.Errorf("migrate: %w", err)
 	}
 
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+	reg.MustRegister(collectors.NewGoCollector())
+
 	st := sqlstore.New(db)
 	srv := &api.Server{Store: st, APIBearerToken: cfg.APIBearerToken}
 
 	httpSrv := &http.Server{
-		Handler:           srv.Router(),
+		Handler:           srv.Router(reg, reg),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       60 * time.Second,
 		WriteTimeout:      60 * time.Second,
