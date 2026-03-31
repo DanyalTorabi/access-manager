@@ -36,8 +36,8 @@ func TestHealth(t *testing.T) {
 	}
 }
 
-// newTestAPI returns an HTTP test server backed by a real SQLite store and migrations.
-func newTestAPI(t *testing.T) (*httptest.Server, store.Store) {
+// newTestStore returns a migrated SQLite store and a cleanup function.
+func newTestStore(t *testing.T) (store.Store, func()) {
 	t.Helper()
 	db, err := sqlstore.Open("file:" + filepath.Join(t.TempDir(), "api.db") + "?_pragma=foreign_keys(1)")
 	if err != nil {
@@ -47,12 +47,18 @@ func newTestAPI(t *testing.T) (*httptest.Server, store.Store) {
 		_ = db.Close()
 		t.Fatal(err)
 	}
-	st := sqlstore.New(db)
+	return sqlstore.New(db), func() { _ = db.Close() }
+}
+
+// newTestAPI returns an HTTP test server backed by a real SQLite store and migrations.
+func newTestAPI(t *testing.T) (*httptest.Server, store.Store) {
+	t.Helper()
+	st, cleanup := newTestStore(t)
 	srv := &Server{Store: st}
 	ts := httptest.NewServer(srv.Router(nil, nil))
 	t.Cleanup(func() {
 		ts.Close()
-		_ = db.Close()
+		cleanup()
 	})
 	return ts, st
 }
@@ -1565,6 +1571,66 @@ func mustCreateDomain(t *testing.T, ts *httptest.Server) string {
 		t.Fatal(err)
 	}
 	return out.ID
+}
+
+// --- duplicate-create 409 tests ---
+
+func TestAPI_accessTypeCreate_duplicateBit(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	var dom store.Domain
+	if err := json.Unmarshal(mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"d"}`), &dom); err != nil {
+		t.Fatal(err)
+	}
+	base := ts.URL + "/api/v1/domains/" + dom.ID
+	mustPostJSON201(t, base+"/access-types", `{"title":"read","bit":"0x1"}`)
+
+	res, err := http.Post(base+"/access-types", "application/json", strings.NewReader(`{"title":"write","bit":"0x1"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusConflict {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("duplicate bit want 409, got %d: %s", res.StatusCode, b)
+	}
+}
+
+func TestAPI_domainCreate_storeErrorClassified(t *testing.T) {
+	ts := newBrokenTestAPI(t)
+	res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(`{"title":"d"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = io.Copy(io.Discard, res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("broken store want 500, got %d", res.StatusCode)
+	}
+}
+
+// --- writeStoreErr unit tests ---
+
+func TestWriteStoreErr_allCases(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want int
+	}{
+		{"not found", store.ErrNotFound, http.StatusNotFound},
+		{"fk violation", store.ErrFKViolation, http.StatusBadRequest},
+		{"invalid input", store.ErrInvalidInput, http.StatusBadRequest},
+		{"conflict", store.ErrConflict, http.StatusConflict},
+		{"generic", fmt.Errorf("boom"), http.StatusInternalServerError},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			writeStoreErr(w, nil, tt.err)
+			if w.Code != tt.want {
+				t.Fatalf("writeStoreErr(%v) = %d, want %d", tt.err, w.Code, tt.want)
+			}
+		})
+	}
 }
 
 // --- store-error tests using a broken (closed-DB) store ---

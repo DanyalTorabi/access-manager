@@ -119,7 +119,7 @@ func (s *Server) domainCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	d := &store.Domain{ID: uuid.NewString(), Title: b.Title}
 	if err := s.Store.DomainCreate(r.Context(), d); err != nil {
-		writeErr(w, http.StatusInternalServerError, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, d)
@@ -145,7 +145,7 @@ func (s *Server) userCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	u := &store.User{ID: uuid.NewString(), DomainID: domainID, Title: b.Title}
 	if err := s.Store.UserCreate(r.Context(), u); err != nil {
-		writeErr(w, http.StatusInternalServerError, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, u)
@@ -186,7 +186,7 @@ func (s *Server) groupCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	g := &store.Group{ID: uuid.NewString(), DomainID: domainID, Title: b.Title, ParentGroupID: b.ParentGroupID}
 	if err := s.Store.GroupCreate(r.Context(), g); err != nil {
-		writeErr(w, http.StatusInternalServerError, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, g)
@@ -238,7 +238,7 @@ func (s *Server) resourceCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	res := &store.Resource{ID: uuid.NewString(), DomainID: domainID, Title: b.Title}
 	if err := s.Store.ResourceCreate(r.Context(), res); err != nil {
-		writeErr(w, http.StatusInternalServerError, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, res)
@@ -281,7 +281,7 @@ func (s *Server) accessTypeCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	a := &store.AccessType{ID: uuid.NewString(), DomainID: domainID, Title: b.Title, Bit: bit}
 	if err := s.Store.AccessTypeCreate(r.Context(), a); err != nil {
-		writeErr(w, http.StatusInternalServerError, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, a)
@@ -316,7 +316,7 @@ func (s *Server) permissionCreate(w http.ResponseWriter, r *http.Request) {
 		ResourceID: b.ResourceID, AccessMask: mask,
 	}
 	if err := s.Store.PermissionCreate(r.Context(), p); err != nil {
-		writeErr(w, http.StatusInternalServerError, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, p)
@@ -427,13 +427,13 @@ func (s *Server) authzCheck(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
+	if s.metrics != nil {
+		s.metrics.AuthzTotal.WithLabelValues(domainID).Inc()
+	}
 	mask, err := s.Store.EffectiveMask(r.Context(), domainID, userID, resourceID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err)
 		return
-	}
-	if s.metrics != nil {
-		s.metrics.AuthzTotal.WithLabelValues(domainID).Inc()
 	}
 	allowed := access.HasBit(mask, bit)
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -451,13 +451,13 @@ func (s *Server) authzMasks(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "user_id and resource_id are required", http.StatusBadRequest)
 		return
 	}
+	if s.metrics != nil {
+		s.metrics.AuthzTotal.WithLabelValues(domainID).Inc()
+	}
 	masks, err := s.Store.PermissionMasksForUserResource(r.Context(), domainID, userID, resourceID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err)
 		return
-	}
-	if s.metrics != nil {
-		s.metrics.AuthzTotal.WithLabelValues(domainID).Inc()
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"masks": masks})
 }

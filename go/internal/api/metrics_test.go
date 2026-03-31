@@ -5,33 +5,22 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/dtorabi/access-manager/internal/store"
-	sqlstore "github.com/dtorabi/access-manager/internal/store/sqlite"
-	"github.com/dtorabi/access-manager/internal/testutil"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 func newTestAPIWithMetrics(t *testing.T) (*httptest.Server, store.Store, *prometheus.Registry) {
 	t.Helper()
-	db, err := sqlstore.Open("file:" + filepath.Join(t.TempDir(), "metrics.db") + "?_pragma=foreign_keys(1)")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := sqlstore.MigrateUp(db, testutil.SQLiteMigrationsDir(t)); err != nil {
-		_ = db.Close()
-		t.Fatal(err)
-	}
-	st := sqlstore.New(db)
+	st, cleanup := newTestStore(t)
 	reg := prometheus.NewRegistry()
 	srv := &Server{Store: st}
 	ts := httptest.NewServer(srv.Router(reg, reg))
 	t.Cleanup(func() {
 		ts.Close()
-		_ = db.Close()
+		cleanup()
 	})
 	return ts, st, reg
 }
@@ -218,5 +207,66 @@ func mustUnmarshal(t *testing.T, data []byte, v any) {
 	t.Helper()
 	if err := json.Unmarshal(data, v); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// --- registerOrReuse tests ---
+
+func TestNewMetrics_idempotent(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	m1 := NewMetrics(reg)
+	m2 := NewMetrics(reg)
+	if m1.ReqTotal != m2.ReqTotal {
+		t.Fatal("second NewMetrics should reuse existing ReqTotal collector")
+	}
+	if m1.ReqDuration != m2.ReqDuration {
+		t.Fatal("second NewMetrics should reuse existing ReqDuration collector")
+	}
+	if m1.AuthzTotal != m2.AuthzTotal {
+		t.Fatal("second NewMetrics should reuse existing AuthzTotal collector")
+	}
+}
+
+// --- statusWriter tests ---
+
+func TestStatusWriter_doubleWriteHeader(t *testing.T) {
+	w := httptest.NewRecorder()
+	sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
+	sw.WriteHeader(http.StatusCreated)
+	sw.WriteHeader(http.StatusNotFound)
+	if sw.status != http.StatusCreated {
+		t.Fatalf("status should be first WriteHeader value 201, got %d", sw.status)
+	}
+	if w.Code != http.StatusCreated {
+		t.Fatalf("underlying writer should have 201, got %d", w.Code)
+	}
+}
+
+func TestStatusWriter_writeWithoutWriteHeader(t *testing.T) {
+	w := httptest.NewRecorder()
+	sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
+	_, err := sw.Write([]byte("hello"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sw.status != http.StatusOK {
+		t.Fatalf("status should default to 200, got %d", sw.status)
+	}
+	if !sw.wroteHeader {
+		t.Fatal("wroteHeader should be true after Write")
+	}
+}
+
+func TestMetrics_errorResponseCounted(t *testing.T) {
+	ts, _, reg := newTestAPIWithMetrics(t)
+	res, err := http.Get(ts.URL + "/api/v1/domains/nonexistent/users/nonexistent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+
+	counter := findCounter(t, reg, "http_requests_total")
+	if counter < 1 {
+		t.Fatalf("error responses should be counted, got %v", counter)
 	}
 }
