@@ -36,9 +36,9 @@ func Error(msg string, attrs ...slog.Attr) {
 
 // Audit emits a structured audit event at INFO level with audit=true.
 // Use for security-relevant mutations (grants, revokes, entity changes).
-func Audit(_ context.Context, action string, attrs ...slog.Attr) {
+func Audit(ctx context.Context, action string, attrs ...slog.Attr) {
 	all := make([]slog.Attr, 0, len(attrs)+2)
 	all = append(all, slog.Bool("audit", true), slog.String("action", action))
 	all = append(all, attrs...)
-	l.LogAttrs(context.Background(), slog.LevelInfo, "audit", all...)
+	l.LogAttrs(ctx, slog.LevelInfo, "audit", all...)
 }

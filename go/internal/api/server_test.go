@@ -1,16 +1,20 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/dtorabi/access-manager/internal/logger"
 	"github.com/dtorabi/access-manager/internal/store"
 	sqlstore "github.com/dtorabi/access-manager/internal/store/sqlite"
 	"github.com/dtorabi/access-manager/internal/testutil"
@@ -79,6 +83,95 @@ func mustPostJSON201(t *testing.T, urlStr, body string) []byte {
 		t.Fatalf("POST %s want 201 got %d: %s", urlStr, res.StatusCode, b)
 	}
 	return b
+}
+
+func TestAPI_auditLog_domainCreate(t *testing.T) {
+	var buf bytes.Buffer
+	logger.Init(slog.LevelInfo, &buf)
+	t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
+
+	ts, _ := newTestAPI(t)
+	payload := `{"title":"AuditCo"}`
+	res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusCreated {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var created store.Domain
+	if err := json.NewDecoder(res.Body).Decode(&created); err != nil {
+		t.Fatal(err)
+	}
+
+	var line map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(buf.Bytes()), &line); err != nil {
+		t.Fatalf("audit log JSON: %v — raw: %q", err, buf.String())
+	}
+	if line["msg"] != "audit" {
+		t.Fatalf("want msg=audit, got %v", line["msg"])
+	}
+	if line["audit"] != true {
+		t.Fatalf("want audit=true, got %v", line["audit"])
+	}
+	if line["action"] != "domain_create" {
+		t.Fatalf("want action=domain_create, got %v", line["action"])
+	}
+	if line["domain_id"] != created.ID {
+		t.Fatalf("want domain_id=%q, got %v", created.ID, line["domain_id"])
+	}
+}
+
+func TestAPI_auditLog_groupCreate_parentFields(t *testing.T) {
+	var buf bytes.Buffer
+	logger.Init(slog.LevelInfo, &buf)
+	t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
+
+	ts, _ := newTestAPI(t)
+	var dom store.Domain
+	if err := json.Unmarshal(mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"ad"}`), &dom); err != nil {
+		t.Fatal(err)
+	}
+	base := ts.URL + "/api/v1/domains/" + dom.ID
+
+	mustPostJSON201(t, base+"/groups", `{"title":"rootg"}`)
+	lines := bytes.Split(bytes.TrimSpace(buf.Bytes()), []byte{'\n'})
+	if len(lines) != 2 {
+		t.Fatalf("want 2 audit lines, got %d: %q", len(lines), buf.String())
+	}
+	var rootLine map[string]any
+	if err := json.Unmarshal(lines[1], &rootLine); err != nil {
+		t.Fatal(err)
+	}
+	if rootLine["action"] != "group_create" {
+		t.Fatalf("want group_create, got %v", rootLine["action"])
+	}
+	if rootLine["parent_root"] != true {
+		t.Fatalf("want parent_root=true for root group, got %v", rootLine["parent_root"])
+	}
+
+	var parent store.Group
+	if err := json.Unmarshal(mustPostJSON201(t, base+"/groups", `{"title":"par"}`), &parent); err != nil {
+		t.Fatal(err)
+	}
+	childBody := fmt.Sprintf(`{"title":"ch","parent_group_id":%q}`, parent.ID)
+	mustPostJSON201(t, base+"/groups", childBody)
+	lines = bytes.Split(bytes.TrimSpace(buf.Bytes()), []byte{'\n'})
+	if len(lines) != 4 {
+		t.Fatalf("want 4 audit lines (domain + 3 groups), got %d: %q", len(lines), buf.String())
+	}
+	var childLine map[string]any
+	if err := json.Unmarshal(lines[3], &childLine); err != nil {
+		t.Fatal(err)
+	}
+	if childLine["action"] != "group_create" {
+		t.Fatalf("want group_create, got %v", childLine["action"])
+	}
+	if childLine["parent_group_id"] != parent.ID {
+		t.Fatalf("want parent_group_id=%q, got %v", parent.ID, childLine["parent_group_id"])
+	}
 }
 
 func TestAPI_domainCreateAndList(t *testing.T) {

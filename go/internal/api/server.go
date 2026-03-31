@@ -114,6 +114,19 @@ type parentBody struct {
 	ParentGroupID *string `json:"parent_group_id"`
 }
 
+// parentGroupAuditAttrs adds parent hierarchy fields for group create vs set-parent.
+// When explicitClear is true (PATCH parent), nil ParentGroupID means the parent was cleared.
+// When explicitClear is false (create), nil means the new group is a root (no parent).
+func parentGroupAuditAttrs(parentID *string, explicitClear bool) []slog.Attr {
+	if parentID != nil {
+		return []slog.Attr{slog.String("parent_group_id", *parentID)}
+	}
+	if explicitClear {
+		return []slog.Attr{slog.String("parent_group_id", ""), slog.Bool("parent_cleared", true)}
+	}
+	return []slog.Attr{slog.Bool("parent_root", true)}
+}
+
 func (s *Server) domainCreate(w http.ResponseWriter, r *http.Request) {
 	var b titleBody
 	if !readJSON(w, r, &b) {
@@ -193,7 +206,9 @@ func (s *Server) groupCreate(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
-	logger.Audit(r.Context(), "group_create", slog.String("domain_id", domainID), slog.String("group_id", g.ID))
+	gaudit := []slog.Attr{slog.String("domain_id", domainID), slog.String("group_id", g.ID)}
+	gaudit = append(gaudit, parentGroupAuditAttrs(b.ParentGroupID, false)...)
+	logger.Audit(r.Context(), "group_create", gaudit...)
 	writeJSON(w, http.StatusCreated, g)
 }
 
@@ -232,7 +247,9 @@ func (s *Server) groupSetParent(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
-	logger.Audit(r.Context(), "group_set_parent", slog.String("domain_id", domainID), slog.String("group_id", groupID))
+	auditAttrs := []slog.Attr{slog.String("domain_id", domainID), slog.String("group_id", groupID)}
+	auditAttrs = append(auditAttrs, parentGroupAuditAttrs(b.ParentGroupID, true)...)
+	logger.Audit(r.Context(), "group_set_parent", auditAttrs...)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -291,7 +308,11 @@ func (s *Server) accessTypeCreate(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
-	logger.Audit(r.Context(), "access_type_create", slog.String("domain_id", domainID), slog.String("access_type_id", a.ID))
+	logger.Audit(r.Context(), "access_type_create",
+		slog.String("domain_id", domainID),
+		slog.String("access_type_id", a.ID),
+		slog.String("bit", strconv.FormatUint(a.Bit, 10)),
+	)
 	writeJSON(w, http.StatusCreated, a)
 }
 
@@ -327,7 +348,12 @@ func (s *Server) permissionCreate(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
-	logger.Audit(r.Context(), "permission_create", slog.String("domain_id", domainID), slog.String("permission_id", p.ID))
+	logger.Audit(r.Context(), "permission_create",
+		slog.String("domain_id", domainID),
+		slog.String("permission_id", p.ID),
+		slog.String("resource_id", p.ResourceID),
+		slog.String("access_mask", strconv.FormatUint(p.AccessMask, 10)),
+	)
 	writeJSON(w, http.StatusCreated, p)
 }
 

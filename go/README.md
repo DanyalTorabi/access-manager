@@ -74,7 +74,7 @@ Run **`make`** from the **repository root** (`make test`, `make lint`, …) or f
 | Run server | `make run` |
 | E2E smoke (**T16**) | From **repo root**: `make e2e` → `go test -race -count=1 -tags=e2e ./e2e/...` (running server; optional **`API_BEARER_TOKEN`**). Optional curl script: **`make e2e-bash`**. See **[test/e2e/README.md](../test/e2e/README.md)**. |
 | Lint | `make lint` |
-| Vuln check | `make vuln` → `govulncheck ./...` |
+| Vuln check | `make vuln` → pinned `go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...` (same pin as CI) |
 | Tidy modules | `make tidy` |
 
 Docker (from **repo root** only): `make docker-build`, `make docker-up`, `make docker-logs`, `make docker-down` — see [root README](../README.md#docker-t19).
