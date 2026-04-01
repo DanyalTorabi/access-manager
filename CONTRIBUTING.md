@@ -55,6 +55,7 @@ Do a quick **reviewer pass** on your own diff (humans and AI assistants) before 
 - Open PRs **into `main`**; follow [docs/branching.md](docs/branching.md).
 - Use the repo **[pull request template](.github/pull_request_template.md)** (GitHub fills it when you open a PR from the UI): **Summary**, **Ticket**, **Checklist**.
 - Reference **GitHub `#…`** when it applies; optional **`Tnn`** matches the [`plan/`](plan/) spec filename (e.g. `T19` → `plan/.../T19-...md`).
+- **Show the PR on the issue:** include **`Fixes #123`**, **`Closes #123`**, or **`Resolves #123`** in the PR body (e.g. under **Ticket**) so GitHub links them and can auto-close on merge; use **`Refs #123`** for link-only. See [AGENTS.md — Linking a PR to an issue](AGENTS.md#linking-a-pr-to-an-issue).
 - Keep **`make test`** and **`make lint`** green for Go changes.
 
 ### Create a PR with `gh`

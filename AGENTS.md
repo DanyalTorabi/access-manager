@@ -68,6 +68,15 @@ By default, **do not** run `git commit`, `git push`, or `gh pr create`. Provide 
 
 **Humans:** Prefer the **`gh`** CLI for issues, PRs, Actions, and API tasks when scripting. Requires [GitHub CLI](https://cli.github.com/) and `gh auth login`. Maintainer steps: [CONTRIBUTING.md](CONTRIBUTING.md) (**T6**). CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (**T13**); **`gh run list`** / **`gh pr checks`**.
 
+### Linking a PR to an issue
+
+GitHub connects a PR to an issue when the issue number appears in the **PR description** or a **commit** on the branch (not from the title alone).
+
+- **`Fixes #123`**, **`Closes #123`**, **`Resolves #123`** — PR appears on the issue; merging into the **default branch** usually **closes** the issue.
+- **`Refs #123`**, **`See #123`** — Linked on the timeline without auto-close.
+
+Use the **Ticket** section of [`.github/pull_request_template.md`](.github/pull_request_template.md) for `Fixes #…` when the PR completes an issue. Details: [GitHub docs — linking a pull request to an issue](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue).
+
 ## Commands
 
 From **repository root:** `make test`, `make lint`, `make cover`, `make run` (delegate to **`go/`**); **`make docker-build`**, **`make docker-up`**, **`make docker-logs`**, **`make docker-down`** for **Docker** (**T19**, repo root only).
