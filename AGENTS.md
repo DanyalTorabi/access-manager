@@ -33,6 +33,10 @@ Guidance for human and AI contributors. Phased work: [plan/README.md](plan/READM
 
 Treat the **access model** (`internal/access`, `internal/store` contracts) as a **future standalone library**: keep it free of chi/HTTP imports. Wire HTTP only in `internal/api` and `cmd/server`. When we need other repos to import it, we will add **`pkg/...`** under **`go/`** and move or expose APIs there (`internal/` cannot be imported by external modules).
 
+## No unused code
+
+Do not add functions, methods, or interfaces that have no callers in the current codebase. If a reviewer (human or Copilot) suggests speculative code (e.g. "consider implementing X for future compatibility"), **defer** it to a ticket and reply on the review thread — do not merge dead code. The only exception is when building a module whose public API is defined by a plan; in that case, reference the plan in a code comment (e.g. `// See plan/phase-N/Txx.md`).
+
 ## Future work and TODO comments
 
 - Anything we **defer** (“do later”, “future work”) must have a **ticket** in [TICKETS.md](TICKETS.md) (or your tracker). **Do not** leave bare TODOs with no tracking.
