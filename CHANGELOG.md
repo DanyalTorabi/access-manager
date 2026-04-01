@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `govulncheck` in CI and `make vuln` target for dependency vulnerability scanning (**T20**)
+- `gosec` linter enabled in `golangci-lint` config (**T20**)
+- `internal/logger` module wrapping `log/slog` with JSON handler and `Audit()` helper for structured audit events (**T20**)
+- Audit logging on all 13 mutation handlers — each emits a structured JSON line with `audit=true`, action name, and relevant IDs (**T20**)
+- Threat model: [`docs/security-review.md`](docs/security-review.md) documenting actors, assets, trust boundaries, mitigations, and known gaps (**T20**)
 - Prometheus metrics middleware: `http_requests_total`, `http_request_duration_seconds`, `authz_checks_total`; `/metrics` endpoint (**T23**)
 - Grafana + Prometheus in `docker-compose.yml`; provisioned datasource and **Access Manager** dashboard under `observability/` (**T23**)
 - E2E smoke: **`go test -race -count=1 -tags=e2e ./e2e/...`** (**T16**); optional bash twin under **`test/e2e/bash/`**; Docker CI runs Go e2e
@@ -21,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Migrated `cmd/server` from `log.Printf` / `log.Fatal` to structured `internal/logger` calls (**T20**)
+- Pinned toolchain to **go1.25.8** via `toolchain` in `go/go.mod` (language `go 1.25.0`) for stdlib security patches (**T20**)
 - Contributor docs: defer valid PR review follow-ups to a named ticket (**Txx**) with a tracking note in **`plan/`** (AGENTS, CONTRIBUTING, Cursor rules)
 
 ## [0.1.0] - 2026-03-27

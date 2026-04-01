@@ -1,16 +1,20 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/dtorabi/access-manager/internal/logger"
 	"github.com/dtorabi/access-manager/internal/store"
 	sqlstore "github.com/dtorabi/access-manager/internal/store/sqlite"
 	"github.com/dtorabi/access-manager/internal/testutil"
@@ -79,6 +83,109 @@ func mustPostJSON201(t *testing.T, urlStr, body string) []byte {
 		t.Fatalf("POST %s want 201 got %d: %s", urlStr, res.StatusCode, b)
 	}
 	return b
+}
+
+// auditLogEntries returns each newline-delimited JSON object from buf that has audit=true.
+func auditLogEntries(t *testing.T, buf string) []map[string]any {
+	t.Helper()
+	var out []map[string]any
+	for _, rawLine := range strings.Split(buf, "\n") {
+		rawLine = strings.TrimSpace(rawLine)
+		if rawLine == "" {
+			continue
+		}
+		var m map[string]any
+		if err := json.Unmarshal([]byte(rawLine), &m); err != nil {
+			t.Fatalf("log line JSON: %v — line %q — full buf: %q", err, rawLine, buf)
+		}
+		if v, ok := m["audit"]; ok && v == true {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func auditLogEntriesWithAction(t *testing.T, buf, action string) []map[string]any {
+	t.Helper()
+	var out []map[string]any
+	for _, e := range auditLogEntries(t, buf) {
+		if e["action"] == action {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+func TestAPI_auditLog_domainCreate(t *testing.T) {
+	var buf bytes.Buffer
+	logger.Init(slog.LevelInfo, &buf)
+	t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
+
+	ts, _ := newTestAPI(t)
+	payload := `{"title":"AuditCo"}`
+	res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusCreated {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var created store.Domain
+	if err := json.NewDecoder(res.Body).Decode(&created); err != nil {
+		t.Fatal(err)
+	}
+
+	domainAudits := auditLogEntriesWithAction(t, buf.String(), "domain_create")
+	if len(domainAudits) != 1 {
+		t.Fatalf("want 1 domain_create audit, got %d in %q", len(domainAudits), buf.String())
+	}
+	line := domainAudits[0]
+	if line["msg"] != "audit" {
+		t.Fatalf("want msg=audit, got %v", line["msg"])
+	}
+	if line["domain_id"] != created.ID {
+		t.Fatalf("want domain_id=%q, got %v", created.ID, line["domain_id"])
+	}
+}
+
+func TestAPI_auditLog_groupCreate_parentFields(t *testing.T) {
+	var buf bytes.Buffer
+	logger.Init(slog.LevelInfo, &buf)
+	t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
+
+	ts, _ := newTestAPI(t)
+	var dom store.Domain
+	if err := json.Unmarshal(mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"ad"}`), &dom); err != nil {
+		t.Fatal(err)
+	}
+	base := ts.URL + "/api/v1/domains/" + dom.ID
+
+	mustPostJSON201(t, base+"/groups", `{"title":"rootg"}`)
+	groups := auditLogEntriesWithAction(t, buf.String(), "group_create")
+	if len(groups) != 1 {
+		t.Fatalf("want 1 group_create audit after first group, got %d: %q", len(groups), buf.String())
+	}
+	rootLine := groups[0]
+	if rootLine["parent_root"] != true {
+		t.Fatalf("want parent_root=true for root group, got %v", rootLine["parent_root"])
+	}
+
+	var parent store.Group
+	if err := json.Unmarshal(mustPostJSON201(t, base+"/groups", `{"title":"par"}`), &parent); err != nil {
+		t.Fatal(err)
+	}
+	childBody := fmt.Sprintf(`{"title":"ch","parent_group_id":%q}`, parent.ID)
+	mustPostJSON201(t, base+"/groups", childBody)
+	groups = auditLogEntriesWithAction(t, buf.String(), "group_create")
+	if len(groups) != 3 {
+		t.Fatalf("want 3 group_create audits after domain + 3 groups, got %d: %q", len(groups), buf.String())
+	}
+	childLine := groups[len(groups)-1]
+	if childLine["parent_group_id"] != parent.ID {
+		t.Fatalf("want parent_group_id=%q, got %v", parent.ID, childLine["parent_group_id"])
+	}
 }
 
 func TestAPI_domainCreateAndList(t *testing.T) {

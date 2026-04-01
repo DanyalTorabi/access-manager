@@ -1,4 +1,4 @@
-.PHONY: build test cover cover-func run tidy lint e2e
+.PHONY: build test cover cover-func run tidy lint vuln e2e
 
 # golang/go#75031: GOTOOLCHAIN=auto can make `go test -cover` fail with "no such tool covdata".
 # Pin the minimum toolchain to the `go` version in go.mod (override: `make test GOTOOLCHAIN=local`).
@@ -31,6 +31,9 @@ tidy:
 
 lint:
 	$(GOLANGCI_LINT) run ./...
+
+vuln:
+	go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
 
 # T16 — requires a running API (default BASE_URL http://127.0.0.1:8080). Bash twin: ../../test/e2e/bash/run.sh
 e2e:

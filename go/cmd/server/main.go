@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -17,14 +17,17 @@ import (
 	"github.com/dtorabi/access-manager/internal/api"
 	"github.com/dtorabi/access-manager/internal/config"
 	"github.com/dtorabi/access-manager/internal/database"
+	"github.com/dtorabi/access-manager/internal/logger"
 	sqlstore "github.com/dtorabi/access-manager/internal/store/sqlite"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 )
 
 func main() {
+	logger.Init(slog.LevelInfo, os.Stderr)
 	if err := runMain(); err != nil {
-		log.Fatal(err)
+		logger.Error("fatal", slog.String("error", err.Error()))
+		os.Exit(1)
 	}
 }
 
@@ -56,7 +59,7 @@ func run(cfg config.Config, ln net.Listener, stop <-chan os.Signal) error {
 		}
 	}
 
-	log.Printf("listening on http://%s", ln.Addr())
+	logger.Info("listening", slog.String("addr", "http://"+ln.Addr().String()))
 	return serve(httpSrv, ln, cfg.ShutdownTimeout, stop)
 }
 
@@ -80,7 +83,7 @@ func serve(httpSrv *http.Server, ln net.Listener, timeout time.Duration, stop <-
 		}
 		return nil
 	case sig := <-stop:
-		log.Printf("signal received: %v, shutting down", sig)
+		logger.Info("shutting down", slog.String("signal", sig.String()))
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -95,7 +98,7 @@ func serve(httpSrv *http.Server, ln net.Listener, timeout time.Duration, stop <-
 	if shutdownErr != nil {
 		return fmt.Errorf("shutdown: %w", shutdownErr)
 	}
-	log.Printf("server stopped")
+	logger.Info("server stopped")
 	return nil
 }
 
@@ -139,6 +142,6 @@ func setup(cfg config.Config) (*http.Server, *sql.DB, error) {
 // maybeWarnAPIAuth logs once if the API may be reachable beyond loopback without Bearer protection.
 func maybeWarnAPIAuth(cfg config.Config) {
 	if msg := config.APIAuthStartupWarning(cfg); msg != "" {
-		log.Printf("warning: %s", msg)
+		logger.Warn(msg)
 	}
 }

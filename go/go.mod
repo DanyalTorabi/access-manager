@@ -2,6 +2,8 @@ module github.com/dtorabi/access-manager
 
 go 1.25.0
 
+toolchain go1.25.8
+
 require (
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/google/uuid v1.6.0

@@ -91,13 +91,21 @@ Exported metrics:
 
 Config files live under **[`observability/`](observability/)**.
 
+## Security (T20)
+
+- **Vulnerability scanning**: `govulncheck` runs in CI and locally via `make vuln`.
+- **Static analysis**: `gosec` linter enabled in `golangci-lint` config.
+- **Structured logging**: All server output uses JSON via `internal/logger` (wrapping `log/slog`).
+- **Audit trail**: Every mutation endpoint emits a structured audit event (`audit=true`) with the action name and relevant entity IDs.
+- **Threat model**: [`docs/security-review.md`](docs/security-review.md) — actors, assets, trust boundaries, mitigations, known gaps.
+
 ## CI / GitHub Actions (T13)
 
 Workflow: **[`.github/workflows/ci.yml`](.github/workflows/ci.yml)** runs on **pull requests** and **pushes** to **`main`**:
 
 | Job | What it does |
 |-----|----------------|
-| **Go** | From **`go/`**: `go test -race ./...`, `go vet ./...`, **golangci-lint** (same pin as `go/Makefile`) |
+| **Go** | From **`go/`**: `go test -race ./...`, `go vet ./...`, **golangci-lint** (same pin as `go/Makefile`), **govulncheck** |
 | **Docker** | `docker compose build`, `compose up`, **`curl /health`**, **Go E2E** (`go test -race -count=1 -tags=e2e ./e2e/...`), `compose down` |
 | **Publish** | On **`push` to `main`** only: push image to **`ghcr.io/<owner>/access-manager`** as **`latest`** and **`sha-<commit>`** (`packages: write` on `GITHUB_TOKEN`) |
 
@@ -119,6 +127,7 @@ See **[CONTRIBUTING.md](CONTRIBUTING.md)** for local setup, PR expectations, **`
 - [TICKETS.md](TICKETS.md) — backlog and curriculum alignment table  
 - [plan/README.md](plan/README.md) — phased implementation plans per ticket  
 - [docs/branching.md](docs/branching.md) — branches and PRs to `main` (**T14**)  
+- [docs/security-review.md](docs/security-review.md) — threat model, actors, mitigations (**T20**)  
 - [CONTRIBUTING.md](CONTRIBUTING.md) — contributor guide and GitHub hygiene (**T6**)  
 - [AGENTS.md](AGENTS.md) — contributor rules for humans and AI  
 - [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — CI + GHCR (**T13**)  

@@ -3,11 +3,13 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/dtorabi/access-manager/internal/access"
+	"github.com/dtorabi/access-manager/internal/logger"
 	"github.com/dtorabi/access-manager/internal/store"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -112,6 +114,19 @@ type parentBody struct {
 	ParentGroupID *string `json:"parent_group_id"`
 }
 
+// parentGroupAuditAttrs adds parent hierarchy fields for group create vs set-parent.
+// When explicitClear is true (PATCH parent), nil ParentGroupID means the parent was cleared.
+// When explicitClear is false (create), nil means the new group is a root (no parent).
+func parentGroupAuditAttrs(parentID *string, explicitClear bool) []slog.Attr {
+	if parentID != nil {
+		return []slog.Attr{slog.String("parent_group_id", *parentID)}
+	}
+	if explicitClear {
+		return []slog.Attr{slog.Bool("parent_cleared", true)}
+	}
+	return []slog.Attr{slog.Bool("parent_root", true)}
+}
+
 func (s *Server) domainCreate(w http.ResponseWriter, r *http.Request) {
 	var b titleBody
 	if !readJSON(w, r, &b) {
@@ -122,6 +137,7 @@ func (s *Server) domainCreate(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "domain_create", slog.String("domain_id", d.ID))
 	writeJSON(w, http.StatusCreated, d)
 }
 
@@ -148,6 +164,7 @@ func (s *Server) userCreate(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "user_create", slog.String("domain_id", domainID), slog.String("user_id", u.ID))
 	writeJSON(w, http.StatusCreated, u)
 }
 
@@ -189,6 +206,9 @@ func (s *Server) groupCreate(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	gaudit := []slog.Attr{slog.String("domain_id", domainID), slog.String("group_id", g.ID)}
+	gaudit = append(gaudit, parentGroupAuditAttrs(b.ParentGroupID, false)...)
+	logger.Audit(r.Context(), "group_create", gaudit...)
 	writeJSON(w, http.StatusCreated, g)
 }
 
@@ -227,6 +247,9 @@ func (s *Server) groupSetParent(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	auditAttrs := []slog.Attr{slog.String("domain_id", domainID), slog.String("group_id", groupID)}
+	auditAttrs = append(auditAttrs, parentGroupAuditAttrs(b.ParentGroupID, true)...)
+	logger.Audit(r.Context(), "group_set_parent", auditAttrs...)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -241,6 +264,7 @@ func (s *Server) resourceCreate(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "resource_create", slog.String("domain_id", domainID), slog.String("resource_id", res.ID))
 	writeJSON(w, http.StatusCreated, res)
 }
 
@@ -284,6 +308,11 @@ func (s *Server) accessTypeCreate(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "access_type_create",
+		slog.String("domain_id", domainID),
+		slog.String("access_type_id", a.ID),
+		slog.Uint64("bit", a.Bit),
+	)
 	writeJSON(w, http.StatusCreated, a)
 }
 
@@ -319,6 +348,12 @@ func (s *Server) permissionCreate(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "permission_create",
+		slog.String("domain_id", domainID),
+		slog.String("permission_id", p.ID),
+		slog.String("resource_id", p.ResourceID),
+		slog.Uint64("access_mask", p.AccessMask),
+	)
 	writeJSON(w, http.StatusCreated, p)
 }
 
@@ -354,6 +389,7 @@ func (s *Server) addUserToGroup(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "add_user_to_group", slog.String("domain_id", domainID), slog.String("user_id", uid), slog.String("group_id", gid))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -365,6 +401,7 @@ func (s *Server) removeUserFromGroup(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "remove_user_from_group", slog.String("domain_id", domainID), slog.String("user_id", uid), slog.String("group_id", gid))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -376,6 +413,7 @@ func (s *Server) grantUserPermission(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "grant_user_permission", slog.String("domain_id", domainID), slog.String("user_id", uid), slog.String("permission_id", pid))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -387,6 +425,7 @@ func (s *Server) revokeUserPermission(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "revoke_user_permission", slog.String("domain_id", domainID), slog.String("user_id", uid), slog.String("permission_id", pid))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -398,6 +437,7 @@ func (s *Server) grantGroupPermission(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "grant_group_permission", slog.String("domain_id", domainID), slog.String("group_id", gid), slog.String("permission_id", pid))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -409,6 +449,7 @@ func (s *Server) revokeGroupPermission(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
+	logger.Audit(r.Context(), "revoke_group_permission", slog.String("domain_id", domainID), slog.String("group_id", gid), slog.String("permission_id", pid))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -435,6 +476,9 @@ func (s *Server) authzCheck(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err)
 		return
 	}
+	if s.metrics != nil {
+		s.metrics.AuthzTotal.WithLabelValues(domainID).Inc()
+	}
 	allowed := access.HasBit(mask, bit)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"allowed":        allowed,
@@ -458,6 +502,9 @@ func (s *Server) authzMasks(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err)
 		return
+	}
+	if s.metrics != nil {
+		s.metrics.AuthzTotal.WithLabelValues(domainID).Inc()
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"masks": masks})
 }

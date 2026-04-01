@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -13,13 +13,14 @@ import (
 	"time"
 
 	"github.com/dtorabi/access-manager/internal/config"
+	"github.com/dtorabi/access-manager/internal/logger"
 	"github.com/dtorabi/access-manager/internal/testutil"
 )
 
 func captureLog(fn func()) string {
 	var buf bytes.Buffer
-	log.SetOutput(&buf)
-	defer log.SetOutput(os.Stderr)
+	logger.Init(slog.LevelDebug, &buf)
+	defer logger.Init(slog.LevelInfo, os.Stderr)
 	fn()
 	return buf.String()
 }
@@ -185,7 +186,7 @@ func TestServe_cleanShutdown(t *testing.T) {
 }
 
 func TestServe_listenerError(t *testing.T) {
-	httpSrv := &http.Server{}
+	httpSrv := &http.Server{ReadHeaderTimeout: 10 * time.Second}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
