@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T27** — Graceful shutdown & concurrency safety (see [TICKETS.md](../../TICKETS.md))
+**T27** — Graceful shutdown & concurrency safety
 
 ## Phase
 

@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T14** — Branching strategy (see [TICKETS.md](../../TICKETS.md))
+**T14** — Branching strategy
 
 ## Phase
 

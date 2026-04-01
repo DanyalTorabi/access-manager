@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T32** — Duplicate constraint handling (see [TICKETS.md](../../TICKETS.md))
+**T32** — Duplicate constraint handling
 
 ## Phase
 

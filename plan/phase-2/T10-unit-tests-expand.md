@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T10** — Unit tests (expand) (see [TICKETS.md](../../TICKETS.md))
+**T10** — Unit tests (expand)
 
 ## Phase
 

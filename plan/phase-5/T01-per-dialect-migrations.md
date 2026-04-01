@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T1** — Per-dialect migrations (see [TICKETS.md](../../TICKETS.md))
+**T1** — Per-dialect migrations
 
 ## Phase
 

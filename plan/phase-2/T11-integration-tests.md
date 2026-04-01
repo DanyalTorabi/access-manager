@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T11** — Integration tests (see [TICKETS.md](../../TICKETS.md))
+**T11** — Integration tests
 
 ## Phase
 

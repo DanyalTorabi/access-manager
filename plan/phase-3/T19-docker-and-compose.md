@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T19** — Docker (see [TICKETS.md](../../TICKETS.md))
+**T19** — Docker
 
 ## Phase
 

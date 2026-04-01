@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T23** — Observability (see [TICKETS.md](../../TICKETS.md))
+**T23** — Observability
 
 ## Phase
 

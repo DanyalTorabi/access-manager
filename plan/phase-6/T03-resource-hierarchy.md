@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T3** — Resource hierarchy (see [TICKETS.md](../../TICKETS.md))
+**T3** — Resource hierarchy
 
 ## Phase
 

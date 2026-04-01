@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T16** — E2E / smoke tests (see [TICKETS.md](../../TICKETS.md))
+**T16** — E2E / smoke tests
 
 ## Phase
 

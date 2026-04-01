@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T6** — GitHub remote + repo hygiene (see [TICKETS.md](../../TICKETS.md))
+**T6** — GitHub remote + repo hygiene
 
 ## Phase
 

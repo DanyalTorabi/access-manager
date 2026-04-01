@@ -12,7 +12,7 @@ Educational / product repo for **domain-scoped** access control (users, groups, 
 | **[`go/`](go/)** | Go module `github.com/dtorabi/access-manager`: HTTP service, `internal/*`, SQLite migrations |
 | [`api/`](api/) | OpenAPI 3 spec and Postman collection; see [api/README.md](api/README.md) |
 | [`plan/`](plan/) | Phased implementation plans per ticket |
-| [`PLAN.md`](PLAN.md), [`TICKETS.md`](TICKETS.md) | Product goals and backlog |
+| [`PLAN.md`](PLAN.md), [`docs/backend-curriculum.md`](docs/backend-curriculum.md) | Product goals; curriculum ↔ repo map (backlog on GitHub only) |
 
 **Import path** (Go): `github.com/dtorabi/access-manager/...` with **module root** = [`go/go.mod`](go/go.mod).
 
@@ -124,8 +124,9 @@ See **[CONTRIBUTING.md](CONTRIBUTING.md)** for local setup, PR expectations, **`
 ## Docs and planning
 
 - [PLAN.md](PLAN.md) — product goals and milestones  
-- [TICKETS.md](TICKETS.md) — backlog and curriculum alignment table  
-- [plan/README.md](plan/README.md) — phased implementation plans per ticket  
+- [GitHub Issues](https://github.com/DanyalTorabi/access-manager/issues) — backlog (single source of truth)  
+- [docs/backend-curriculum.md](docs/backend-curriculum.md) — Backend Engineering curriculum ↔ this repo (not a ticket list)  
+- [plan/README.md](plan/README.md) — phased implementation plans per umbrella (**Tnn**)  
 - [docs/branching.md](docs/branching.md) — branches and PRs to `main`  
 - [docs/security-review.md](docs/security-review.md) — threat model, actors, mitigations  
 - [CONTRIBUTING.md](CONTRIBUTING.md) — contributor guide and GitHub hygiene  

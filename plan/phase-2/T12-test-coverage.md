@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T12** — Test coverage (see [TICKETS.md](../../TICKETS.md))
+**T12** — Test coverage
 
 ## Phase
 

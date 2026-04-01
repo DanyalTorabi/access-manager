@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T17** — API docs & contract testing (see [TICKETS.md](../../TICKETS.md))
+**T17** — API docs & contract testing
 
 ## Phase
 
@@ -35,7 +35,7 @@ Publish **OpenAPI 3** (YAML/JSON) for REST routes and a **Postman collection** (
 
 ## Out of scope
 
-- gRPC/Protobuf (out of product scope per TICKETS).
+- gRPC/Protobuf (out of product scope per [PLAN.md](../../PLAN.md) and [docs/backend-curriculum.md](../../docs/backend-curriculum.md)).
 
 ## Dependencies
 

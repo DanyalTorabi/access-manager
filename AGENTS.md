@@ -1,10 +1,10 @@
 # AGENTS.md — access-manager
 
-Guidance for human and AI contributors. Phased work: [plan/README.md](plan/README.md). Product context: [PLAN.md](PLAN.md), backlog: [TICKETS.md](TICKETS.md). Branching: [docs/branching.md](docs/branching.md) (**T14**). Contributing + GitHub: [CONTRIBUTING.md](CONTRIBUTING.md) (**T6**).
+Guidance for human and AI contributors. Phased work: [plan/README.md](plan/README.md). Product context: [PLAN.md](PLAN.md). **Backlog:** [GitHub Issues](https://github.com/DanyalTorabi/access-manager/issues) only—do not maintain a parallel ticket list in the repo. Curriculum ↔ repo map: [docs/backend-curriculum.md](docs/backend-curriculum.md). Branching: [docs/branching.md](docs/branching.md) (**T14**). Contributing + GitHub: [CONTRIBUTING.md](CONTRIBUTING.md) (**T6**).
 
 ## Repository shape
 
-- **Root:** plans, tickets, product docs; optional future **`spec/`** and non-Go implementations.
+- **Root:** plans, product docs; optional future **`spec/`** and non-Go implementations. Work is tracked on **GitHub Issues**, not in a repo ticket file.
 - **Go service and module:** everything under **[`go/`](go/)** (**T29**).
 
 ## Go module
@@ -39,13 +39,13 @@ Do not add functions, methods, or interfaces that have no callers in the current
 
 ## Future work and TODO comments
 
-- Anything we **defer** (“do later”, “future work”) must have a **ticket** in [TICKETS.md](TICKETS.md) (or your tracker). **Do not** leave bare TODOs with no tracking.
-- In code or docs, reference the ticket explicitly, e.g. `// TODO(T14): ...` or `See TICKETS.md T23`.
-- **Prefer updating an existing open ticket** when the follow-up fits that scope; avoid spinning a new ticket for every micro-item unless it is genuinely separate work.
+- Anything we **defer** (“do later”, “future work”) must have a **GitHub issue** (or, for the smallest nits, a clear follow-up in an **existing** issue/PR). **Do not** leave bare TODOs with no tracking.
+- In code or docs, reference work explicitly, e.g. `Fixes #123` or `// TODO(T36): ...` where **`T36`** points readers to the matching file under [`plan/`](plan/) (filename `T36-...`), not to a repo ticket registry.
+- **Prefer updating an existing open issue** when the follow-up fits that scope; avoid one new issue per tiny item unless it is genuinely separate work.
 
 ### Pull request / Copilot follow-ups
 
-If a review comment is correct but **out of scope for the current PR**, say on the thread that it will be handled in **Txx** (specific ticket id), and add a **note** to that ticket’s [plan/](plan/) file (e.g. under Steps or Deliverables) so the item is scheduled and traceable.
+If a review comment is correct but **out of scope for the current PR**, say on the thread that it will be handled in **#…** / **Txx**, and add a **note** to that umbrella’s [plan/](plan/) file (e.g. under Steps or Deliverables) so the item is scheduled and traceable.
 
 ## Before you open a PR (self-review)
 

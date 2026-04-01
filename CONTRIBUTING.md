@@ -51,10 +51,10 @@ Do a quick **reviewer pass** on your own diff (humans and AI assistants) before 
 3. **Secrets** — No API tokens, passwords, or real `.env` values in commits; use env vars and **`.env.example`**-style placeholders only.
 4. **Common review nits** — Skim for: **`//go:build`** mistakes (e2e package must not be “tests only” under `-tags=e2e`), **assert HTTP status before `json.Decode` / Unmarshal** in tests when setup requests can fail, and **strict checks** for IDs / booleans in smoke scripts (e.g. `jq -e`) where loose parsing hides bugs.
 
-- Deferring a valid review comment to a **later ticket**: reply on the PR with the ticket id (**Txx**) and add a short tracking note to that ticket’s **`plan/...`** spec so it is not forgotten (see [AGENTS.md](AGENTS.md)).
+- Deferring a valid review comment to **later work**: reply on the PR with the **GitHub issue #** and/or **Txx** and add a short tracking note to that umbrella’s **`plan/...`** spec so it is not forgotten (see [AGENTS.md](AGENTS.md)).
 - Open PRs **into `main`**; follow [docs/branching.md](docs/branching.md).
 - Use the repo **[pull request template](.github/pull_request_template.md)** (GitHub fills it when you open a PR from the UI): **Summary**, **Ticket**, **Checklist**.
-- Reference a ticket from [TICKETS.md](TICKETS.md) when it applies (e.g. `T19`).
+- Reference **GitHub `#…`** when it applies; optional **`Tnn`** matches the [`plan/`](plan/) spec filename (e.g. `T19` → `plan/.../T19-...md`).
 - Keep **`make test`** and **`make lint`** green for Go changes.
 
 ### Create a PR with `gh`
@@ -72,7 +72,7 @@ T13
 
 ## Checklist
 - [x] \`make test\` / \`make lint\` locally
-- [x] Docs updated (README, CONTRIBUTING, AGENTS, TICKETS)
+- [x] Docs updated (README, CONTRIBUTING, AGENTS, `docs/` as needed)
 "
 ```
 

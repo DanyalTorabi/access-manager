@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T20** — Security review (see [TICKETS.md](../../TICKETS.md))
+**T20** — Security review
 
 ## Phase
 

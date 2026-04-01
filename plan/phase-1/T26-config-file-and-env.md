@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T26** — Config: file + env (see [TICKETS.md](../../TICKETS.md))
+**T26** — Config: file + env
 
 ## Phase
 

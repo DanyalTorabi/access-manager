@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T13** — CI/CD (curriculum-aligned) (see [TICKETS.md](../../TICKETS.md))
+**T13** — CI/CD (curriculum-aligned)
 
 ## Phase
 

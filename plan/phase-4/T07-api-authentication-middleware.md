@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T7** — API authentication middleware (see [TICKETS.md](../../TICKETS.md))
+**T7** — API authentication middleware
 
 ## Phase
 

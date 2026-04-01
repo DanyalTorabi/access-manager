@@ -34,4 +34,5 @@ Release branches and version tags are **out of scope** until a CHANGELOG / semve
 ## See also
 
 - [CONTRIBUTING.md](../CONTRIBUTING.md) — maintainer checklist: remote, branch protection, Actions/GHCR
-- [TICKETS.md](../TICKETS.md) — backlog and ticket index
+- [GitHub Issues](https://github.com/DanyalTorabi/access-manager/issues) — backlog  
+- [docs/backend-curriculum.md](backend-curriculum.md) — curriculum ↔ repo (not a ticket list)

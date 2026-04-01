@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T5** — Authz benchmarks / load tests (see [TICKETS.md](../../TICKETS.md))
+**T5** — Authz benchmarks / load tests
 
 ## Phase
 

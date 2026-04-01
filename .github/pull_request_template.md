@@ -4,7 +4,7 @@
 
 ## Ticket
 
-<!-- e.g. T13 — id from [TICKETS.md](../TICKETS.md) or “n/a” for docs-only typos -->
+<!-- GitHub #… (preferred) and/or Tnn matching plan/…/Tnn-*.md; “n/a” for docs-only typos -->
 
 ## Checklist
 

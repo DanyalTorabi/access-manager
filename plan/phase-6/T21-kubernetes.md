@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T21** — Kubernetes (see [TICKETS.md](../../TICKETS.md))
+**T21** — Kubernetes
 
 ## Phase
 
@@ -23,7 +23,7 @@ Deploy the server (and dependencies or externalize them) with **Deployments**, *
 2. Externalize DB: use managed SQL or in-cluster Postgres with persistence (team choice).
 3. Add resource requests/limits; run as non-root (match Dockerfile).
 4. Document `kubectl apply` or Helm install in README/docs.
-5. Optional: Argo CD / Terraform when org defines (TBC in TICKETS).
+5. Optional: Argo CD / Terraform when org defines (TBC in GitHub / product planning).
 
 ## Files / paths
 
