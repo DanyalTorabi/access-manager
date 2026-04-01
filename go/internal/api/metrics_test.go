@@ -171,7 +171,7 @@ func findCounterWithLabel(t *testing.T, reg *prometheus.Registry, name, labelNam
 	}
 	for _, mf := range mfs {
 		if mf.GetName() == name {
-			for _, m := range m.GetMetric() {
+			for _, m := range mf.GetMetric() {
 				for _, lp := range m.GetLabel() {
 					if lp.GetName() == labelName && lp.GetValue() == labelValue {
 						return m.GetCounter().GetValue()
@@ -193,7 +193,7 @@ func findHistogramSampleCount(t *testing.T, reg *prometheus.Registry, name strin
 	for _, mf := range mfs {
 		if mf.GetName() == name {
 			var total uint64
-			for _, m := range m.GetMetric() {
+			for _, m := range mf.GetMetric() {
 				total += m.GetHistogram().GetSampleCount()
 			}
 			return total
