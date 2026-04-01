@@ -10,6 +10,13 @@ import (
 	"strings"
 )
 
+// ensureSQLiteForeignKeysOn reapplies FK enforcement on the connection pool.
+// Migrations (e.g. table rebuilds) may run PRAGMA foreign_keys=OFF; if a migration
+// fails mid-script, restore ON so the process does not keep running with FKs disabled.
+func ensureSQLiteForeignKeysOn(db *sql.DB) {
+	_, _ = db.Exec("PRAGMA foreign_keys=ON")
+}
+
 // MigrateUp applies all pending *.up.sql migrations in dir (filenames like 000001_name.up.sql).
 func MigrateUp(db *sql.DB, dir string) error {
 	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -59,13 +66,16 @@ func MigrateUp(db *sql.DB, dir string) error {
 		}
 		if _, err := tx.Exec(string(body)); err != nil {
 			_ = tx.Rollback()
+			ensureSQLiteForeignKeysOn(db)
 			return fmt.Errorf("exec migration %d: %w", v, err)
 		}
 		if _, err := tx.Exec(`INSERT INTO schema_migrations (version) VALUES (?)`, v); err != nil {
 			_ = tx.Rollback()
+			ensureSQLiteForeignKeysOn(db)
 			return fmt.Errorf("record migration %d: %w", v, err)
 		}
 		if err := tx.Commit(); err != nil {
+			ensureSQLiteForeignKeysOn(db)
 			return err
 		}
 	}

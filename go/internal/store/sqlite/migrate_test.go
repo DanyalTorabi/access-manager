@@ -68,6 +68,30 @@ func TestMigrateUp_badSQL(t *testing.T) {
 	}
 }
 
+func TestMigrateUp_restoresForeignKeysAfterPRAGMAOffAndFailure(t *testing.T) {
+	db, err := Open("file:" + filepath.Join(t.TempDir(), "mig.db") + "?_pragma=foreign_keys(1)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	dir := t.TempDir()
+	// First statement disables FK checks; second fails. Migrator must leave enforcement ON afterward.
+	body := "PRAGMA foreign_keys = OFF;\nNOT VALID SQL ;;;\n"
+	if err := os.WriteFile(filepath.Join(dir, "000001_bad_fk.up.sql"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := MigrateUp(db, dir); err == nil {
+		t.Fatal("want error for bad SQL")
+	}
+	var fk int
+	if err := db.QueryRow("PRAGMA foreign_keys").Scan(&fk); err != nil {
+		t.Fatal(err)
+	}
+	if fk != 1 {
+		t.Fatalf("want PRAGMA foreign_keys restored to 1 after failed migration, got %d", fk)
+	}
+}
+
 func TestParseVersion(t *testing.T) {
 	tests := []struct {
 		name    string
