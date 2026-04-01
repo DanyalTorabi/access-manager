@@ -64,6 +64,9 @@ func (m *Metrics) Middleware(next http.Handler) http.Handler {
 }
 
 // statusWriter captures the HTTP status code written by the handler.
+// NOTE: wrapping http.ResponseWriter hides optional interfaces (Flusher,
+// Hijacker, etc.). If callers ever need those, add an Unwrap method that
+// returns the underlying ResponseWriter so http.NewResponseController works.
 type statusWriter struct {
 	http.ResponseWriter
 	status      int
