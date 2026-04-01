@@ -60,7 +60,7 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 | T20 | Security review | open | govulncheck, SAST, threat model, secrets |
 | T21 | Kubernetes | open | Deployments, probes, config from **T26**; ArgoCD/Terraform when org defines |
 | T22 | Environments: dev / PR / staging / prod | open | Promotion, secrets, DB per env |
-| T23 | Observability | open | **Prometheus** metrics (e.g. requests, authz checks, errors), **Grafana** dashboards, compose; tests + CI |
+| T23 | Observability | done | **Prometheus** metrics (`/metrics`), **Grafana** dashboards, compose; middleware + authz counter; tests. Plan: [plan/phase-6/T23-observability-prometheus-grafana.md](plan/phase-6/T23-observability-prometheus-grafana.md) |
 | T2 | Optional group ancestor permission inheritance | open | V1: direct membership only |
 | T3 | Resource hierarchy | open | Flat resources in v1 |
 | T4 | Materialized `user_resource_mask` for hot path | open | If profiling requires |

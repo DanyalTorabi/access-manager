@@ -27,6 +27,10 @@ curl -s http://127.0.0.1:8080/health
 
 Example response: `{"status":"ok"}`
 
+### Metrics (T23)
+
+Prometheus metrics are served at **`/metrics`** (outside bearer auth). The middleware records `http_requests_total`, `http_request_duration_seconds`, and `authz_checks_total`. See root [README.md — Observability](../README.md#observability-t23) for Grafana/Prometheus compose setup.
+
 ## Docker
 
 From the **repository root** (not `go/`): **`make docker-build`**, **`make docker-up`**, **`make docker-logs`**, **`make docker-down`** — see root **[README.md](../README.md#docker-t19)** (section **Docker (T19)**).

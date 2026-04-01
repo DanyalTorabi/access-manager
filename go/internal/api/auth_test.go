@@ -149,7 +149,7 @@ func TestAPI_bearerRequiredOnAPIRoutes(t *testing.T) {
 	defer func() { _ = db.Close() }()
 	st := sqlstore.New(db)
 	srv := &Server{Store: st, APIBearerToken: "test-token"}
-	ts := httptest.NewServer(srv.Router())
+	ts := httptest.NewServer(srv.Router(nil, nil))
 	t.Cleanup(ts.Close)
 
 	res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(`{"title":"X"}`))

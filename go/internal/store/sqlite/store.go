@@ -46,7 +46,7 @@ func maskFromSQL(v int64) uint64 { return uint64(v) }
 
 func (s *Store) DomainCreate(ctx context.Context, d *store.Domain) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO domains (id, title) VALUES (?, ?)`, d.ID, d.Title)
-	return err
+	return wrapConstraintError(err)
 }
 
 func (s *Store) DomainGet(ctx context.Context, id string) (*store.Domain, error) {
@@ -81,7 +81,7 @@ func (s *Store) DomainList(ctx context.Context) ([]store.Domain, error) {
 func (s *Store) UserCreate(ctx context.Context, u *store.User) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO users (id, domain_id, title) VALUES (?, ?, ?)`,
 		u.ID, u.DomainID, u.Title)
-	return err
+	return wrapConstraintError(err)
 }
 
 func (s *Store) UserGet(ctx context.Context, domainID, id string) (*store.User, error) {
@@ -122,7 +122,7 @@ func (s *Store) GroupCreate(ctx context.Context, g *store.Group) error {
 	}
 	_, err := s.db.ExecContext(ctx, `INSERT INTO groups (id, domain_id, title, parent_group_id) VALUES (?, ?, ?, ?)`,
 		g.ID, g.DomainID, g.Title, parent)
-	return err
+	return wrapConstraintError(err)
 }
 
 func (s *Store) GroupGet(ctx context.Context, domainID, id string) (*store.Group, error) {
@@ -204,7 +204,7 @@ func (s *Store) GroupSetParent(ctx context.Context, domainID, groupID string, pa
 func (s *Store) ResourceCreate(ctx context.Context, r *store.Resource) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO resources (id, domain_id, title) VALUES (?, ?, ?)`,
 		r.ID, r.DomainID, r.Title)
-	return err
+	return wrapConstraintError(err)
 }
 
 func (s *Store) ResourceGet(ctx context.Context, domainID, id string) (*store.Resource, error) {
@@ -239,7 +239,7 @@ func (s *Store) ResourceList(ctx context.Context, domainID string) ([]store.Reso
 func (s *Store) AccessTypeCreate(ctx context.Context, a *store.AccessType) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO access_types (id, domain_id, title, bit) VALUES (?, ?, ?, ?)`,
 		a.ID, a.DomainID, a.Title, maskToSQL(a.Bit))
-	return err
+	return wrapConstraintError(err)
 }
 
 func (s *Store) AccessTypeList(ctx context.Context, domainID string) ([]store.AccessType, error) {
@@ -264,7 +264,7 @@ func (s *Store) AccessTypeList(ctx context.Context, domainID string) ([]store.Ac
 func (s *Store) PermissionCreate(ctx context.Context, p *store.Permission) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO permissions (id, domain_id, title, resource_id, access_mask) VALUES (?, ?, ?, ?, ?)`,
 		p.ID, p.DomainID, p.Title, p.ResourceID, maskToSQL(p.AccessMask))
-	return err
+	return wrapConstraintError(err)
 }
 
 func (s *Store) PermissionGet(ctx context.Context, domainID, id string) (*store.Permission, error) {

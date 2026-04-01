@@ -11,6 +11,8 @@ import (
 	"github.com/dtorabi/access-manager/internal/store"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Server exposes HTTP handlers for the access manager.
@@ -19,11 +21,29 @@ type Server struct {
 	// APIBearerToken, if non-empty, requires Authorization: Bearer <token> on /api/v1/*.
 	// /health stays public. Empty means no auth on API (local dev / loopback only — document in README).
 	APIBearerToken string
+
+	metrics *Metrics
 }
 
-func (s *Server) Router() chi.Router {
+// Router builds the chi router. reg and gather supply the Prometheus registry
+// for metrics middleware and the /metrics endpoint. Pass nil for both to
+// disable instrumentation (e.g. in tests that don't care about metrics).
+func (s *Server) Router(reg prometheus.Registerer, gather prometheus.Gatherer) chi.Router {
 	r := chi.NewRouter()
+
+	if reg != nil {
+		s.metrics = NewMetrics(reg)
+		r.Use(s.metrics.Middleware)
+	} else {
+		s.metrics = nil
+	}
+
 	r.Get("/health", s.health)
+	// /metrics is outside bearer auth so Prometheus can scrape without a token.
+	// Bind to loopback or use network policy when exposing beyond localhost.
+	if gather != nil {
+		r.Handle("/metrics", promhttp.HandlerFor(gather, promhttp.HandlerOpts{}))
+	}
 
 	r.Route("/api/v1", func(r chi.Router) {
 		if tok := strings.TrimSpace(s.APIBearerToken); tok != "" {
@@ -99,7 +119,7 @@ func (s *Server) domainCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	d := &store.Domain{ID: uuid.NewString(), Title: b.Title}
 	if err := s.Store.DomainCreate(r.Context(), d); err != nil {
-		writeErr(w, http.StatusInternalServerError, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, d)
@@ -125,7 +145,7 @@ func (s *Server) userCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	u := &store.User{ID: uuid.NewString(), DomainID: domainID, Title: b.Title}
 	if err := s.Store.UserCreate(r.Context(), u); err != nil {
-		writeErr(w, http.StatusInternalServerError, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, u)
@@ -166,7 +186,7 @@ func (s *Server) groupCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	g := &store.Group{ID: uuid.NewString(), DomainID: domainID, Title: b.Title, ParentGroupID: b.ParentGroupID}
 	if err := s.Store.GroupCreate(r.Context(), g); err != nil {
-		writeErr(w, http.StatusInternalServerError, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, g)
@@ -218,7 +238,7 @@ func (s *Server) resourceCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	res := &store.Resource{ID: uuid.NewString(), DomainID: domainID, Title: b.Title}
 	if err := s.Store.ResourceCreate(r.Context(), res); err != nil {
-		writeErr(w, http.StatusInternalServerError, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, res)
@@ -261,7 +281,7 @@ func (s *Server) accessTypeCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	a := &store.AccessType{ID: uuid.NewString(), DomainID: domainID, Title: b.Title, Bit: bit}
 	if err := s.Store.AccessTypeCreate(r.Context(), a); err != nil {
-		writeErr(w, http.StatusInternalServerError, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, a)
@@ -296,7 +316,7 @@ func (s *Server) permissionCreate(w http.ResponseWriter, r *http.Request) {
 		ResourceID: b.ResourceID, AccessMask: mask,
 	}
 	if err := s.Store.PermissionCreate(r.Context(), p); err != nil {
-		writeErr(w, http.StatusInternalServerError, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, p)
@@ -407,6 +427,9 @@ func (s *Server) authzCheck(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
+	if s.metrics != nil {
+		s.metrics.AuthzTotal.WithLabelValues(domainID).Inc()
+	}
 	mask, err := s.Store.EffectiveMask(r.Context(), domainID, userID, resourceID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err)
@@ -427,6 +450,9 @@ func (s *Server) authzMasks(w http.ResponseWriter, r *http.Request) {
 	if userID == "" || resourceID == "" {
 		http.Error(w, "user_id and resource_id are required", http.StatusBadRequest)
 		return
+	}
+	if s.metrics != nil {
+		s.metrics.AuthzTotal.WithLabelValues(domainID).Inc()
 	}
 	masks, err := s.Store.PermissionMasksForUserResource(r.Context(), domainID, userID, resourceID)
 	if err != nil {
