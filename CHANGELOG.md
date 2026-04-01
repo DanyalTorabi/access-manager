@@ -9,10 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **T37 / #48:** `GET` / `PATCH` / `DELETE` for domains; `PATCH` / `DELETE` for users, groups, resources, access types, and permissions; `GET` for a single access type. Partial JSON bodies for `PATCH` (see OpenAPI).
+- **T33:** SQLite migration `000002_restrict_foreign_keys` — foreign keys use `ON DELETE RESTRICT` so deletes fail while dependents exist (maps to **400** with `store.ErrFKViolation`), instead of cascading.
 - `govulncheck` in CI and `make vuln` target for dependency vulnerability scanning
 - `gosec` linter enabled in `golangci-lint` config
 - `internal/logger` module wrapping `log/slog` with JSON handler and `Audit()` helper for structured audit events
-- Audit logging on all 13 mutation handlers — each emits a structured JSON line with `audit=true`, action name, and relevant IDs
+- Audit logging on mutation handlers — each emits a structured JSON line with `audit=true`, action name, and relevant IDs
 - Threat model: [`docs/security-review.md`](docs/security-review.md) documenting actors, assets, trust boundaries, mitigations, and known gaps
 - Prometheus metrics middleware: `http_requests_total`, `http_request_duration_seconds`, `authz_checks_total`; `/metrics` endpoint
 - Grafana + Prometheus in `docker-compose.yml`; provisioned datasource and **Access Manager** dashboard under `observability/`

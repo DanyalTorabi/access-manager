@@ -1800,6 +1800,20 @@ func TestAPI_storeErrors(t *testing.T) {
 		{"revokeGroupPerm", http.MethodDelete, "/api/v1/domains/" + domID + "/groups/" + groupID + "/permissions/" + permID, "", 500},
 		{"authzCheck", http.MethodGet, "/api/v1/domains/" + domID + "/authz/check?user_id=" + userID + "&resource_id=" + resourceID + "&access_bit=0x1", "", 500},
 		{"authzMasks", http.MethodGet, "/api/v1/domains/" + domID + "/authz/masks?user_id=" + userID + "&resource_id=" + resourceID, "", 500},
+		{"domainGet", http.MethodGet, "/api/v1/domains/" + domID, "", 500},
+		{"domainPatch", http.MethodPatch, "/api/v1/domains/" + domID, `{"title":"x"}`, 500},
+		{"domainDelete", http.MethodDelete, "/api/v1/domains/" + domID, "", 500},
+		{"userPatch", http.MethodPatch, "/api/v1/domains/" + domID + "/users/" + userID, `{"title":"x"}`, 500},
+		{"userDelete", http.MethodDelete, "/api/v1/domains/" + domID + "/users/" + userID, "", 500},
+		{"groupPatch", http.MethodPatch, "/api/v1/domains/" + domID + "/groups/" + groupID, `{"title":"x"}`, 500},
+		{"groupDelete", http.MethodDelete, "/api/v1/domains/" + domID + "/groups/" + groupID, "", 500},
+		{"resourcePatch", http.MethodPatch, "/api/v1/domains/" + domID + "/resources/" + resourceID, `{"title":"x"}`, 500},
+		{"resourceDelete", http.MethodDelete, "/api/v1/domains/" + domID + "/resources/" + resourceID, "", 500},
+		{"accessTypeGet", http.MethodGet, "/api/v1/domains/" + domID + "/access-types/" + uuid.NewString(), "", 500},
+		{"accessTypePatch", http.MethodPatch, "/api/v1/domains/" + domID + "/access-types/" + uuid.NewString(), `{"title":"x"}`, 500},
+		{"accessTypeDelete", http.MethodDelete, "/api/v1/domains/" + domID + "/access-types/" + uuid.NewString(), "", 500},
+		{"permissionPatch", http.MethodPatch, "/api/v1/domains/" + domID + "/permissions/" + permID, `{"title":"x"}`, 500},
+		{"permissionDelete", http.MethodDelete, "/api/v1/domains/" + domID + "/permissions/" + permID, "", 500},
 	}
 
 	for _, tt := range tests {
@@ -1825,5 +1839,272 @@ func TestAPI_storeErrors(t *testing.T) {
 				t.Fatalf("want %d, got %d", tt.want, res.StatusCode)
 			}
 		})
+	}
+}
+
+func TestAPI_domainGetPatchDelete(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	var dom store.Domain
+	if err := json.Unmarshal(mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"orig"}`), &dom); err != nil {
+		t.Fatal(err)
+	}
+	base := ts.URL + "/api/v1/domains/" + dom.ID
+
+	res, err := http.Get(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("GET domain want 200, got %d: %s", res.StatusCode, b)
+	}
+	var got store.Domain
+	if err := json.Unmarshal(b, &got); err != nil || got.Title != "orig" {
+		t.Fatalf("domain: %+v err=%v", got, err)
+	}
+
+	reqPatch, err := http.NewRequest(http.MethodPatch, base, strings.NewReader(`{"title":"renamed"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	reqPatch.Header.Set("Content-Type", "application/json")
+	res, err = http.DefaultClient.Do(reqPatch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ = io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("PATCH domain want 200, got %d: %s", res.StatusCode, b)
+	}
+	if err := json.Unmarshal(b, &got); err != nil || got.Title != "renamed" {
+		t.Fatalf("patched: %+v", got)
+	}
+
+	reqDel, err := http.NewRequest(http.MethodDelete, base, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err = http.DefaultClient.Do(reqDel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusNoContent {
+		t.Fatalf("DELETE domain want 204, got %d", res.StatusCode)
+	}
+}
+
+func TestAPI_domainDelete_blockedByUser(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	var dom store.Domain
+	if err := json.Unmarshal(mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"d"}`), &dom); err != nil {
+		t.Fatal(err)
+	}
+	base := ts.URL + "/api/v1/domains/" + dom.ID
+	_ = mustPostJSON201(t, base+"/users", `{"title":"u"}`)
+
+	reqDel, err := http.NewRequest(http.MethodDelete, base, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := http.DefaultClient.Do(reqDel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("DELETE domain with user want 400, got %d: %s", res.StatusCode, b)
+	}
+}
+
+func TestAPI_userResourcePermissionPatchDelete(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	var dom store.Domain
+	if err := json.Unmarshal(mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"d"}`), &dom); err != nil {
+		t.Fatal(err)
+	}
+	base := ts.URL + "/api/v1/domains/" + dom.ID
+
+	uBody := mustPostJSON201(t, base+"/users", `{"title":"u"}`)
+	var u store.User
+	if err := json.Unmarshal(uBody, &u); err != nil {
+		t.Fatal(err)
+	}
+	reqUP, _ := http.NewRequest(http.MethodPatch, base+"/users/"+u.ID, strings.NewReader(`{"title":"v"}`))
+	reqUP.Header.Set("Content-Type", "application/json")
+	res, err := http.DefaultClient.Do(reqUP)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("user patch: %d %s", res.StatusCode, b)
+	}
+
+	rBody := mustPostJSON201(t, base+"/resources", `{"title":"r"}`)
+	var resrc store.Resource
+	if err := json.Unmarshal(rBody, &resrc); err != nil {
+		t.Fatal(err)
+	}
+	reqRP, _ := http.NewRequest(http.MethodPatch, base+"/resources/"+resrc.ID, strings.NewReader(`{"title":"r2"}`))
+	reqRP.Header.Set("Content-Type", "application/json")
+	res, err = http.DefaultClient.Do(reqRP)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ = io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("resource patch: %d %s", res.StatusCode, b)
+	}
+
+	atBody := mustPostJSON201(t, base+"/access-types", `{"title":"read","bit":"0x1"}`)
+	var at store.AccessType
+	if err := json.Unmarshal(atBody, &at); err != nil {
+		t.Fatal(err)
+	}
+	reqAT, _ := http.NewRequest(http.MethodPatch, base+"/access-types/"+at.ID, strings.NewReader(`{"title":"READ"}`))
+	reqAT.Header.Set("Content-Type", "application/json")
+	res, err = http.DefaultClient.Do(reqAT)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ = io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("access type patch: %d %s", res.StatusCode, b)
+	}
+
+	pBody := mustPostJSON201(t, base+"/permissions", `{"title":"p","resource_id":"`+resrc.ID+`","access_mask":"0x3"}`)
+	var perm store.Permission
+	if err := json.Unmarshal(pBody, &perm); err != nil {
+		t.Fatal(err)
+	}
+	reqPP, _ := http.NewRequest(http.MethodPatch, base+"/permissions/"+perm.ID, strings.NewReader(`{"title":"perm2"}`))
+	reqPP.Header.Set("Content-Type", "application/json")
+	res, err = http.DefaultClient.Do(reqPP)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ = io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("permission patch: %d %s", res.StatusCode, b)
+	}
+
+	reqPD, _ := http.NewRequest(http.MethodDelete, base+"/permissions/"+perm.ID, nil)
+	res, err = http.DefaultClient.Do(reqPD)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusNoContent {
+		t.Fatalf("permission delete: %d", res.StatusCode)
+	}
+
+	reqRD, _ := http.NewRequest(http.MethodDelete, base+"/resources/"+resrc.ID, nil)
+	res, err = http.DefaultClient.Do(reqRD)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusNoContent {
+		t.Fatalf("resource delete: %d", res.StatusCode)
+	}
+
+	reqATD, _ := http.NewRequest(http.MethodDelete, base+"/access-types/"+at.ID, nil)
+	res, err = http.DefaultClient.Do(reqATD)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusNoContent {
+		t.Fatalf("access type delete: %d", res.StatusCode)
+	}
+
+	reqUD, _ := http.NewRequest(http.MethodDelete, base+"/users/"+u.ID, nil)
+	res, err = http.DefaultClient.Do(reqUD)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusNoContent {
+		t.Fatalf("user delete: %d", res.StatusCode)
+	}
+}
+
+func TestAPI_groupPatchDelete(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	var dom store.Domain
+	if err := json.Unmarshal(mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"d"}`), &dom); err != nil {
+		t.Fatal(err)
+	}
+	base := ts.URL + "/api/v1/domains/" + dom.ID
+	g1 := json.RawMessage(mustPostJSON201(t, base+"/groups", `{"title":"g1"}`))
+	g2 := json.RawMessage(mustPostJSON201(t, base+"/groups", `{"title":"g2"}`))
+	var grp1, grp2 store.Group
+	_ = json.Unmarshal(g1, &grp1)
+	_ = json.Unmarshal(g2, &grp2)
+
+	reqGP, _ := http.NewRequest(http.MethodPatch, base+"/groups/"+grp2.ID,
+		strings.NewReader(`{"title":"two","parent_group_id":"`+grp1.ID+`"}`))
+	reqGP.Header.Set("Content-Type", "application/json")
+	res, err := http.DefaultClient.Do(reqGP)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("group patch: %d %s", res.StatusCode, b)
+	}
+
+	reqGD, _ := http.NewRequest(http.MethodDelete, base+"/groups/"+grp2.ID, nil)
+	res, err = http.DefaultClient.Do(reqGD)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusNoContent {
+		t.Fatalf("group delete child: %d", res.StatusCode)
+	}
+
+	reqGD2, _ := http.NewRequest(http.MethodDelete, base+"/groups/"+grp1.ID, nil)
+	res, err = http.DefaultClient.Do(reqGD2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusNoContent {
+		t.Fatalf("group delete parent: %d", res.StatusCode)
+	}
+}
+
+func TestAPI_patchEmptyBody(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	var dom store.Domain
+	if err := json.Unmarshal(mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"d"}`), &dom); err != nil {
+		t.Fatal(err)
+	}
+	base := ts.URL + "/api/v1/domains/" + dom.ID
+	uBody := mustPostJSON201(t, base+"/users", `{"title":"u"}`)
+	var u store.User
+	if err := json.Unmarshal(uBody, &u); err != nil {
+		t.Fatal(err)
+	}
+
+	req, _ := http.NewRequest(http.MethodPatch, base+"/users/"+u.ID, strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("empty patch want 400, got %d", res.StatusCode)
 	}
 }

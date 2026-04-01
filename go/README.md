@@ -85,8 +85,8 @@ Equivalent without Make (from **`go/`**): `go test -race ./...`, `go vet ./...`,
 
 REST routes live under **`/api/v1`** with domain-scoped segments, for example:
 
-- `GET /api/v1/domains`
-- `POST /api/v1/domains`
+- `GET` / `POST /api/v1/domains`; `GET` / `PATCH` / `DELETE /api/v1/domains/{domainID}`
+- Domain-scoped CRUD includes `PATCH` / `DELETE` for users, groups, resources, permissions, and access types (plus `GET` for a single access type). Deletes fail with **400** when SQLite foreign keys block removal.
 - `GET /api/v1/domains/{domainID}/authz/check?user_id=&resource_id=&access_bit=`
 
 ### Authentication
@@ -101,7 +101,7 @@ Full HTTP contract: **[`api/openapi.yaml`](../api/openapi.yaml)** (OpenAPI 3) an
 
 ### Structured logging & audit
 
-Server output is structured JSON via `internal/logger` (wrapping `log/slog`). All 13 mutation handlers emit audit events with `audit=true`, the action name, and relevant entity IDs. Example:
+Server output is structured JSON via `internal/logger` (wrapping `log/slog`). All mutation handlers (creates, updates, deletes, membership/grant changes) emit audit events with `audit=true`, the action name, and relevant entity IDs. Example:
 
 ```json
 {"time":"...","level":"INFO","msg":"audit","audit":true,"action":"grant_user_permission","domain_id":"d1","user_id":"u1","permission_id":"p1"}

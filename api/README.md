@@ -11,7 +11,7 @@
 2. Open the collection **Variables** tab (or edit collection variables):
    - **`baseUrl`** — e.g. `http://127.0.0.1:8080` (match `HTTP_ADDR`).
    - **`bearerToken`** — your `API_BEARER_TOKEN` value if the server requires Bearer auth; leave empty if not configured.
-   - **`domainId`**, **`userId`**, **`groupId`**, **`resourceId`**, **`permissionId`** — fill from JSON responses after creating entities (IDs are UUID strings).
+   - **`domainId`**, **`userId`**, **`groupId`**, **`resourceId`**, **`permissionId`**, **`accessTypeId`** — fill from JSON responses after creating entities (IDs are UUID strings).
 3. Collection auth is **Bearer Token** using `{{bearerToken}}`. Postman omits or sends an empty token when the variable is blank (behavior may vary by version); if requests **return 401**, set the token or disable collection auth for local dev without Bearer. The **Health** request overrides auth to **No auth** so `/health` stays unauthenticated when `bearerToken` is set.
 
 ## OpenAPI

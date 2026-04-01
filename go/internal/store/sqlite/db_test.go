@@ -29,3 +29,14 @@ func TestOpen_invalidDSN(t *testing.T) {
 		t.Fatal("want error for invalid DSN")
 	}
 }
+
+// Read-only open against a non-existent file fails at Ping(), exercising the
+// close + wrap error path in Open (not the PRAGMA path).
+func TestOpen_readOnlyMissingFile(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "does-not-exist.db")
+	dsn := "file:" + missing + "?mode=ro&_pragma=foreign_keys(1)"
+	_, err := Open(dsn)
+	if err == nil {
+		t.Fatal("want error when read-only database file is missing")
+	}
+}

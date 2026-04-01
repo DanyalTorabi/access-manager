@@ -894,3 +894,475 @@ func TestRevokeGroupPermission_successAndNotFound(t *testing.T) {
 		t.Fatalf("second revoke: want ErrNotFound, got %v", err)
 	}
 }
+
+func TestRestrictDelete_domainWithUser(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UserCreate(ctx, &store.User{ID: uuid.NewString(), DomainID: domainID, Title: "u"}); err != nil {
+		t.Fatal(err)
+	}
+	err := s.DomainDelete(ctx, domainID)
+	if !errors.Is(err, store.ErrFKViolation) {
+		t.Fatalf("want ErrFKViolation, got %v", err)
+	}
+}
+
+func TestRestrictDelete_resourceWithPermission(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	rid := uuid.NewString()
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{
+		ID: uuid.NewString(), DomainID: domainID, Title: "p", ResourceID: rid, AccessMask: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	err := s.ResourceDelete(ctx, domainID, rid)
+	if !errors.Is(err, store.ErrFKViolation) {
+		t.Fatalf("want ErrFKViolation, got %v", err)
+	}
+}
+
+func TestRestrictDelete_userInGroup(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	uid := uuid.NewString()
+	gid := uuid.NewString()
+	if err := s.UserCreate(ctx, &store.User{ID: uid, DomainID: domainID, Title: "u"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GroupCreate(ctx, &store.Group{ID: gid, DomainID: domainID, Title: "g"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddUserToGroup(ctx, domainID, uid, gid); err != nil {
+		t.Fatal(err)
+	}
+	err := s.UserDelete(ctx, domainID, uid)
+	if !errors.Is(err, store.ErrFKViolation) {
+		t.Fatalf("want ErrFKViolation, got %v", err)
+	}
+}
+
+func TestRestrictDelete_groupWithChild(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	parentID := uuid.NewString()
+	childID := uuid.NewString()
+	if err := s.GroupCreate(ctx, &store.Group{ID: parentID, DomainID: domainID, Title: "p"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GroupCreate(ctx, &store.Group{ID: childID, DomainID: domainID, Title: "c", ParentGroupID: &parentID}); err != nil {
+		t.Fatal(err)
+	}
+	err := s.GroupDelete(ctx, domainID, parentID)
+	if !errors.Is(err, store.ErrFKViolation) {
+		t.Fatalf("want ErrFKViolation, got %v", err)
+	}
+}
+
+func TestDomainDelete_emptyDomain(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DomainDelete(ctx, domainID); err != nil {
+		t.Fatal(err)
+	}
+	_, err := s.DomainGet(ctx, domainID)
+	if !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("want ErrNotFound, got %v", err)
+	}
+}
+
+func TestPatchDomainUserResource(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	title := "d2"
+	d, err := s.DomainPatch(ctx, domainID, &title)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Title != "d2" {
+		t.Fatalf("domain title: %q", d.Title)
+	}
+	uid := uuid.NewString()
+	if err := s.UserCreate(ctx, &store.User{ID: uid, DomainID: domainID, Title: "u"}); err != nil {
+		t.Fatal(err)
+	}
+	ut := "alice"
+	u, err := s.UserPatch(ctx, domainID, uid, &ut)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Title != "alice" {
+		t.Fatalf("user title: %q", u.Title)
+	}
+	rid := uuid.NewString()
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	rt := "doc"
+	r, err := s.ResourcePatch(ctx, domainID, rid, &rt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Title != "doc" {
+		t.Fatalf("resource title: %q", r.Title)
+	}
+}
+
+func TestAccessTypeGetPatchDelete(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	aid := uuid.NewString()
+	if err := s.AccessTypeCreate(ctx, &store.AccessType{ID: aid, DomainID: domainID, Title: "read", Bit: 1}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.AccessTypeGet(ctx, domainID, aid)
+	if err != nil || got.Title != "read" || got.Bit != 1 {
+		t.Fatalf("get: %+v err=%v", got, err)
+	}
+	nt := "READ"
+	a, err := s.AccessTypePatch(ctx, domainID, aid, store.AccessTypePatchParams{Title: &nt})
+	if err != nil || a.Title != "READ" || a.Bit != 1 {
+		t.Fatalf("patch title: %+v err=%v", a, err)
+	}
+	b2 := uint64(2)
+	a2, err := s.AccessTypePatch(ctx, domainID, aid, store.AccessTypePatchParams{Bit: &b2})
+	if err != nil || a2.Bit != 2 {
+		t.Fatalf("patch bit: %+v err=%v", a2, err)
+	}
+	if err := s.AccessTypeDelete(ctx, domainID, aid); err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.AccessTypeGet(ctx, domainID, aid)
+	if !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("want ErrNotFound, got %v", err)
+	}
+}
+
+func TestPermissionPatchDelete(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	r1 := uuid.NewString()
+	r2 := uuid.NewString()
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: r1, DomainID: domainID, Title: "a"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: r2, DomainID: domainID, Title: "b"}); err != nil {
+		t.Fatal(err)
+	}
+	pid := uuid.NewString()
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: pid, DomainID: domainID, Title: "p", ResourceID: r1, AccessMask: 1}); err != nil {
+		t.Fatal(err)
+	}
+	pt := "perm"
+	p, err := s.PermissionPatch(ctx, domainID, pid, store.PermissionPatchParams{Title: &pt})
+	if err != nil || p.Title != "perm" {
+		t.Fatalf("patch title: %+v err=%v", p, err)
+	}
+	p, err = s.PermissionPatch(ctx, domainID, pid, store.PermissionPatchParams{ResourceID: &r2})
+	if err != nil || p.ResourceID != r2 {
+		t.Fatalf("patch resource: %+v err=%v", p, err)
+	}
+	m := uint64(7)
+	p, err = s.PermissionPatch(ctx, domainID, pid, store.PermissionPatchParams{AccessMask: &m})
+	if err != nil || p.AccessMask != 7 {
+		t.Fatalf("patch mask: %+v err=%v", p, err)
+	}
+	if err := s.PermissionDelete(ctx, domainID, pid); err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.PermissionGet(ctx, domainID, pid)
+	if !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("want ErrNotFound, got %v", err)
+	}
+}
+
+func TestGroupPatch_titleAndParent(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	pID := uuid.NewString()
+	cID := uuid.NewString()
+	if err := s.GroupCreate(ctx, &store.Group{ID: pID, DomainID: domainID, Title: "par"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GroupCreate(ctx, &store.Group{ID: cID, DomainID: domainID, Title: "chi"}); err != nil {
+		t.Fatal(err)
+	}
+	nt := "child"
+	g, err := s.GroupPatch(ctx, domainID, cID, store.GroupPatchParams{Title: &nt, UpdateParent: true, ParentGroupID: &pID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.Title != "child" || g.ParentGroupID == nil || *g.ParentGroupID != pID {
+		t.Fatalf("group: %+v", g)
+	}
+	g, err = s.GroupPatch(ctx, domainID, cID, store.GroupPatchParams{UpdateParent: true, ParentGroupID: nil})
+	if err != nil || g.ParentGroupID != nil {
+		t.Fatalf("clear parent: %+v err=%v", g, err)
+	}
+}
+
+func TestDelete_userGroupResource_success(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	uid := uuid.NewString()
+	gid := uuid.NewString()
+	rid := uuid.NewString()
+	if err := s.UserCreate(ctx, &store.User{ID: uid, DomainID: domainID, Title: "u"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GroupCreate(ctx, &store.Group{ID: gid, DomainID: domainID, Title: "g"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UserDelete(ctx, domainID, uid); err != nil {
+		t.Fatalf("UserDelete: %v", err)
+	}
+	if err := s.GroupDelete(ctx, domainID, gid); err != nil {
+		t.Fatalf("GroupDelete: %v", err)
+	}
+	if err := s.ResourceDelete(ctx, domainID, rid); err != nil {
+		t.Fatalf("ResourceDelete: %v", err)
+	}
+}
+
+func TestDelete_notFound(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	missing := uuid.NewString()
+	if err := s.DomainDelete(ctx, missing); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("DomainDelete: want ErrNotFound, got %v", err)
+	}
+	if err := s.UserDelete(ctx, domainID, missing); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("UserDelete: want ErrNotFound, got %v", err)
+	}
+	if err := s.GroupDelete(ctx, domainID, missing); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("GroupDelete: want ErrNotFound, got %v", err)
+	}
+	if err := s.ResourceDelete(ctx, domainID, missing); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("ResourceDelete: want ErrNotFound, got %v", err)
+	}
+	if err := s.AccessTypeDelete(ctx, domainID, missing); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("AccessTypeDelete: want ErrNotFound, got %v", err)
+	}
+	if err := s.PermissionDelete(ctx, domainID, missing); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("PermissionDelete: want ErrNotFound, got %v", err)
+	}
+}
+
+func TestPatch_emptyInvalid_notFound(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	uid := uuid.NewString()
+	if err := s.UserCreate(ctx, &store.User{ID: uid, DomainID: domainID, Title: "u"}); err != nil {
+		t.Fatal(err)
+	}
+	rid := uuid.NewString()
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	gid := uuid.NewString()
+	if err := s.GroupCreate(ctx, &store.Group{ID: gid, DomainID: domainID, Title: "g"}); err != nil {
+		t.Fatal(err)
+	}
+	aid := uuid.NewString()
+	if err := s.AccessTypeCreate(ctx, &store.AccessType{ID: aid, DomainID: domainID, Title: "read", Bit: 1}); err != nil {
+		t.Fatal(err)
+	}
+	pid := uuid.NewString()
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: pid, DomainID: domainID, Title: "p", ResourceID: rid, AccessMask: 1}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.DomainPatch(ctx, domainID, nil); !errors.Is(err, store.ErrInvalidInput) {
+		t.Fatalf("DomainPatch nil: want ErrInvalidInput, got %v", err)
+	}
+	badDomain := uuid.NewString()
+	title := "x"
+	if _, err := s.DomainPatch(ctx, badDomain, &title); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("DomainPatch missing domain: %v", err)
+	}
+	if _, err := s.UserPatch(ctx, domainID, uuid.NewString(), &title); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("UserPatch not found: %v", err)
+	}
+	if _, err := s.UserPatch(ctx, domainID, uid, nil); !errors.Is(err, store.ErrInvalidInput) {
+		t.Fatalf("UserPatch nil title: %v", err)
+	}
+	if _, err := s.ResourcePatch(ctx, domainID, uuid.NewString(), &title); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("ResourcePatch not found: %v", err)
+	}
+	if _, err := s.ResourcePatch(ctx, domainID, rid, nil); !errors.Is(err, store.ErrInvalidInput) {
+		t.Fatalf("ResourcePatch nil: %v", err)
+	}
+	if _, err := s.GroupPatch(ctx, domainID, gid, store.GroupPatchParams{}); !errors.Is(err, store.ErrInvalidInput) {
+		t.Fatalf("GroupPatch empty: %v", err)
+	}
+	if _, err := s.GroupPatch(ctx, domainID, uuid.NewString(), store.GroupPatchParams{Title: &title}); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("GroupPatch missing group: %v", err)
+	}
+	if _, err := s.AccessTypePatch(ctx, domainID, aid, store.AccessTypePatchParams{}); !errors.Is(err, store.ErrInvalidInput) {
+		t.Fatalf("AccessTypePatch empty: %v", err)
+	}
+	if _, err := s.AccessTypePatch(ctx, domainID, uuid.NewString(), store.AccessTypePatchParams{Title: &title}); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("AccessTypePatch not found: %v", err)
+	}
+	if _, err := s.PermissionPatch(ctx, domainID, pid, store.PermissionPatchParams{}); !errors.Is(err, store.ErrInvalidInput) {
+		t.Fatalf("PermissionPatch empty: %v", err)
+	}
+	if _, err := s.PermissionPatch(ctx, domainID, uuid.NewString(), store.PermissionPatchParams{Title: &title}); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("PermissionPatch not found: %v", err)
+	}
+	otherDomain := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: otherDomain, Title: "o"}); err != nil {
+		t.Fatal(err)
+	}
+	otherRes := uuid.NewString()
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: otherRes, DomainID: otherDomain, Title: "or"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.PermissionPatch(ctx, domainID, pid, store.PermissionPatchParams{ResourceID: &otherRes}); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("PermissionPatch foreign resource: want ErrNotFound, got %v", err)
+	}
+}
+
+func TestGroupPatch_titleOnly(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	gid := uuid.NewString()
+	if err := s.GroupCreate(ctx, &store.Group{ID: gid, DomainID: domainID, Title: "g"}); err != nil {
+		t.Fatal(err)
+	}
+	nt := "renamed"
+	g, err := s.GroupPatch(ctx, domainID, gid, store.GroupPatchParams{Title: &nt})
+	if err != nil || g.Title != "renamed" {
+		t.Fatalf("got %+v err=%v", g, err)
+	}
+}
+
+func TestAccessTypePatch_duplicateBitConflict(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	a1 := uuid.NewString()
+	a2 := uuid.NewString()
+	if err := s.AccessTypeCreate(ctx, &store.AccessType{ID: a1, DomainID: domainID, Title: "a", Bit: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AccessTypeCreate(ctx, &store.AccessType{ID: a2, DomainID: domainID, Title: "b", Bit: 2}); err != nil {
+		t.Fatal(err)
+	}
+	b1 := uint64(2)
+	_, err := s.AccessTypePatch(ctx, domainID, a1, store.AccessTypePatchParams{Bit: &b1})
+	if !errors.Is(err, store.ErrConflict) {
+		t.Fatalf("want ErrConflict, got %v", err)
+	}
+}
+
+func TestDomainCreate_duplicateID_conflict(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	id := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: id, Title: "a"}); err != nil {
+		t.Fatal(err)
+	}
+	err := s.DomainCreate(ctx, &store.Domain{ID: id, Title: "b"})
+	if !errors.Is(err, store.ErrConflict) {
+		t.Fatalf("want ErrConflict, got %v", err)
+	}
+}
+
+func TestEffectiveMask_dbClosed(t *testing.T) {
+	ctx := context.Background()
+	db, err := Open("file:" + filepath.Join(t.TempDir(), "closed.db") + "?_pragma=foreign_keys(1)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := MigrateUp(db, testutil.SQLiteMigrationsDir(t)); err != nil {
+		_ = db.Close()
+		t.Fatal(err)
+	}
+	s := New(db)
+	domainID := uuid.NewString()
+	uid := uuid.NewString()
+	rid := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		_ = db.Close()
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.EffectiveMask(ctx, domainID, uid, rid)
+	if err == nil {
+		t.Fatal("want error from closed db")
+	}
+}
+
+func TestWrapConstraintError_plainErrorUnchanged(t *testing.T) {
+	err := wrapConstraintError(errors.New("some other failure"))
+	if err == nil || !strings.Contains(err.Error(), "some other failure") {
+		t.Fatalf("got %v", err)
+	}
+	if errors.Is(err, store.ErrFKViolation) || errors.Is(err, store.ErrConflict) {
+		t.Fatal("plain error should not be classified as FK/conflict")
+	}
+}

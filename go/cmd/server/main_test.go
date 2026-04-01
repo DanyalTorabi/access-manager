@@ -98,6 +98,22 @@ func TestSetup_badMigrations(t *testing.T) {
 	}
 }
 
+// Relative MigrationsDir is joined with os.Getwd(); run from module root so migrate finds sqlite files.
+func TestSetup_relativeMigrationsDir(t *testing.T) {
+	root := testutil.RepoRoot(t)
+	t.Chdir(root)
+	cfg := testCfg(t)
+	cfg.MigrationsDir = "migrations/sqlite"
+	httpSrv, db, err := setup(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	if httpSrv == nil {
+		t.Fatal("nil http server")
+	}
+}
+
 // --- run tests ---
 
 func TestRun_success(t *testing.T) {

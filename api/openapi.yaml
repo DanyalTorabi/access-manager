@@ -77,6 +77,13 @@ components:
       schema:
         type: string
         format: uuid
+    accessTypeID:
+      name: accessTypeID
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
 
   schemas:
     ErrorBody:
@@ -110,6 +117,49 @@ components:
       properties:
         title:
           type: string
+
+    PatchTitleBody:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+
+    GroupPatchBody:
+      type: object
+      description: |
+        At least one of `title` or `parent_group_id` must be present.
+        Omit `parent_group_id` to leave the parent unchanged; send `null` to clear (root group).
+      properties:
+        title:
+          type: string
+        parent_group_id:
+          type: string
+          format: uuid
+          nullable: true
+
+    AccessTypePatchBody:
+      type: object
+      description: At least one of `title` or `bit` must be present.
+      properties:
+        title:
+          type: string
+        bit:
+          type: string
+          description: Decimal or `0x` hex (parsed server-side).
+
+    PermissionPatchBody:
+      type: object
+      description: At least one of `title`, `resource_id`, or `access_mask` must be present.
+      properties:
+        title:
+          type: string
+        resource_id:
+          type: string
+          format: uuid
+        access_mask:
+          type: string
+          description: Decimal or `0x` hex.
 
     User:
       type: object
@@ -324,6 +374,80 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
 
+  /api/v1/domains/{domainID}:
+    parameters:
+      - $ref: "#/components/parameters/domainID"
+    get:
+      tags: [Domains]
+      summary: Get domain
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Domain"
+        "404":
+          description: Not found
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    patch:
+      tags: [Domains]
+      summary: Patch domain (title)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchTitleBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Domain"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: Not found
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    delete:
+      tags: [Domains]
+      summary: Delete domain
+      description: |
+        Fails with **400** if the domain still has users, groups, resources, access types, permissions, or related rows (foreign key RESTRICT).
+      responses:
+        "204":
+          description: No content
+        "400":
+          description: Bad request (e.g. entity still referenced)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: Not found
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
   /api/v1/domains/{domainID}/users:
     parameters:
       - $ref: "#/components/parameters/domainID"
@@ -388,6 +512,57 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
+        "404":
+          description: Not found
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    patch:
+      tags: [Users]
+      summary: Patch user (title)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchTitleBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: Not found
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    delete:
+      tags: [Users]
+      summary: Delete user
+      description: Fails with **400** if the user still has group memberships or direct permission grants.
+      responses:
+        "204":
+          description: No content
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "404":
           description: Not found
         "401":
@@ -461,6 +636,57 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Group"
+        "404":
+          description: Not found
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    patch:
+      tags: [Groups]
+      summary: Patch group (title and/or parent)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupPatchBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: Not found
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    delete:
+      tags: [Groups]
+      summary: Delete group
+      description: Fails with **400** if the group has members, child groups, or group permission grants.
+      responses:
+        "204":
+          description: No content
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "404":
           description: Not found
         "401":
@@ -571,6 +797,57 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+    patch:
+      tags: [Resources]
+      summary: Patch resource (title)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchTitleBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Resource"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: Not found
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    delete:
+      tags: [Resources]
+      summary: Delete resource
+      description: Fails with **400** while permissions still reference this resource.
+      responses:
+        "204":
+          description: No content
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: Not found
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
 
   /api/v1/domains/{domainID}/access-types:
     parameters:
@@ -615,6 +892,79 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v1/domains/{domainID}/access-types/{accessTypeID}:
+    parameters:
+      - $ref: "#/components/parameters/domainID"
+      - $ref: "#/components/parameters/accessTypeID"
+    get:
+      tags: [AccessTypes]
+      summary: Get access type
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessType"
+        "404":
+          description: Not found
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    patch:
+      tags: [AccessTypes]
+      summary: Patch access type
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccessTypePatchBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessType"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: Not found
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Conflict (e.g. duplicate bit in domain)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    delete:
+      tags: [AccessTypes]
+      summary: Delete access type
+      responses:
+        "204":
+          description: No content
+        "404":
+          description: Not found
         "401":
           description: Unauthorized
           content:
@@ -686,6 +1036,57 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Permission"
+        "404":
+          description: Not found
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    patch:
+      tags: [Permissions]
+      summary: Patch permission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PermissionPatchBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Permission"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: Not found
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    delete:
+      tags: [Permissions]
+      summary: Delete permission
+      description: Fails with **400** while user or group grants still reference this permission.
+      responses:
+        "204":
+          description: No content
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "404":
           description: Not found
         "401":
