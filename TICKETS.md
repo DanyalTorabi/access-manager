@@ -50,6 +50,11 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 | T19 | Docker | done | [Dockerfile](Dockerfile), [docker-compose.yml](docker-compose.yml), [.dockerignore](.dockerignore); distroless non-root + SQLite tmpfs; **T13** can reuse compose |
 | T1 | Per-dialect migrations (postgres/mysql) | open | **`go/migrations/`** + **`go/internal/database`** |
 | T6 | GitHub remote + repo hygiene | done | [CONTRIBUTING.md](CONTRIBUTING.md) maintainer checklist; [.github/](.github/) PR + issue templates; complete **branch protection** + **Actions/GHCR** in GitHub UI per CONTRIBUTING |
+| T33 | Restrict cascading deletes | open | Change FK constraints from `CASCADE` to `RESTRICT` on referenced entities so deleting an in-use entity (e.g. a group with members, a permission that is granted) returns an error instead of silently removing related data. New migration + store-layer error handling. Pairs with **T37** (delete endpoints). |
+| T34 | List pagination | open | Add `start` (offset) and `pagesize` query parameters to all list endpoints. Default page size, max cap, return total count or next-page indicator in response. |
+| T35 | List filtering | open | Add filter query parameters on all fields for list endpoints. Support operators: `starts_with`, `contains`, `ends_with`. Design a consistent query parameter convention (e.g. `?title__contains=foo`). |
+| T36 | Sanitize API error responses + fix Postman/OpenAPI samples | open | (1) Stop exposing internal/SQL error details to API consumers — return clean, database-agnostic messages (e.g. "referenced domain does not exist") while logging the internal error via `logger`. (2) Complete Postman collection variables and request ordering so samples work out of the box (create domain before user, etc.). (3) Align OpenAPI spec with any changes. |
+| T37 | Delete and update (PATCH) endpoints | open | Add `DELETE` and `PATCH` endpoints for all entities (domains, users, groups, resources, access types, permissions). PATCH for partial updates. DELETE behavior depends on **T33** (restrict when in use). Update Postman + OpenAPI. |
 
 ---
 
@@ -80,7 +85,7 @@ Engineering practices follow the org **Backend Engineering** curriculum where th
 | Build & local dev | T9, T19, T26, T28, T29 |
 | Testing & quality | T10, T11, T12, T16, T17, T27, T5, T30 |
 | Platform & delivery | T6, T13, T19, T21, T22, T29 |
-| Security & access | T7, T20, T31 |
-| Product / data model | T1–T4 |
+| Security & access | T7, T20, T31, T33, T36 |
+| Product / data model | T1–T4, T34, T35, T37 |
 | Tooling / AI | T18 |
 | Ops / runtime | T23 |
