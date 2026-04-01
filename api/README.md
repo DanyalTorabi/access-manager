@@ -1,4 +1,4 @@
-# API contract artifacts (**T17**)
+# API contract artifacts
 
 | File | Purpose |
 |------|---------|

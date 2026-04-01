@@ -1,4 +1,4 @@
-# End-to-end smoke (**T16**)
+# End-to-end smoke
 
 Two implementations of the **same** journey (health → domain → entities → group grant → `authz/check`):
 

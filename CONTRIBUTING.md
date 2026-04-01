@@ -5,7 +5,7 @@ Thanks for contributing to **access-manager**. The Go service lives under [`go/`
 ## Before you start
 
 - [**AGENTS.md**](AGENTS.md) — security, layout, library boundaries, post-change checks.
-- [**docs/branching.md**](docs/branching.md) — branch names and **PRs to `main`** (**T14**).
+- [**docs/branching.md**](docs/branching.md) — branch names and **PRs to `main`**.
 
 ## Local development
 
@@ -16,11 +16,11 @@ make test
 make lint
 ```
 
-End-to-end smoke (**T16**): with the server reachable (default `http://127.0.0.1:8080`), run **`make e2e`** (`go test -race -count=1 -tags=e2e ./e2e/...` from **`go/`**). Optional **`make e2e-bash`** uses **curl** + **jq**. Set **`API_BEARER_TOKEN`** when Bearer auth is enabled. See **[test/e2e/README.md](test/e2e/README.md)**.
+End-to-end smoke: with the server reachable (default `http://127.0.0.1:8080`), run **`make e2e`** (`go test -race -count=1 -tags=e2e ./e2e/...` from **`go/`**). Optional **`make e2e-bash`** uses **curl** + **jq**. Set **`API_BEARER_TOKEN`** when Bearer auth is enabled. See **[test/e2e/README.md](test/e2e/README.md)**.
 
 See [**go/README.md**](go/README.md) for config, environment variables, and the HTTP API.
 
-### Docker (**T19**)
+### Docker
 
 From the repository root:
 
@@ -30,7 +30,7 @@ make docker-up          # detached; then: make docker-logs
 make docker-down
 ```
 
-See the root [**README** — Docker (T19)](README.md#docker-t19) for image layout and port binding.
+See the root [**README** — Docker](README.md#docker) for image layout and port binding.
 
 ## Commits
 
@@ -84,7 +84,7 @@ Prefer **`gh`** for issues, PRs, Actions, and API calls ([GitHub CLI](https://cl
 
 ---
 
-## Maintainer checklist: GitHub (**T6**)
+## Maintainer checklist: GitHub
 
 **Canonical remote:** [https://github.com/DanyalTorabi/access-manager](https://github.com/DanyalTorabi/access-manager)
 
@@ -112,7 +112,7 @@ In GitHub: **Settings → Branches → Branch protection rules** for `main`:
 - Optionally require **approvals**.
 - After the first green CI run on **`main`**, add **required status checks** by **check / job name** (GitHub does not key off the workflow file path). Enable **Go (test, vet, lint)** and **Docker build & compose smoke** from workflow **CI** (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
-### Actions and GHCR (**T13**)
+### Actions and GHCR
 
 - **Settings → Actions → General:** enable Actions as appropriate for the org.
 - CI workflow: **[`.github/workflows/ci.yml`](.github/workflows/ci.yml)** — the **Publish image to GHCR** job sets **`packages: write`** on `GITHUB_TOKEN` and pushes **`ghcr.io/<lowercase-owner>/access-manager`** on every push to **`main`**.
