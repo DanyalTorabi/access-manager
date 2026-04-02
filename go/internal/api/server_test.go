@@ -1800,14 +1800,15 @@ func TestWriteInternalErr_generic(t *testing.T) {
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("want 500, got %d", w.Code)
 	}
+	respBytes := w.Body.Bytes()
 	var body map[string]string
-	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+	if err := json.Unmarshal(respBytes, &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if body["error"] != "internal server error" {
 		t.Fatalf("body = %q, want generic", body["error"])
 	}
-	if strings.Contains(w.Body.String(), "database is closed") {
+	if strings.Contains(string(respBytes), "database is closed") {
 		t.Fatal("raw error leaked to client")
 	}
 	if !strings.Contains(buf.String(), "database is closed") {
