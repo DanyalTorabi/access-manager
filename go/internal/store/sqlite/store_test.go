@@ -978,6 +978,190 @@ func TestRestrictDelete_groupWithChild(t *testing.T) {
 	}
 }
 
+func TestRestrictDelete_domainWithGroup(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GroupCreate(ctx, &store.Group{ID: uuid.NewString(), DomainID: domainID, Title: "g"}); err != nil {
+		t.Fatal(err)
+	}
+	err := s.DomainDelete(ctx, domainID)
+	if !errors.Is(err, store.ErrFKViolation) {
+		t.Fatalf("want ErrFKViolation, got %v", err)
+	}
+}
+
+func TestRestrictDelete_domainWithResource(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: uuid.NewString(), DomainID: domainID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	err := s.DomainDelete(ctx, domainID)
+	if !errors.Is(err, store.ErrFKViolation) {
+		t.Fatalf("want ErrFKViolation, got %v", err)
+	}
+}
+
+func TestRestrictDelete_domainWithAccessType(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AccessTypeCreate(ctx, &store.AccessType{ID: uuid.NewString(), DomainID: domainID, Title: "read", Bit: 1}); err != nil {
+		t.Fatal(err)
+	}
+	err := s.DomainDelete(ctx, domainID)
+	if !errors.Is(err, store.ErrFKViolation) {
+		t.Fatalf("want ErrFKViolation, got %v", err)
+	}
+}
+
+func TestRestrictDelete_userWithUserGrant(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	uid := uuid.NewString()
+	rid := uuid.NewString()
+	pid := uuid.NewString()
+	if err := s.UserCreate(ctx, &store.User{ID: uid, DomainID: domainID, Title: "u"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: pid, DomainID: domainID, Title: "p", ResourceID: rid, AccessMask: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GrantUserPermission(ctx, domainID, uid, pid); err != nil {
+		t.Fatal(err)
+	}
+	err := s.UserDelete(ctx, domainID, uid)
+	if !errors.Is(err, store.ErrFKViolation) {
+		t.Fatalf("want ErrFKViolation, got %v", err)
+	}
+}
+
+func TestRestrictDelete_groupWithMember(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	uid := uuid.NewString()
+	gid := uuid.NewString()
+	if err := s.UserCreate(ctx, &store.User{ID: uid, DomainID: domainID, Title: "u"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GroupCreate(ctx, &store.Group{ID: gid, DomainID: domainID, Title: "g"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddUserToGroup(ctx, domainID, uid, gid); err != nil {
+		t.Fatal(err)
+	}
+	err := s.GroupDelete(ctx, domainID, gid)
+	if !errors.Is(err, store.ErrFKViolation) {
+		t.Fatalf("want ErrFKViolation, got %v", err)
+	}
+}
+
+func TestRestrictDelete_groupWithGroupGrant(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	gid := uuid.NewString()
+	rid := uuid.NewString()
+	pid := uuid.NewString()
+	if err := s.GroupCreate(ctx, &store.Group{ID: gid, DomainID: domainID, Title: "g"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: pid, DomainID: domainID, Title: "p", ResourceID: rid, AccessMask: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GrantGroupPermission(ctx, domainID, gid, pid); err != nil {
+		t.Fatal(err)
+	}
+	err := s.GroupDelete(ctx, domainID, gid)
+	if !errors.Is(err, store.ErrFKViolation) {
+		t.Fatalf("want ErrFKViolation, got %v", err)
+	}
+}
+
+func TestRestrictDelete_permissionWithUserGrant(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	uid := uuid.NewString()
+	rid := uuid.NewString()
+	pid := uuid.NewString()
+	if err := s.UserCreate(ctx, &store.User{ID: uid, DomainID: domainID, Title: "u"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: pid, DomainID: domainID, Title: "p", ResourceID: rid, AccessMask: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GrantUserPermission(ctx, domainID, uid, pid); err != nil {
+		t.Fatal(err)
+	}
+	err := s.PermissionDelete(ctx, domainID, pid)
+	if !errors.Is(err, store.ErrFKViolation) {
+		t.Fatalf("want ErrFKViolation, got %v", err)
+	}
+}
+
+func TestRestrictDelete_permissionWithGroupGrant(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	gid := uuid.NewString()
+	rid := uuid.NewString()
+	pid := uuid.NewString()
+	if err := s.GroupCreate(ctx, &store.Group{ID: gid, DomainID: domainID, Title: "g"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: pid, DomainID: domainID, Title: "p", ResourceID: rid, AccessMask: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GrantGroupPermission(ctx, domainID, gid, pid); err != nil {
+		t.Fatal(err)
+	}
+	err := s.PermissionDelete(ctx, domainID, pid)
+	if !errors.Is(err, store.ErrFKViolation) {
+		t.Fatalf("want ErrFKViolation, got %v", err)
+	}
+}
+
 func TestDomainDelete_emptyDomain(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)
