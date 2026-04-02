@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "access-manager",
-    "description": "Use with api/openapi.yaml as the contract source of truth. Set variables: baseUrl, bearerToken (when API_BEARER_TOKEN is set), domainId, userId, groupId, resourceId, permissionId, accessTypeId after creating entities. For DELETE samples, remove dependents first (permissions before resources, memberships before users/groups, etc.).",
+    "description": "Use with api/openapi.yaml as the contract source of truth.\n\nCreate requests auto-save IDs into collection variables (domainId, userId, etc.) so you can \"Run collection\" top-to-bottom without manual copy-paste.\n\nSet baseUrl (default http://127.0.0.1:8080) and bearerToken (when API_BEARER_TOKEN is configured) before running.\n\nFor DELETE samples, dependents are removed first (permissions → resources/access-types → memberships → users/groups → domain).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -24,7 +24,6 @@
       "request": {"method": "GET", "url": "{{baseUrl}}/health"},
       "auth": {"type": "noauth"}
     },
-    {"name": "List domains", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains"}},
     {
       "name": "Create domain",
       "request": {
@@ -32,8 +31,10 @@
         "header": [{"key": "Content-Type", "value": "application/json"}],
         "body": {"mode": "raw", "raw": "{\"title\": \"Example domain\"}"},
         "url": "{{baseUrl}}/api/v1/domains"
-      }
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["var json = pm.response.json();", "if (json.ID) pm.collectionVariables.set('domainId', json.ID);"]}}]
     },
+    {"name": "List domains", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains"}},
     {"name": "Get domain", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}"}},
     {
       "name": "Patch domain",
@@ -44,7 +45,6 @@
         "url": "{{baseUrl}}/api/v1/domains/{{domainId}}"
       }
     },
-    {"name": "List users", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users"}},
     {
       "name": "Create user",
       "request": {
@@ -52,8 +52,10 @@
         "header": [{"key": "Content-Type", "value": "application/json"}],
         "body": {"mode": "raw", "raw": "{\"title\": \"Alice\"}"},
         "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users"
-      }
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["var json = pm.response.json();", "if (json.ID) pm.collectionVariables.set('userId', json.ID);"]}}]
     },
+    {"name": "List users", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users"}},
     {"name": "Get user", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}"}},
     {
       "name": "Patch user",
@@ -64,7 +66,6 @@
         "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}"
       }
     },
-    {"name": "List groups", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups"}},
     {
       "name": "Create group",
       "request": {
@@ -72,8 +73,10 @@
         "header": [{"key": "Content-Type", "value": "application/json"}],
         "body": {"mode": "raw", "raw": "{\"title\": \"Admins\"}"},
         "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups"
-      }
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["var json = pm.response.json();", "if (json.ID) pm.collectionVariables.set('groupId', json.ID);"]}}]
     },
+    {"name": "List groups", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups"}},
     {"name": "Get group", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups/{{groupId}}"}},
     {
       "name": "Patch group",
@@ -93,7 +96,6 @@
         "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups/{{groupId}}/parent"
       }
     },
-    {"name": "List resources", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/resources"}},
     {
       "name": "Create resource",
       "request": {
@@ -101,8 +103,10 @@
         "header": [{"key": "Content-Type", "value": "application/json"}],
         "body": {"mode": "raw", "raw": "{\"title\": \"Doc\"}"},
         "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/resources"
-      }
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["var json = pm.response.json();", "if (json.ID) pm.collectionVariables.set('resourceId', json.ID);"]}}]
     },
+    {"name": "List resources", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/resources"}},
     {"name": "Get resource", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/resources/{{resourceId}}"}},
     {
       "name": "Patch resource",
@@ -113,7 +117,6 @@
         "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/resources/{{resourceId}}"
       }
     },
-    {"name": "List access types", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/access-types"}},
     {
       "name": "Create access type",
       "request": {
@@ -121,8 +124,10 @@
         "header": [{"key": "Content-Type", "value": "application/json"}],
         "body": {"mode": "raw", "raw": "{\"title\": \"Read\", \"bit\": \"1\"}"},
         "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/access-types"
-      }
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["var json = pm.response.json();", "if (json.ID) pm.collectionVariables.set('accessTypeId', json.ID);"]}}]
     },
+    {"name": "List access types", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/access-types"}},
     {"name": "Get access type", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/access-types/{{accessTypeId}}"}},
     {
       "name": "Patch access type",
@@ -133,7 +138,6 @@
         "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/access-types/{{accessTypeId}}"
       }
     },
-    {"name": "List permissions", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/permissions"}},
     {
       "name": "Create permission",
       "request": {
@@ -141,8 +145,10 @@
         "header": [{"key": "Content-Type", "value": "application/json"}],
         "body": {"mode": "raw", "raw": "{\"title\": \"Read doc\", \"resource_id\": \"{{resourceId}}\", \"access_mask\": \"1\"}"},
         "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/permissions"
-      }
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["var json = pm.response.json();", "if (json.ID) pm.collectionVariables.set('permissionId', json.ID);"]}}]
     },
+    {"name": "List permissions", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/permissions"}},
     {"name": "Get permission", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/permissions/{{permissionId}}"}},
     {
       "name": "Patch permission",
@@ -154,16 +160,16 @@
       }
     },
     {"name": "Add user to group", "request": {"method": "POST", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}/groups/{{groupId}}"}},
-    {"name": "Remove user from group", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}/groups/{{groupId}}"}},
     {"name": "Grant user permission", "request": {"method": "POST", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}/permissions/{{permissionId}}"}},
-    {"name": "Revoke user permission", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}/permissions/{{permissionId}}"}},
     {"name": "Grant group permission", "request": {"method": "POST", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups/{{groupId}}/permissions/{{permissionId}}"}},
-    {"name": "Revoke group permission", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups/{{groupId}}/permissions/{{permissionId}}"}},
     {"name": "Authz check", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/authz/check?user_id={{userId}}&resource_id={{resourceId}}&access_bit=1"}},
     {"name": "Authz masks", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/authz/masks?user_id={{userId}}&resource_id={{resourceId}}"}},
+    {"name": "Revoke group permission", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups/{{groupId}}/permissions/{{permissionId}}"}},
+    {"name": "Revoke user permission", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}/permissions/{{permissionId}}"}},
+    {"name": "Remove user from group", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}/groups/{{groupId}}"}},
     {"name": "Delete permission", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/permissions/{{permissionId}}"}},
-    {"name": "Delete resource", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/resources/{{resourceId}}"}},
     {"name": "Delete access type", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/access-types/{{accessTypeId}}"}},
+    {"name": "Delete resource", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/resources/{{resourceId}}"}},
     {"name": "Delete user", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}"}},
     {"name": "Delete group", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups/{{groupId}}"}},
     {"name": "Delete domain", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}"}}

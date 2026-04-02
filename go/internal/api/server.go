@@ -177,7 +177,7 @@ func (s *Server) domainCreate(w http.ResponseWriter, r *http.Request) {
 func (s *Server) domainList(w http.ResponseWriter, r *http.Request) {
 	list, err := s.Store.DomainList(r.Context())
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err)
+		writeInternalErr(w, r, err)
 		return
 	}
 	if list == nil {
@@ -244,7 +244,7 @@ func (s *Server) userList(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
 	list, err := s.Store.UserList(r.Context(), domainID)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err)
+		writeInternalErr(w, r, err)
 		return
 	}
 	if list == nil {
@@ -319,7 +319,7 @@ func (s *Server) groupList(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
 	list, err := s.Store.GroupList(r.Context(), domainID)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err)
+		writeInternalErr(w, r, err)
 		return
 	}
 	if list == nil {
@@ -429,7 +429,7 @@ func (s *Server) resourceList(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
 	list, err := s.Store.ResourceList(r.Context(), domainID)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err)
+		writeInternalErr(w, r, err)
 		return
 	}
 	if list == nil {
@@ -508,7 +508,7 @@ func (s *Server) accessTypeList(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
 	list, err := s.Store.AccessTypeList(r.Context(), domainID)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err)
+		writeInternalErr(w, r, err)
 		return
 	}
 	if list == nil {
@@ -604,7 +604,7 @@ func (s *Server) permissionList(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
 	list, err := s.Store.PermissionList(r.Context(), domainID)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err)
+		writeInternalErr(w, r, err)
 		return
 	}
 	if list == nil {
@@ -761,7 +761,7 @@ func (s *Server) authzCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	mask, err := s.Store.EffectiveMask(r.Context(), domainID, userID, resourceID)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err)
+		writeInternalErr(w, r, err)
 		return
 	}
 	if s.metrics != nil {
@@ -788,7 +788,7 @@ func (s *Server) authzMasks(w http.ResponseWriter, r *http.Request) {
 	}
 	masks, err := s.Store.PermissionMasksForUserResource(r.Context(), domainID, userID, resourceID)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, err)
+		writeInternalErr(w, r, err)
 		return
 	}
 	if s.metrics != nil {
@@ -807,22 +807,58 @@ func writeErr(w http.ResponseWriter, status int, err error) {
 	writeJSON(w, status, map[string]string{"error": err.Error()})
 }
 
-// writeStoreErr classifies a store-layer error into the correct HTTP status:
-// ErrNotFound → 404, ErrFKViolation/ErrInvalidInput → 400, ErrConflict → 409,
-// everything else → 500.
-func writeStoreErr(w http.ResponseWriter, _ *http.Request, err error) {
+// writeStoreErr classifies a store-layer error into the correct HTTP status
+// and returns a stable, database-agnostic message. The full error is logged
+// server-side so operators can correlate support requests with logs.
+func writeStoreErr(w http.ResponseWriter, r *http.Request, err error) {
+	var status int
+	var msg string
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		writeErr(w, http.StatusNotFound, err)
+		status = http.StatusNotFound
+		msg = "resource not found"
 	case errors.Is(err, store.ErrFKViolation):
-		writeErr(w, http.StatusBadRequest, err)
+		status = http.StatusBadRequest
+		msg = "referenced entity does not exist or is still referenced"
 	case errors.Is(err, store.ErrInvalidInput):
-		writeErr(w, http.StatusBadRequest, err)
+		status = http.StatusBadRequest
+		msg = publicInvalidInputMsg(err)
 	case errors.Is(err, store.ErrConflict):
-		writeErr(w, http.StatusConflict, err)
+		status = http.StatusConflict
+		msg = "resource already exists"
 	default:
-		writeErr(w, http.StatusInternalServerError, err)
+		status = http.StatusInternalServerError
+		msg = "internal server error"
 	}
+	logStoreErr(r, status, err)
+	writeJSON(w, status, map[string]string{"error": msg})
+}
+
+// writeInternalErr logs the full error and returns a generic 500 to the client.
+// Use for non-store errors (list queries, authz) that should never leak details.
+func writeInternalErr(w http.ResponseWriter, r *http.Request, err error) {
+	logStoreErr(r, http.StatusInternalServerError, err)
+	writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+}
+
+func logStoreErr(r *http.Request, status int, err error) {
+	logger.Error("request error",
+		slog.Int("status", status),
+		slog.String("err", err.Error()),
+		slog.String("method", r.Method),
+		slog.String("path", r.URL.Path),
+	)
+}
+
+// publicInvalidInputMsg extracts the user-friendly detail from a store.ErrInvalidInput
+// wrapped error (e.g. "store: invalid input: cycle detected …" → "cycle detected …").
+func publicInvalidInputMsg(err error) string {
+	full := err.Error()
+	const prefix = "store: invalid input: "
+	if after, ok := strings.CutPrefix(full, prefix); ok && after != "" {
+		return after
+	}
+	return "invalid request"
 }
 
 const maxRequestBodySize = 1 << 20 // 1 MiB

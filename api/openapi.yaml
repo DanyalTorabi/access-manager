@@ -88,10 +88,36 @@ components:
   schemas:
     ErrorBody:
       type: object
+      description: >-
+        Stable, user-facing error envelope. The `error` field contains a
+        short, database-agnostic message suitable for display or programmatic
+        matching. Internal details (SQL driver text, stack traces) are never
+        included; operators should consult server logs for diagnostics.
       required: [error]
       properties:
         error:
           type: string
+          description: Human-readable error message (stable across releases for a given status code).
+      example:
+        error: resource not found
+    ErrorBody400:
+      description: Example 400 response
+      allOf:
+        - $ref: "#/components/schemas/ErrorBody"
+      example:
+        error: referenced entity does not exist or is still referenced
+    ErrorBody409:
+      description: Example 409 response
+      allOf:
+        - $ref: "#/components/schemas/ErrorBody"
+      example:
+        error: resource already exists
+    ErrorBody500:
+      description: Example 500 response
+      allOf:
+        - $ref: "#/components/schemas/ErrorBody"
+      example:
+        error: internal server error
 
     HealthResponse:
       type: object

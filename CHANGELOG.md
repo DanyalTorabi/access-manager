@@ -20,11 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Grafana + Prometheus in `docker-compose.yml`; provisioned datasource and **Access Manager** dashboard under `observability/`
 - E2E smoke: **`go test -race -count=1 -tags=e2e ./e2e/...`**; optional bash twin under **`test/e2e/bash/`**; Docker CI runs Go e2e
 - OpenAPI 3 spec and Postman collection under **`api/`** with README for **`baseUrl`** and Bearer token variables
+- **T36 / #47:** Postman collection Create requests auto-save entity IDs into collection variables; items reordered for dependency-safe top-to-bottom run; OpenAPI `ErrorBody` schema documents stable error semantics
 
 ### Fixed
 
 - OpenAPI: optional Bearer security, `authz/check` **400** documents both `text/plain` and JSON error body, clarify request vs response JSON field naming (review feedback)
 - OpenAPI: distinguish CRUD vs authz response shapes; document mask/bit SQLite-safe range; Postman **Health** uses **noauth**; **api/README** wording (Copilot follow-up)
+
+### Security
+
+- **T36 / #47:** API error responses no longer expose internal SQL/driver details. All error bodies use stable, database-agnostic messages (`resource not found`, `referenced entity does not exist or is still referenced`, `internal server error`, etc.). Full errors are logged server-side for operator diagnostics.
 
 ### Changed
 
