@@ -356,7 +356,7 @@ func (s *Server) groupPatch(w http.ResponseWriter, r *http.Request) {
 		default:
 			var pid string
 			if err := json.Unmarshal(trimmed, &pid); err != nil {
-				writeErr(w, http.StatusBadRequest, err)
+				writeErr(w, http.StatusBadRequest, errors.New("parent_group_id must be a UUID string or null"))
 				return
 			}
 			params.ParentGroupID = &pid

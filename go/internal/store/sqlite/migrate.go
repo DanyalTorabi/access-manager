@@ -12,6 +12,7 @@ import (
 )
 
 var fkPragmaRe = regexp.MustCompile(`(?i)^\s*PRAGMA\s+foreign_keys\s*=`)
+var fkOffValueRe = regexp.MustCompile(`(?i)=\s*(off|0)\b`)
 
 // splitFKPragmas removes PRAGMA foreign_keys lines from a migration body and
 // returns whether any of them disable FK checks (OFF / 0). The cleaned body
@@ -22,8 +23,11 @@ func splitFKPragmas(body string) (disableFK bool, cleaned string) {
 	var kept []string
 	for _, line := range strings.Split(body, "\n") {
 		if fkPragmaRe.MatchString(line) {
-			lower := strings.ToLower(line)
-			if strings.Contains(lower, "off") || strings.Contains(lower, "= 0") || strings.Contains(lower, "=0") {
+			stmt := line
+			if idx := strings.Index(stmt, "--"); idx >= 0 {
+				stmt = stmt[:idx]
+			}
+			if fkOffValueRe.MatchString(stmt) {
 				disableFK = true
 			}
 			continue

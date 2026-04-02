@@ -123,6 +123,12 @@ func TestSplitFKPragmas(t *testing.T) {
 			wantOff:   false,
 			wantClean: "SELECT 1;",
 		},
+		{
+			name:      "on with off in comment does not false-positive",
+			input:     "PRAGMA foreign_keys = ON; -- turn off later\nSELECT 1;",
+			wantOff:   false,
+			wantClean: "SELECT 1;",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
