@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T22** — Environments: dev / PR / staging / prod (see [TICKETS.md](../../TICKETS.md))
+**T22** — Environments: dev / PR / staging / prod
 
 ## Phase
 

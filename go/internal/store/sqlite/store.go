@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/dtorabi/access-manager/internal/access"
 	"github.com/dtorabi/access-manager/internal/store"
@@ -30,14 +31,24 @@ func constraintCode(err error) int {
 }
 
 func wrapConstraintError(err error) error {
+	if err == nil {
+		return nil
+	}
 	switch constraintCode(err) {
 	case sqlite3.SQLITE_CONSTRAINT_FOREIGNKEY:
 		return errors.Join(store.ErrFKViolation, err)
 	case sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY, sqlite3.SQLITE_CONSTRAINT_UNIQUE:
 		return errors.Join(store.ErrConflict, err)
-	default:
-		return err
 	}
+	// database/sql sometimes returns errors that do not unwrap to *sqlite.Error.
+	msg := strings.ToLower(err.Error())
+	if strings.Contains(msg, "foreign key constraint failed") {
+		return errors.Join(store.ErrFKViolation, err)
+	}
+	if strings.Contains(msg, "unique constraint failed") || strings.Contains(msg, "primary key constraint") {
+		return errors.Join(store.ErrConflict, err)
+	}
+	return err
 }
 
 func maskToSQL(m uint64) int64 { return int64(m) }
@@ -78,6 +89,34 @@ func (s *Store) DomainList(ctx context.Context) ([]store.Domain, error) {
 	return list, rows.Err()
 }
 
+func (s *Store) DomainDelete(ctx context.Context, id string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM domains WHERE id = ?`, id)
+	if err != nil {
+		return wrapConstraintError(err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return store.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) DomainPatch(ctx context.Context, id string, title *string) (*store.Domain, error) {
+	if title == nil {
+		return nil, fmt.Errorf("%w: empty patch", store.ErrInvalidInput)
+	}
+	if _, err := s.DomainGet(ctx, id); err != nil {
+		return nil, err
+	}
+	if _, err := s.db.ExecContext(ctx, `UPDATE domains SET title = ? WHERE id = ?`, *title, id); err != nil {
+		return nil, wrapConstraintError(err)
+	}
+	return s.DomainGet(ctx, id)
+}
+
 func (s *Store) UserCreate(ctx context.Context, u *store.User) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO users (id, domain_id, title) VALUES (?, ?, ?)`,
 		u.ID, u.DomainID, u.Title)
@@ -111,6 +150,34 @@ func (s *Store) UserList(ctx context.Context, domainID string) ([]store.User, er
 		list = append(list, u)
 	}
 	return list, rows.Err()
+}
+
+func (s *Store) UserDelete(ctx context.Context, domainID, id string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM users WHERE id = ? AND domain_id = ?`, id, domainID)
+	if err != nil {
+		return wrapConstraintError(err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return store.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) UserPatch(ctx context.Context, domainID, id string, title *string) (*store.User, error) {
+	if title == nil {
+		return nil, fmt.Errorf("%w: empty patch", store.ErrInvalidInput)
+	}
+	if _, err := s.UserGet(ctx, domainID, id); err != nil {
+		return nil, err
+	}
+	if _, err := s.db.ExecContext(ctx, `UPDATE users SET title = ? WHERE id = ? AND domain_id = ?`, *title, id, domainID); err != nil {
+		return nil, wrapConstraintError(err)
+	}
+	return s.UserGet(ctx, domainID, id)
 }
 
 func (s *Store) GroupCreate(ctx context.Context, g *store.Group) error {
@@ -162,15 +229,31 @@ func (s *Store) GroupList(ctx context.Context, domainID string) ([]store.Group, 
 	return list, rows.Err()
 }
 
-func (s *Store) GroupSetParent(ctx context.Context, domainID, groupID string, parentID *string) error {
+func groupGetTx(ctx context.Context, tx *sql.Tx, domainID, id string) (*store.Group, error) {
+	row := tx.QueryRowContext(ctx, `SELECT id, domain_id, title, parent_group_id FROM groups WHERE id = ? AND domain_id = ?`, id, domainID)
+	var out store.Group
+	var parent sql.NullString
+	if err := row.Scan(&out.ID, &out.DomainID, &out.Title, &parent); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, store.ErrNotFound
+		}
+		return nil, err
+	}
+	if parent.Valid {
+		out.ParentGroupID = &parent.String
+	}
+	return &out, nil
+}
+
+func groupSetParentTx(ctx context.Context, tx *sql.Tx, domainID, groupID string, parentID *string) error {
 	if parentID != nil && *parentID == groupID {
 		return fmt.Errorf("%w: group cannot be its own parent", store.ErrInvalidInput)
 	}
-	if _, err := s.GroupGet(ctx, domainID, groupID); err != nil {
+	if _, err := groupGetTx(ctx, tx, domainID, groupID); err != nil {
 		return err
 	}
 	if parentID != nil {
-		p, err := s.GroupGet(ctx, domainID, *parentID)
+		p, err := groupGetTx(ctx, tx, domainID, *parentID)
 		if err != nil {
 			return err
 		}
@@ -183,7 +266,7 @@ func (s *Store) GroupSetParent(ctx context.Context, domainID, groupID string, pa
 			if walk == groupID {
 				return fmt.Errorf("%w: cycle detected in group parent chain", store.ErrInvalidInput)
 			}
-			pg, err := s.GroupGet(ctx, domainID, walk)
+			pg, err := groupGetTx(ctx, tx, domainID, walk)
 			if err != nil {
 				return err
 			}
@@ -197,8 +280,63 @@ func (s *Store) GroupSetParent(ctx context.Context, domainID, groupID string, pa
 	if parentID != nil {
 		parent = *parentID
 	}
-	_, err := s.db.ExecContext(ctx, `UPDATE groups SET parent_group_id = ? WHERE id = ? AND domain_id = ?`, parent, groupID, domainID)
-	return err
+	_, err := tx.ExecContext(ctx, `UPDATE groups SET parent_group_id = ? WHERE id = ? AND domain_id = ?`, parent, groupID, domainID)
+	return wrapConstraintError(err)
+}
+
+func (s *Store) GroupSetParent(ctx context.Context, domainID, groupID string, parentID *string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := groupSetParentTx(ctx, tx, domainID, groupID, parentID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *Store) GroupDelete(ctx context.Context, domainID, id string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM groups WHERE id = ? AND domain_id = ?`, id, domainID)
+	if err != nil {
+		return wrapConstraintError(err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return store.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) GroupPatch(ctx context.Context, domainID, groupID string, p store.GroupPatchParams) (*store.Group, error) {
+	if p.Title == nil && !p.UpdateParent {
+		return nil, fmt.Errorf("%w: empty patch", store.ErrInvalidInput)
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := groupGetTx(ctx, tx, domainID, groupID); err != nil {
+		return nil, err
+	}
+	if p.Title != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE groups SET title = ? WHERE id = ? AND domain_id = ?`, *p.Title, groupID, domainID); err != nil {
+			return nil, wrapConstraintError(err)
+		}
+	}
+	if p.UpdateParent {
+		if err := groupSetParentTx(ctx, tx, domainID, groupID, p.ParentGroupID); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return s.GroupGet(ctx, domainID, groupID)
 }
 
 func (s *Store) ResourceCreate(ctx context.Context, r *store.Resource) error {
@@ -236,6 +374,34 @@ func (s *Store) ResourceList(ctx context.Context, domainID string) ([]store.Reso
 	return list, rows.Err()
 }
 
+func (s *Store) ResourceDelete(ctx context.Context, domainID, id string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM resources WHERE id = ? AND domain_id = ?`, id, domainID)
+	if err != nil {
+		return wrapConstraintError(err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return store.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) ResourcePatch(ctx context.Context, domainID, id string, title *string) (*store.Resource, error) {
+	if title == nil {
+		return nil, fmt.Errorf("%w: empty patch", store.ErrInvalidInput)
+	}
+	if _, err := s.ResourceGet(ctx, domainID, id); err != nil {
+		return nil, err
+	}
+	if _, err := s.db.ExecContext(ctx, `UPDATE resources SET title = ? WHERE id = ? AND domain_id = ?`, *title, id, domainID); err != nil {
+		return nil, wrapConstraintError(err)
+	}
+	return s.ResourceGet(ctx, domainID, id)
+}
+
 func (s *Store) AccessTypeCreate(ctx context.Context, a *store.AccessType) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO access_types (id, domain_id, title, bit) VALUES (?, ?, ?, ?)`,
 		a.ID, a.DomainID, a.Title, maskToSQL(a.Bit))
@@ -259,6 +425,71 @@ func (s *Store) AccessTypeList(ctx context.Context, domainID string) ([]store.Ac
 		list = append(list, a)
 	}
 	return list, rows.Err()
+}
+
+func (s *Store) AccessTypeGet(ctx context.Context, domainID, id string) (*store.AccessType, error) {
+	row := s.db.QueryRowContext(ctx, `SELECT id, domain_id, title, bit FROM access_types WHERE id = ? AND domain_id = ?`, id, domainID)
+	var out store.AccessType
+	var bit int64
+	if err := row.Scan(&out.ID, &out.DomainID, &out.Title, &bit); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, store.ErrNotFound
+		}
+		return nil, err
+	}
+	out.Bit = maskFromSQL(bit)
+	return &out, nil
+}
+
+func (s *Store) AccessTypeDelete(ctx context.Context, domainID, id string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM access_types WHERE id = ? AND domain_id = ?`, id, domainID)
+	if err != nil {
+		return wrapConstraintError(err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return store.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) AccessTypePatch(ctx context.Context, domainID, id string, p store.AccessTypePatchParams) (*store.AccessType, error) {
+	if p.Title == nil && p.Bit == nil {
+		return nil, fmt.Errorf("%w: empty patch", store.ErrInvalidInput)
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	row := tx.QueryRowContext(ctx, `SELECT title, bit FROM access_types WHERE id = ? AND domain_id = ?`, id, domainID)
+	var curTitle string
+	var curBit int64
+	if err := row.Scan(&curTitle, &curBit); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, store.ErrNotFound
+		}
+		return nil, err
+	}
+	title := curTitle
+	if p.Title != nil {
+		title = *p.Title
+	}
+	bit := maskFromSQL(curBit)
+	if p.Bit != nil {
+		bit = *p.Bit
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE access_types SET title = ?, bit = ? WHERE id = ? AND domain_id = ?`,
+		title, maskToSQL(bit), id, domainID); err != nil {
+		return nil, wrapConstraintError(err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return s.AccessTypeGet(ctx, domainID, id)
 }
 
 func (s *Store) PermissionCreate(ctx context.Context, p *store.Permission) error {
@@ -298,6 +529,68 @@ func (s *Store) PermissionList(ctx context.Context, domainID string) ([]store.Pe
 		list = append(list, p)
 	}
 	return list, rows.Err()
+}
+
+func (s *Store) PermissionDelete(ctx context.Context, domainID, id string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM permissions WHERE id = ? AND domain_id = ?`, id, domainID)
+	if err != nil {
+		return wrapConstraintError(err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return store.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) PermissionPatch(ctx context.Context, domainID, id string, p store.PermissionPatchParams) (*store.Permission, error) {
+	if p.Title == nil && p.ResourceID == nil && p.AccessMask == nil {
+		return nil, fmt.Errorf("%w: empty patch", store.ErrInvalidInput)
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	row := tx.QueryRowContext(ctx, `SELECT title, resource_id, access_mask FROM permissions WHERE id = ? AND domain_id = ?`, id, domainID)
+	var curTitle, curResourceID string
+	var curMask int64
+	if err := row.Scan(&curTitle, &curResourceID, &curMask); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, store.ErrNotFound
+		}
+		return nil, err
+	}
+	title := curTitle
+	if p.Title != nil {
+		title = *p.Title
+	}
+	resourceID := curResourceID
+	if p.ResourceID != nil {
+		var exists int
+		if err := tx.QueryRowContext(ctx, `SELECT 1 FROM resources WHERE id = ? AND domain_id = ?`, *p.ResourceID, domainID).Scan(&exists); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, store.ErrNotFound
+			}
+			return nil, err
+		}
+		resourceID = *p.ResourceID
+	}
+	mask := maskFromSQL(curMask)
+	if p.AccessMask != nil {
+		mask = *p.AccessMask
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE permissions SET title = ?, resource_id = ?, access_mask = ? WHERE id = ? AND domain_id = ?`,
+		title, resourceID, maskToSQL(mask), id, domainID); err != nil {
+		return nil, wrapConstraintError(err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return s.PermissionGet(ctx, domainID, id)
 }
 
 func (s *Store) AddUserToGroup(ctx context.Context, domainID, userID, groupID string) error {

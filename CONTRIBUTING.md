@@ -5,7 +5,7 @@ Thanks for contributing to **access-manager**. The Go service lives under [`go/`
 ## Before you start
 
 - [**AGENTS.md**](AGENTS.md) — security, layout, library boundaries, post-change checks.
-- [**docs/branching.md**](docs/branching.md) — branch names and **PRs to `main`** (**T14**).
+- [**docs/branching.md**](docs/branching.md) — branch names and **PRs to `main`**.
 
 ## Local development
 
@@ -16,11 +16,11 @@ make test
 make lint
 ```
 
-End-to-end smoke (**T16**): with the server reachable (default `http://127.0.0.1:8080`), run **`make e2e`** (`go test -race -count=1 -tags=e2e ./e2e/...` from **`go/`**). Optional **`make e2e-bash`** uses **curl** + **jq**. Set **`API_BEARER_TOKEN`** when Bearer auth is enabled. See **[test/e2e/README.md](test/e2e/README.md)**.
+End-to-end smoke: with the server reachable (default `http://127.0.0.1:8080`), run **`make e2e`** (`go test -race -count=1 -tags=e2e ./e2e/...` from **`go/`**). Optional **`make e2e-bash`** uses **curl** + **jq**. Set **`API_BEARER_TOKEN`** when Bearer auth is enabled. See **[test/e2e/README.md](test/e2e/README.md)**.
 
 See [**go/README.md**](go/README.md) for config, environment variables, and the HTTP API.
 
-### Docker (**T19**)
+### Docker
 
 From the repository root:
 
@@ -30,7 +30,7 @@ make docker-up          # detached; then: make docker-logs
 make docker-down
 ```
 
-See the root [**README** — Docker (T19)](README.md#docker-t19) for image layout and port binding.
+See the root [**README** — Docker](README.md#docker) for image layout and port binding.
 
 ## Commits
 
@@ -51,10 +51,11 @@ Do a quick **reviewer pass** on your own diff (humans and AI assistants) before 
 3. **Secrets** — No API tokens, passwords, or real `.env` values in commits; use env vars and **`.env.example`**-style placeholders only.
 4. **Common review nits** — Skim for: **`//go:build`** mistakes (e2e package must not be “tests only” under `-tags=e2e`), **assert HTTP status before `json.Decode` / Unmarshal** in tests when setup requests can fail, and **strict checks** for IDs / booleans in smoke scripts (e.g. `jq -e`) where loose parsing hides bugs.
 
-- Deferring a valid review comment to a **later ticket**: reply on the PR with the ticket id (**Txx**) and add a short tracking note to that ticket’s **`plan/...`** spec so it is not forgotten (see [AGENTS.md](AGENTS.md)).
+- Deferring a valid review comment to **later work**: reply on the PR with the **GitHub issue #** and/or **Txx** and add a short tracking note to that umbrella’s **`plan/...`** spec so it is not forgotten (see [AGENTS.md](AGENTS.md)).
 - Open PRs **into `main`**; follow [docs/branching.md](docs/branching.md).
 - Use the repo **[pull request template](.github/pull_request_template.md)** (GitHub fills it when you open a PR from the UI): **Summary**, **Ticket**, **Checklist**.
-- Reference a ticket from [TICKETS.md](TICKETS.md) when it applies (e.g. `T19`).
+- Reference **GitHub `#…`** when it applies; optional **`Tnn`** matches the [`plan/`](plan/) spec filename (e.g. `T19` → `plan/.../T19-...md`).
+- **Show the PR on the issue:** include **`Fixes #123`**, **`Closes #123`**, or **`Resolves #123`** in the PR body (e.g. under **Ticket**) so GitHub links them and can auto-close on merge; use **`Refs #123`** for link-only. See [AGENTS.md — Linking a PR to an issue](AGENTS.md#linking-a-pr-to-an-issue).
 - Keep **`make test`** and **`make lint`** green for Go changes.
 
 ### Create a PR with `gh`
@@ -72,7 +73,7 @@ T13
 
 ## Checklist
 - [x] \`make test\` / \`make lint\` locally
-- [x] Docs updated (README, CONTRIBUTING, AGENTS, TICKETS)
+- [x] Docs updated (README, CONTRIBUTING, AGENTS, `docs/` as needed)
 "
 ```
 
@@ -84,7 +85,7 @@ Prefer **`gh`** for issues, PRs, Actions, and API calls ([GitHub CLI](https://cl
 
 ---
 
-## Maintainer checklist: GitHub (**T6**)
+## Maintainer checklist: GitHub
 
 **Canonical remote:** [https://github.com/DanyalTorabi/access-manager](https://github.com/DanyalTorabi/access-manager)
 
@@ -112,7 +113,7 @@ In GitHub: **Settings → Branches → Branch protection rules** for `main`:
 - Optionally require **approvals**.
 - After the first green CI run on **`main`**, add **required status checks** by **check / job name** (GitHub does not key off the workflow file path). Enable **Go (test, vet, lint)** and **Docker build & compose smoke** from workflow **CI** (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
-### Actions and GHCR (**T13**)
+### Actions and GHCR
 
 - **Settings → Actions → General:** enable Actions as appropriate for the org.
 - CI workflow: **[`.github/workflows/ci.yml`](.github/workflows/ci.yml)** — the **Publish image to GHCR** job sets **`packages: write`** on `GITHUB_TOKEN` and pushes **`ghcr.io/<lowercase-owner>/access-manager`** on every push to **`main`**.

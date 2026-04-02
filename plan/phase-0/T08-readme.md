@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T8** — README (see [TICKETS.md](../../TICKETS.md))
+**T8** — README
 
 ## Phase
 
@@ -22,7 +22,7 @@ Add a root **README.md** so anyone can clone, configure env, run the server, and
 2. **Build/run:** `go run ./cmd/server` or `make run` after T9.
 3. **Environment:** `DATABASE_DRIVER`, `DATABASE_URL`, `HTTP_ADDR`, `MIGRATIONS_DIR` (see [cmd/server/main.go](../../go/cmd/server/main.go)).
 4. **Smoke test:** `curl` example for `GET /health`.
-5. Link [TICKETS.md](../../TICKETS.md) curriculum table and [plan/README.md](../README.md).
+5. Link [docs/backend-curriculum.md](../../docs/backend-curriculum.md) and [plan/README.md](../README.md).
 6. State that **structured config file** is introduced in **T26** (until then, env only).
 
 ## Files / paths

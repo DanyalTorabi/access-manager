@@ -3,16 +3,16 @@
 [![CI](https://github.com/DanyalTorabi/access-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/DanyalTorabi/access-manager/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/DanyalTorabi/access-manager/graph/badge.svg)](https://codecov.io/gh/DanyalTorabi/access-manager)
 
-Educational / product repo for **domain-scoped** access control (users, groups, resources, access-type bits, permissions). Implementations can live side by side: the **Go** HTTP service is under **[`go/`](go/)**; the HTTP contract lives under **[`api/`](api/)** (**T17** — OpenAPI + Postman).
+Educational / product repo for **domain-scoped** access control (users, groups, resources, access-type bits, permissions). Implementations can live side by side: the **Go** HTTP service is under **[`go/`](go/)**; the HTTP contract lives under **[`api/`](api/)** (OpenAPI + Postman).
 
 ## Repository layout
 
 | Path | Purpose |
 |------|---------|
 | **[`go/`](go/)** | Go module `github.com/dtorabi/access-manager`: HTTP service, `internal/*`, SQLite migrations |
-| [`api/`](api/) | OpenAPI 3 spec and Postman collection (**T17**); see [api/README.md](api/README.md) |
+| [`api/`](api/) | OpenAPI 3 spec and Postman collection; see [api/README.md](api/README.md) |
 | [`plan/`](plan/) | Phased implementation plans per ticket |
-| [`PLAN.md`](PLAN.md), [`TICKETS.md`](TICKETS.md) | Product goals and backlog |
+| [`PLAN.md`](PLAN.md), [`docs/backend-curriculum.md`](docs/backend-curriculum.md) | Product goals; curriculum ↔ repo map (backlog on GitHub only) |
 
 **Import path** (Go): `github.com/dtorabi/access-manager/...` with **module root** = [`go/go.mod`](go/go.mod).
 
@@ -37,9 +37,9 @@ go run ./cmd/server
 
 Details: **[go/README.md](go/README.md)** (config, env, API overview, `make` targets).
 
-**API auth (T7):** optional static Bearer token via **`API_BEARER_TOKEN`** / **`api_bearer_token`** protects **`/api/v1/*`**; **`/health`** stays public. If you listen on a non-loopback address without a token, the process logs a startup warning—set a token before any real exposure.
+**API auth:** optional static Bearer token via **`API_BEARER_TOKEN`** / **`api_bearer_token`** protects **`/api/v1/*`**; **`/health`** stays public. If you listen on a non-loopback address without a token, the process logs a startup warning—set a token before any real exposure.
 
-## Docker (T19)
+## Docker
 
 Multi-stage image (distroless, non-root, `CGO_ENABLED=0` / `modernc.org/sqlite`) built from repo root; SQLite data uses a **tmpfs** mount (ephemeral) in the default compose file.
 
@@ -51,7 +51,7 @@ From the **repository root**, use **`make`** (same idea as `make test` / `make r
 | `make docker-up` | `docker compose up -d` (detached) |
 | `make docker-logs` | `docker compose logs -f` (follow app logs) |
 | `make docker-down` | `docker compose down` |
-| `make e2e` | **[T16]** — `go test -race -count=1 -tags=e2e ./e2e/...` against **`BASE_URL`** (server must be up; optional **`make e2e-bash`**) |
+| `make e2e` | `go test -race -count=1 -tags=e2e ./e2e/...` against **`BASE_URL`** (server must be up; optional **`make e2e-bash`**) |
 
 ```bash
 make docker-build
@@ -68,7 +68,7 @@ make docker-down
 - **[docker-compose.yml](docker-compose.yml)** — `app` service  
 - **[.dockerignore](.dockerignore)**
 
-## Observability (T23)
+## Observability
 
 Prometheus metrics are exported at **`/metrics`** (outside bearer auth, like `/health`). Compose includes **Prometheus** and **Grafana** services bound to loopback:
 
@@ -91,7 +91,7 @@ Exported metrics:
 
 Config files live under **[`observability/`](observability/)**.
 
-## Security (T20)
+## Security
 
 - **Vulnerability scanning**: `govulncheck` runs in CI and locally via `make vuln`.
 - **Static analysis**: `gosec` linter enabled in `golangci-lint` config.
@@ -99,7 +99,7 @@ Config files live under **[`observability/`](observability/)**.
 - **Audit trail**: Every mutation endpoint emits a structured audit event (`audit=true`) with the action name and relevant entity IDs.
 - **Threat model**: [`docs/security-review.md`](docs/security-review.md) — actors, assets, trust boundaries, mitigations, known gaps.
 
-## CI / GitHub Actions (T13)
+## CI / GitHub Actions
 
 Workflow: **[`.github/workflows/ci.yml`](.github/workflows/ci.yml)** runs on **pull requests** and **pushes** to **`main`**:
 
@@ -113,28 +113,29 @@ Enable **Actions** for the repo; for **branch protection**, add required checks 
 
 Optional: run workflows locally with **[nektos/act](https://github.com/nektos/act)** (limited parity vs GitHub runners).
 
-## Branching and pull requests (T14)
+## Branching and pull requests
 
-All changes should go to **`main`** via **pull requests**. Branch naming, merge policy, and how this ties to CI (**T13**) and branch protection (**T6**) are documented in **[docs/branching.md](docs/branching.md)**.
+All changes should go to **`main`** via **pull requests**. Branch naming, merge policy, and how this ties to CI and branch protection are documented in **[docs/branching.md](docs/branching.md)**.
 
 ## Contributing
 
-See **[CONTRIBUTING.md](CONTRIBUTING.md)** for local setup, PR expectations, **`gh`** usage, and the **maintainer checklist** (remote, branch protection, Actions/GHCR) for **T6**.
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for local setup, PR expectations, **`gh`** usage, and the **maintainer checklist** (remote, branch protection, Actions/GHCR).
 
 ## Docs and planning
 
 - [PLAN.md](PLAN.md) — product goals and milestones  
-- [TICKETS.md](TICKETS.md) — backlog and curriculum alignment table  
-- [plan/README.md](plan/README.md) — phased implementation plans per ticket  
-- [docs/branching.md](docs/branching.md) — branches and PRs to `main` (**T14**)  
-- [docs/security-review.md](docs/security-review.md) — threat model, actors, mitigations (**T20**)  
-- [CONTRIBUTING.md](CONTRIBUTING.md) — contributor guide and GitHub hygiene (**T6**)  
+- [GitHub Issues](https://github.com/DanyalTorabi/access-manager/issues) — backlog (single source of truth)  
+- [docs/backend-curriculum.md](docs/backend-curriculum.md) — Backend Engineering curriculum ↔ this repo (not a ticket list)  
+- [plan/README.md](plan/README.md) — phased implementation plans per umbrella (**Tnn**)  
+- [docs/branching.md](docs/branching.md) — branches and PRs to `main`  
+- [docs/security-review.md](docs/security-review.md) — threat model, actors, mitigations  
+- [CONTRIBUTING.md](CONTRIBUTING.md) — contributor guide and GitHub hygiene  
 - [AGENTS.md](AGENTS.md) — contributor rules for humans and AI  
-- [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — CI + GHCR (**T13**)  
-- [CHANGELOG.md](CHANGELOG.md) — release notes (**T15**); see below  
-- [api/README.md](api/README.md) — OpenAPI + Postman import and variables (**T17**)  
+- [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — CI + GHCR  
+- [CHANGELOG.md](CHANGELOG.md) — release notes; see below  
+- [api/README.md](api/README.md) — OpenAPI + Postman import and variables  
 
-### Changelog (**T15**)
+### Changelog
 
 User-facing or notable changes belong under **`## [Unreleased]`** in [CHANGELOG.md](CHANGELOG.md), using [Keep a Changelog](https://keepachangelog.com/) sections (**Added**, **Changed**, **Fixed**, **Removed**, **Security**). Merge each PR that needs a note before release; when you cut a release, move the bullets into a new `## [x.y.z] - YYYY-MM-DD` section and create a matching Git tag (`v0.1.0`, etc.).
 

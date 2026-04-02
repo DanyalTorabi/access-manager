@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T28** — golangci-lint (see [TICKETS.md](../../TICKETS.md))
+**T28** — golangci-lint
 
 ## Phase
 

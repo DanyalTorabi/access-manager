@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T31** — Handler error classification (see [TICKETS.md](../../TICKETS.md))
+**T31** — Handler error classification
 
 ## Phase
 

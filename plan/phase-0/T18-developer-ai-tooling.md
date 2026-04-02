@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T18** — Developer AI / editor tooling (see [TICKETS.md](../../TICKETS.md))
+**T18** — Developer AI / editor tooling
 
 ## Phase
 
@@ -24,7 +24,7 @@ Give humans and AI assistants consistent, repo-specific rules: layout, module pa
 - **Security:** no credentials in source; loopback bind for dev; validate/sanitize inputs (see workspace rules).
 - **Library mindset:** business rules and persistence contracts live in layers that **do not** import `chi` or HTTP types; handlers stay thin. See **Library boundary** below.
 - **Proportionality:** trivial fixes (typo, one-liner) need only quick `go test` on affected packages—not a full release checklist.
-- **Deferred work:** Anything left for later must have a **ticket** in TICKETS.md. Put the ticket id in the comment (e.g. `TODO(T17): ...`). **Update an existing open ticket** when the follow-up belongs there; avoid a new ticket per tiny item unless it is separate work.
+- **Deferred work:** Anything left for later must have a **GitHub issue** (or a note on an existing issue/PR). Put **`#…`** or `TODO(T17): ...` in comments when helpful. **Update an existing open issue** when the follow-up belongs there; avoid a new issue per tiny item unless it is separate work.
 
 ## After each task (when applicable)
 
@@ -49,7 +49,7 @@ Complete what exists today; do not block on missing tooling.
 ## Steps
 
 1. Add `.cursor/rules/access-manager.mdc` (alwaysApply or `**/*.go` globs): security, library boundary, post-task checklist summary.
-2. Add root `AGENTS.md`: module path `github.com/dtorabi/access-manager`, directory map, links to [PLAN.md](../../PLAN.md), [TICKETS.md](../../TICKETS.md), [plan/README.md](../README.md).
+2. Add root `AGENTS.md`: module path `github.com/dtorabi/access-manager`, directory map, links to [PLAN.md](../../PLAN.md), [docs/backend-curriculum.md](../../docs/backend-curriculum.md), [plan/README.md](../README.md).
 3. Document commands: until T9/T28, `go test -race ./...`; after T9, prefer `make test`, `make lint`, `make cover`.
 4. Call out **library-first** layering and future `pkg/` migration in both files.
 
@@ -60,7 +60,7 @@ Complete what exists today; do not block on missing tooling.
 ## Acceptance criteria
 
 - New contributor (or AI) can open `AGENTS.md` and understand layout, security, **after-task steps**, and **library vs HTTP** split in under a few minutes.
-- Cursor rules reinforce the same without duplicating entire TICKETS.
+- Cursor rules reinforce the same without duplicating GitHub backlog in-repo.
 
 ## Out of scope
 

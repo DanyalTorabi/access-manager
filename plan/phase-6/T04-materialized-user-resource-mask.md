@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T4** — Materialized `user_resource_mask` for hot path (see [TICKETS.md](../../TICKETS.md))
+**T4** — Materialized `user_resource_mask` for hot path
 
 ## Phase
 

@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T9** — Makefile (see [TICKETS.md](../../TICKETS.md))
+**T9** — Makefile
 
 ## Phase
 

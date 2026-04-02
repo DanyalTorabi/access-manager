@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T15** — CHANGELOG (see [TICKETS.md](../../TICKETS.md))
+**T15** — CHANGELOG
 
 ## Phase
 

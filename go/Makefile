@@ -11,10 +11,13 @@ GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v
 build:
 	go build -o bin/server ./cmd/server
 
+# Clear test result cache so `make test` / `make cover` always re-run packages (not cached passes).
 test:
+	go clean -testcache
 	go test -race ./...
 
 cover:
+	go clean -testcache
 	go test -race -coverprofile=coverage.out ./...
 	@go tool cover -func=coverage.out | tail -n 1
 	@echo "coverage.out written; run: go tool cover -html=coverage.out"

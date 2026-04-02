@@ -19,4 +19,4 @@ about: Report incorrect behavior or a crash
 
 ## Optional
 
-- Ticket id from [TICKETS.md](https://github.com/DanyalTorabi/access-manager/blob/main/TICKETS.md), if any:
+- Related **GitHub issue** # or **`Tnn`** (plan spec under `plan/…/Tnn-*.md`), if any:

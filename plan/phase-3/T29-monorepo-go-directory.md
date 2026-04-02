@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T29** — Monorepo layout: Go implementation lives under **`go/`** (see [TICKETS.md](../../TICKETS.md))
+**T29** — Monorepo layout: Go implementation lives under **`go/`**
 
 ## Phase
 
@@ -17,7 +17,7 @@ Prepare a **multi-language–friendly** repository: shared docs and plans at the
 - [x] `go/` contains: `cmd/`, `internal/`, `migrations/`, `go.mod`, `go.sum`, `Makefile`, `.golangci.yml`, `config.example.yaml`, `.env.example`
 - [x] Root **`Makefile`** forwards targets to `$(MAKE) -C go …`
 - [x] Root **README** describes monorepo layout; Go quickstart uses `cd go` or `make` from root
-- [x] **AGENTS.md**, **PLAN.md**, plan links, **TICKETS** updated for `go/` paths
+- [x] **AGENTS.md**, **PLAN.md**, plan links updated for `go/` paths
 - [ ] Optional later: `spec/` (OpenAPI, fixtures), other language roots (`rust/`, …) at repo root
 
 ## Steps

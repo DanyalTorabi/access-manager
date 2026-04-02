@@ -4,7 +4,7 @@
 
 ## Ticket
 
-<!-- e.g. T13 — id from [TICKETS.md](../TICKETS.md) or “n/a” for docs-only typos -->
+<!-- e.g. Fixes #48 — links PR to issue and auto-closes on merge; or Refs #48 for link-only. Optional Tnn = plan/…/Tnn-*.md. “n/a” for docs-only typos -->
 
 ## Checklist
 

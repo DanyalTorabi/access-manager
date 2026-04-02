@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T2** — Optional group ancestor permission inheritance (see [TICKETS.md](../../TICKETS.md))
+**T2** — Optional group ancestor permission inheritance
 
 ## Phase
 

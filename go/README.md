@@ -1,6 +1,6 @@
 # access-manager (Go)
 
-HTTP service and Go module for **domain-scoped** access control: users, groups, resources, access-type bits, and permissions (`uint64` masks). SQLite is the default store; the design allows other SQL drivers later (**T1**).
+HTTP service and Go module for **domain-scoped** access control: users, groups, resources, access-type bits, and permissions (`uint64` masks). SQLite is the default store; the design allows other SQL drivers later.
 
 **Module:** `github.com/dtorabi/access-manager` (this directory is the **module root**).
 
@@ -27,13 +27,13 @@ curl -s http://127.0.0.1:8080/health
 
 Example response: `{"status":"ok"}`
 
-### Metrics (T23)
+### Metrics
 
-Prometheus metrics are served at **`/metrics`** (outside bearer auth). The middleware records `http_requests_total`, `http_request_duration_seconds`, and `authz_checks_total`. See root [README.md — Observability](../README.md#observability-t23) for Grafana/Prometheus compose setup.
+Prometheus metrics are served at **`/metrics`** (outside bearer auth). The middleware records `http_requests_total`, `http_request_duration_seconds`, and `authz_checks_total`. See root [README.md — Observability](../README.md#observability) for Grafana/Prometheus compose setup.
 
 ## Docker
 
-From the **repository root** (not `go/`): **`make docker-build`**, **`make docker-up`**, **`make docker-logs`**, **`make docker-down`** — see root **[README.md](../README.md#docker-t19)** (section **Docker (T19)**).
+From the **repository root** (not `go/`): **`make docker-build`**, **`make docker-up`**, **`make docker-logs`**, **`make docker-down`** — see root **[README.md](../README.md#docker)** (section **Docker**).
 
 ## Configuration
 
@@ -72,12 +72,12 @@ Run **`make`** from the **repository root** (`make test`, `make lint`, …) or f
 | Coverage profile | `make cover` → `coverage.out`, prints total statement coverage; HTML: `go tool cover -html=coverage.out` |
 | Coverage by function | `make cover-func` |
 | Run server | `make run` |
-| E2E smoke (**T16**) | From **repo root**: `make e2e` → `go test -race -count=1 -tags=e2e ./e2e/...` (running server; optional **`API_BEARER_TOKEN`**). Optional curl script: **`make e2e-bash`**. See **[test/e2e/README.md](../test/e2e/README.md)**. |
+| E2E smoke | From **repo root**: `make e2e` → `go test -race -count=1 -tags=e2e ./e2e/...` (running server; optional **`API_BEARER_TOKEN`**). Optional curl script: **`make e2e-bash`**. See **[test/e2e/README.md](../test/e2e/README.md)**. |
 | Lint | `make lint` |
 | Vuln check | `make vuln` → pinned `go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...` (same pin as CI) |
 | Tidy modules | `make tidy` |
 
-Docker (from **repo root** only): `make docker-build`, `make docker-up`, `make docker-logs`, `make docker-down` — see [root README](../README.md#docker-t19).
+Docker (from **repo root** only): `make docker-build`, `make docker-up`, `make docker-logs`, `make docker-down` — see [root README](../README.md#docker).
 
 Equivalent without Make (from **`go/`**): `go test -race ./...`, `go vet ./...`, `golangci-lint run ./...`. If `go test -cover` fails with `no such tool "covdata"` on Go 1.25+, set `GOTOOLCHAIN` to `go` plus the `go.mod` version and `+auto` (for example `go1.25.0+auto` when `go.mod` says `go 1.25.0`). The [Makefile](Makefile) exports that for `make test` / `make cover`; see [golang/go#75031](https://github.com/golang/go/issues/75031).
 
@@ -85,23 +85,23 @@ Equivalent without Make (from **`go/`**): `go test -race ./...`, `go vet ./...`,
 
 REST routes live under **`/api/v1`** with domain-scoped segments, for example:
 
-- `GET /api/v1/domains`
-- `POST /api/v1/domains`
+- `GET` / `POST /api/v1/domains`; `GET` / `PATCH` / `DELETE /api/v1/domains/{domainID}`
+- Domain-scoped CRUD includes `PATCH` / `DELETE` for users, groups, resources, permissions, and access types (plus `GET` for a single access type). Deletes fail with **400** when SQLite foreign keys block removal.
 - `GET /api/v1/domains/{domainID}/authz/check?user_id=&resource_id=&access_bit=`
 
-### Authentication (**T7**)
+### Authentication
 
 When **`API_BEARER_TOKEN`** (or YAML **`api_bearer_token`**) is non-empty, clients must send:
 
 `Authorization: Bearer <token>`
 
-on **`/api/v1/*`** requests. **`/health`** is not protected. The service compares the presented token to the configured secret using **SHA-256** digests and a **constant-time** equality check (you still send the plain token in the header). If the token is unset and **`HTTP_ADDR`** binds beyond loopback (for example **`0.0.0.0:8080`** or **`:8080`**), the server logs a one-time warning at startup. JWT/JWKS validation is out of scope for this ticket.
+on **`/api/v1/*`** requests. **`/health`** is not protected. The service compares the presented token to the configured secret using **SHA-256** digests and a **constant-time** equality check (you still send the plain token in the header). If the token is unset and **`HTTP_ADDR`** binds beyond loopback (for example **`0.0.0.0:8080`** or **`:8080`**), the server logs a one-time warning at startup. JWT/JWKS validation is planned as a future enhancement.
 
-Full HTTP contract: **[`api/openapi.yaml`](../api/openapi.yaml)** (OpenAPI 3) and **[`api/postman/access-manager.postman_collection.json`](../api/postman/access-manager.postman_collection.json)**. Import steps and **`baseUrl`** / **`bearerToken`** variables: **[`api/README.md`](../api/README.md)** (**T17**).
+Full HTTP contract: **[`api/openapi.yaml`](../api/openapi.yaml)** (OpenAPI 3) and **[`api/postman/access-manager.postman_collection.json`](../api/postman/access-manager.postman_collection.json)**. Import steps and **`baseUrl`** / **`bearerToken`** variables: **[`api/README.md`](../api/README.md)**.
 
-### Structured logging & audit (T20)
+### Structured logging & audit
 
-Server output is structured JSON via `internal/logger` (wrapping `log/slog`). All 13 mutation handlers emit audit events with `audit=true`, the action name, and relevant entity IDs. Example:
+Server output is structured JSON via `internal/logger` (wrapping `log/slog`). All mutation handlers (creates, updates, deletes, membership/grant changes) emit audit events with `audit=true`, the action name, and relevant entity IDs. Example:
 
 ```json
 {"time":"...","level":"INFO","msg":"audit","audit":true,"action":"grant_user_permission","domain_id":"d1","user_id":"u1","permission_id":"p1"}
