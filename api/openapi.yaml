@@ -130,6 +130,7 @@ components:
       description: |
         At least one of `title` or `parent_group_id` must be present.
         Omit `parent_group_id` to leave the parent unchanged; send `null` to clear (root group).
+      minProperties: 1
       properties:
         title:
           type: string
@@ -141,6 +142,7 @@ components:
     AccessTypePatchBody:
       type: object
       description: At least one of `title` or `bit` must be present.
+      minProperties: 1
       properties:
         title:
           type: string
@@ -151,6 +153,7 @@ components:
     PermissionPatchBody:
       type: object
       description: At least one of `title`, `resource_id`, or `access_mask` must be present.
+      minProperties: 1
       properties:
         title:
           type: string
