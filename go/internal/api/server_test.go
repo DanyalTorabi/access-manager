@@ -2047,8 +2047,12 @@ func TestAPI_groupPatchDelete(t *testing.T) {
 	g1 := json.RawMessage(mustPostJSON201(t, base+"/groups", `{"title":"g1"}`))
 	g2 := json.RawMessage(mustPostJSON201(t, base+"/groups", `{"title":"g2"}`))
 	var grp1, grp2 store.Group
-	_ = json.Unmarshal(g1, &grp1)
-	_ = json.Unmarshal(g2, &grp2)
+	if err := json.Unmarshal(g1, &grp1); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(g2, &grp2); err != nil {
+		t.Fatal(err)
+	}
 
 	reqGP, _ := http.NewRequest(http.MethodPatch, base+"/groups/"+grp2.ID,
 		strings.NewReader(`{"title":"two","parent_group_id":"`+grp1.ID+`"}`))
