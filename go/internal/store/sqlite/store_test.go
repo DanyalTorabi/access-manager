@@ -1405,7 +1405,7 @@ func TestRestrictDelete_domainWithAccessType(t *testing.T) {
 	}
 }
 
-func TestRestrictDelete_userWithPermission(t *testing.T) {
+func TestRestrictDelete_userWithUserGrant(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)
 	domainID := uuid.NewString()
@@ -1457,7 +1457,7 @@ func TestRestrictDelete_groupWithMember(t *testing.T) {
 	}
 }
 
-func TestRestrictDelete_groupWithPermission(t *testing.T) {
+func TestRestrictDelete_groupWithGroupGrant(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)
 	domainID := uuid.NewString()
