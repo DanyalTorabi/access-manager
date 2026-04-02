@@ -39,7 +39,8 @@ func TestOpen_unsupportedDriver(t *testing.T) {
 }
 
 func TestOpen_sqlite_invalidDSN(t *testing.T) {
-	_, _, err := Open("sqlite", "file:/nonexistent/path/db.sqlite?_pragma=foreign_keys(1)")
+	dsn := "file:" + t.TempDir() + "?_pragma=foreign_keys(1)"
+	_, _, err := Open("sqlite", dsn)
 	if err == nil {
 		t.Fatal("want error for invalid/inaccessible DSN")
 	}
