@@ -902,16 +902,12 @@ func publicInvalidInputMsg(err error) string {
 	return "invalid request"
 }
 
-const (
-	defaultLimit      = 20
-	maxLimit          = 100
-	maxRequestBodySize = 1 << 20 // 1 MiB
-)
+const maxRequestBodySize = 1 << 20 // 1 MiB
 
 type listMeta struct {
-	Total  int `json:"total"`
-	Offset int `json:"offset"`
-	Limit  int `json:"limit"`
+	Total  int64 `json:"total"`
+	Offset int   `json:"offset"`
+	Limit  int   `json:"limit"`
 }
 
 type listEnvelope struct {
@@ -920,7 +916,7 @@ type listEnvelope struct {
 }
 
 func parsePagination(r *http.Request) (store.ListOpts, error) {
-	opts := store.ListOpts{Offset: 0, Limit: defaultLimit}
+	opts := store.ListOpts{Offset: 0, Limit: store.DefaultLimit}
 	q := r.URL.Query()
 	if v := q.Get("offset"); v != "" {
 		n, err := strconv.Atoi(v)
@@ -940,15 +936,15 @@ func parsePagination(r *http.Request) (store.ListOpts, error) {
 		if n < 1 {
 			n = 1
 		}
-		if n > maxLimit {
-			n = maxLimit
+		if n > store.MaxLimit {
+			n = store.MaxLimit
 		}
 		opts.Limit = n
 	}
 	return opts, nil
 }
 
-func writeList(w http.ResponseWriter, data any, total int, opts store.ListOpts) {
+func writeList(w http.ResponseWriter, data any, total int64, opts store.ListOpts) {
 	writeJSON(w, http.StatusOK, listEnvelope{
 		Data: data,
 		Meta: listMeta{Total: total, Offset: opts.Offset, Limit: opts.Limit},

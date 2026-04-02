@@ -55,21 +55,6 @@ func maskToSQL(m uint64) int64 { return int64(m) }
 
 func maskFromSQL(v int64) uint64 { return uint64(v) }
 
-const defaultLimit = 20
-const maxLimit = 100
-
-func sanitizeListOpts(opts store.ListOpts) store.ListOpts {
-	if opts.Limit <= 0 {
-		opts.Limit = defaultLimit
-	}
-	if opts.Limit > maxLimit {
-		opts.Limit = maxLimit
-	}
-	if opts.Offset < 0 {
-		opts.Offset = 0
-	}
-	return opts
-}
 
 func (s *Store) DomainCreate(ctx context.Context, d *store.Domain) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO domains (id, title) VALUES (?, ?)`, d.ID, d.Title)
@@ -88,9 +73,9 @@ func (s *Store) DomainGet(ctx context.Context, id string) (*store.Domain, error)
 	return &out, nil
 }
 
-func (s *Store) DomainList(ctx context.Context, opts store.ListOpts) ([]store.Domain, int, error) {
-	opts = sanitizeListOpts(opts)
-	var total int
+func (s *Store) DomainList(ctx context.Context, opts store.ListOpts) ([]store.Domain, int64, error) {
+	opts = store.SanitizeListOpts(opts)
+	var total int64
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM domains`).Scan(&total); err != nil {
 		return nil, 0, err
 	}
@@ -158,9 +143,9 @@ func (s *Store) UserGet(ctx context.Context, domainID, id string) (*store.User, 
 	return &out, nil
 }
 
-func (s *Store) UserList(ctx context.Context, domainID string, opts store.ListOpts) ([]store.User, int, error) {
-	opts = sanitizeListOpts(opts)
-	var total int
+func (s *Store) UserList(ctx context.Context, domainID string, opts store.ListOpts) ([]store.User, int64, error) {
+	opts = store.SanitizeListOpts(opts)
+	var total int64
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users WHERE domain_id = ?`, domainID).Scan(&total); err != nil {
 		return nil, 0, err
 	}
@@ -238,9 +223,9 @@ func (s *Store) GroupGet(ctx context.Context, domainID, id string) (*store.Group
 	return &out, nil
 }
 
-func (s *Store) GroupList(ctx context.Context, domainID string, opts store.ListOpts) ([]store.Group, int, error) {
-	opts = sanitizeListOpts(opts)
-	var total int
+func (s *Store) GroupList(ctx context.Context, domainID string, opts store.ListOpts) ([]store.Group, int64, error) {
+	opts = store.SanitizeListOpts(opts)
+	var total int64
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM groups WHERE domain_id = ?`, domainID).Scan(&total); err != nil {
 		return nil, 0, err
 	}
@@ -394,9 +379,9 @@ func (s *Store) ResourceGet(ctx context.Context, domainID, id string) (*store.Re
 	return &out, nil
 }
 
-func (s *Store) ResourceList(ctx context.Context, domainID string, opts store.ListOpts) ([]store.Resource, int, error) {
-	opts = sanitizeListOpts(opts)
-	var total int
+func (s *Store) ResourceList(ctx context.Context, domainID string, opts store.ListOpts) ([]store.Resource, int64, error) {
+	opts = store.SanitizeListOpts(opts)
+	var total int64
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM resources WHERE domain_id = ?`, domainID).Scan(&total); err != nil {
 		return nil, 0, err
 	}
@@ -452,9 +437,9 @@ func (s *Store) AccessTypeCreate(ctx context.Context, a *store.AccessType) error
 	return wrapConstraintError(err)
 }
 
-func (s *Store) AccessTypeList(ctx context.Context, domainID string, opts store.ListOpts) ([]store.AccessType, int, error) {
-	opts = sanitizeListOpts(opts)
-	var total int
+func (s *Store) AccessTypeList(ctx context.Context, domainID string, opts store.ListOpts) ([]store.AccessType, int64, error) {
+	opts = store.SanitizeListOpts(opts)
+	var total int64
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM access_types WHERE domain_id = ?`, domainID).Scan(&total); err != nil {
 		return nil, 0, err
 	}
@@ -563,9 +548,9 @@ func (s *Store) PermissionGet(ctx context.Context, domainID, id string) (*store.
 	return &out, nil
 }
 
-func (s *Store) PermissionList(ctx context.Context, domainID string, opts store.ListOpts) ([]store.Permission, int, error) {
-	opts = sanitizeListOpts(opts)
-	var total int
+func (s *Store) PermissionList(ctx context.Context, domainID string, opts store.ListOpts) ([]store.Permission, int64, error) {
+	opts = store.SanitizeListOpts(opts)
+	var total int64
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM permissions WHERE domain_id = ?`, domainID).Scan(&total); err != nil {
 		return nil, 0, err
 	}

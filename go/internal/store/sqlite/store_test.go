@@ -1635,6 +1635,135 @@ func TestUserList_pagination(t *testing.T) {
 	}
 }
 
+func TestGroupList_pagination(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 5; i++ {
+		title := string(rune('a' + i))
+		if err := s.GroupCreate(ctx, &store.Group{ID: uuid.NewString(), DomainID: domainID, Title: title}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, total, err := s.GroupList(ctx, domainID, store.ListOpts{Offset: 1, Limit: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 5 || len(list) != 2 {
+		t.Fatalf("items=%d total=%d", len(list), total)
+	}
+	if list[0].Title != "b" || list[1].Title != "c" {
+		t.Fatalf("content: %+v", list)
+	}
+
+	list, total, err = s.GroupList(ctx, domainID, store.ListOpts{Offset: 10, Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 5 || len(list) != 0 {
+		t.Fatalf("past end: items=%d total=%d", len(list), total)
+	}
+}
+
+func TestResourceList_pagination(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 5; i++ {
+		title := string(rune('a' + i))
+		if err := s.ResourceCreate(ctx, &store.Resource{ID: uuid.NewString(), DomainID: domainID, Title: title}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, total, err := s.ResourceList(ctx, domainID, store.ListOpts{Offset: 2, Limit: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 5 || len(list) != 2 {
+		t.Fatalf("items=%d total=%d", len(list), total)
+	}
+	if list[0].Title != "c" || list[1].Title != "d" {
+		t.Fatalf("content: %+v", list)
+	}
+}
+
+func TestAccessTypeList_pagination(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 5; i++ {
+		title := string(rune('a' + i))
+		bit := uint64(1 << i)
+		if err := s.AccessTypeCreate(ctx, &store.AccessType{ID: uuid.NewString(), DomainID: domainID, Title: title, Bit: bit}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, total, err := s.AccessTypeList(ctx, domainID, store.ListOpts{Offset: 0, Limit: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 5 || len(list) != 3 {
+		t.Fatalf("items=%d total=%d", len(list), total)
+	}
+
+	list, total, err = s.AccessTypeList(ctx, domainID, store.ListOpts{Offset: 4, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 5 || len(list) != 1 {
+		t.Fatalf("last page: items=%d total=%d", len(list), total)
+	}
+}
+
+func TestPermissionList_pagination(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	rid := uuid.NewString()
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 5; i++ {
+		title := string(rune('a' + i))
+		if err := s.PermissionCreate(ctx, &store.Permission{
+			ID: uuid.NewString(), DomainID: domainID, Title: title, ResourceID: rid, AccessMask: uint64(1 << i),
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, total, err := s.PermissionList(ctx, domainID, store.ListOpts{Offset: 1, Limit: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 5 || len(list) != 2 {
+		t.Fatalf("items=%d total=%d", len(list), total)
+	}
+
+	list, total, err = s.PermissionList(ctx, domainID, store.ListOpts{Offset: 10, Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 5 || len(list) != 0 {
+		t.Fatalf("past end: items=%d total=%d", len(list), total)
+	}
+}
+
 func TestStore_closedDB_methods(t *testing.T) {
 	ctx := context.Background()
 	db, err := Open("file:" + filepath.Join(t.TempDir(), "closedall.db") + "?_pragma=foreign_keys(1)")
@@ -1996,17 +2125,17 @@ func TestSanitizeListOpts(t *testing.T) {
 		in   store.ListOpts
 		want store.ListOpts
 	}{
-		{"zero limit defaults", store.ListOpts{Offset: 0, Limit: 0}, store.ListOpts{Offset: 0, Limit: defaultLimit}},
-		{"negative limit defaults", store.ListOpts{Offset: 0, Limit: -5}, store.ListOpts{Offset: 0, Limit: defaultLimit}},
-		{"over max capped", store.ListOpts{Offset: 0, Limit: 500}, store.ListOpts{Offset: 0, Limit: maxLimit}},
+		{"zero limit defaults", store.ListOpts{Offset: 0, Limit: 0}, store.ListOpts{Offset: 0, Limit: store.DefaultLimit}},
+		{"negative limit defaults", store.ListOpts{Offset: 0, Limit: -5}, store.ListOpts{Offset: 0, Limit: store.DefaultLimit}},
+		{"over max capped", store.ListOpts{Offset: 0, Limit: 500}, store.ListOpts{Offset: 0, Limit: store.MaxLimit}},
 		{"negative offset zeroed", store.ListOpts{Offset: -3, Limit: 10}, store.ListOpts{Offset: 0, Limit: 10}},
 		{"valid unchanged", store.ListOpts{Offset: 5, Limit: 25}, store.ListOpts{Offset: 5, Limit: 25}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := sanitizeListOpts(tt.in)
+			got := store.SanitizeListOpts(tt.in)
 			if got != tt.want {
-				t.Fatalf("sanitizeListOpts(%+v) = %+v, want %+v", tt.in, got, tt.want)
+				t.Fatalf("SanitizeListOpts(%+v) = %+v, want %+v", tt.in, got, tt.want)
 			}
 		})
 	}

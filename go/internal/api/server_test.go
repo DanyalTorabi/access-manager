@@ -1687,9 +1687,9 @@ func TestAPI_accessTypeList_empty(t *testing.T) {
 type listResponse[T any] struct {
 	Data []T `json:"data"`
 	Meta struct {
-		Total  int `json:"total"`
-		Offset int `json:"offset"`
-		Limit  int `json:"limit"`
+		Total  int64 `json:"total"`
+		Offset int   `json:"offset"`
+		Limit  int   `json:"limit"`
 	} `json:"meta"`
 }
 
@@ -2681,6 +2681,64 @@ func TestAPI_pagination_invalidOffset_otherEndpoints(t *testing.T) {
 			_ = res.Body.Close()
 			if res.StatusCode != http.StatusBadRequest {
 				t.Fatalf("want 400, got %d", res.StatusCode)
+			}
+		})
+	}
+}
+
+func TestAPI_scopedList_pagination(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	dom := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + dom
+
+	for i := 0; i < 5; i++ {
+		title := fmt.Sprintf("u-%c", 'a'+i)
+		mustPostJSON201(t, base+"/users", fmt.Sprintf(`{"title":%q}`, title))
+	}
+	for i := 0; i < 3; i++ {
+		title := fmt.Sprintf("g-%c", 'a'+i)
+		mustPostJSON201(t, base+"/groups", fmt.Sprintf(`{"title":%q}`, title))
+	}
+	for i := 0; i < 4; i++ {
+		title := fmt.Sprintf("r-%c", 'a'+i)
+		mustPostJSON201(t, base+"/resources", fmt.Sprintf(`{"title":%q}`, title))
+	}
+
+	tests := []struct {
+		name      string
+		path      string
+		wantTotal int64
+	}{
+		{"users", base + "/users?offset=1&limit=2", 5},
+		{"groups", base + "/groups?offset=0&limit=2", 3},
+		{"resources", base + "/resources?offset=2&limit=2", 4},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := http.Get(tt.path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = res.Body.Close() }()
+			if res.StatusCode != http.StatusOK {
+				b, _ := io.ReadAll(res.Body)
+				t.Fatalf("status %d: %s", res.StatusCode, b)
+			}
+			var env struct {
+				Meta struct {
+					Total  int64 `json:"total"`
+					Offset int   `json:"offset"`
+					Limit  int   `json:"limit"`
+				} `json:"meta"`
+			}
+			if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+				t.Fatal(err)
+			}
+			if env.Meta.Total != tt.wantTotal {
+				t.Fatalf("total: want %d, got %d", tt.wantTotal, env.Meta.Total)
+			}
+			if env.Meta.Limit != 2 {
+				t.Fatalf("limit: want 2, got %d", env.Meta.Limit)
 			}
 		})
 	}
