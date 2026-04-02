@@ -190,12 +190,13 @@ func TestDomainGet_foundAndNotFound(t *testing.T) {
 func TestDomainList_emptyAndMultiple(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)
-	list, err := s.DomainList(ctx)
+	allOpts := store.ListOpts{Offset: 0, Limit: 100}
+	list, total, err := s.DomainList(ctx, allOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 0 {
-		t.Fatalf("want empty, got %d", len(list))
+	if len(list) != 0 || total != 0 {
+		t.Fatalf("want empty, got %d items total=%d", len(list), total)
 	}
 	d1 := uuid.NewString()
 	d2 := uuid.NewString()
@@ -205,12 +206,12 @@ func TestDomainList_emptyAndMultiple(t *testing.T) {
 	if err := s.DomainCreate(ctx, &store.Domain{ID: d2, Title: "apple"}); err != nil {
 		t.Fatal(err)
 	}
-	list, err = s.DomainList(ctx)
+	list, total, err = s.DomainList(ctx, allOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 2 {
-		t.Fatalf("want 2, got %d", len(list))
+	if len(list) != 2 || total != 2 {
+		t.Fatalf("want 2, got %d items total=%d", len(list), total)
 	}
 	if list[0].Title != "apple" || list[1].Title != "zebra" {
 		t.Fatalf("order by title: got %+v", list)
@@ -256,12 +257,13 @@ func TestUserList_emptyAndWithItems(t *testing.T) {
 	if err := s.DomainCreate(ctx, &store.Domain{ID: otherDomain, Title: "other"}); err != nil {
 		t.Fatal(err)
 	}
-	list, err := s.UserList(ctx, domainID)
+	allOpts := store.ListOpts{Offset: 0, Limit: 100}
+	list, total, err := s.UserList(ctx, domainID, allOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 0 {
-		t.Fatalf("want empty, got %d", len(list))
+	if len(list) != 0 || total != 0 {
+		t.Fatalf("want empty, got %d items total=%d", len(list), total)
 	}
 	u1 := uuid.NewString()
 	u2 := uuid.NewString()
@@ -274,12 +276,12 @@ func TestUserList_emptyAndWithItems(t *testing.T) {
 	if err := s.UserCreate(ctx, &store.User{ID: uuid.NewString(), DomainID: otherDomain, Title: "loner"}); err != nil {
 		t.Fatal(err)
 	}
-	list, err = s.UserList(ctx, domainID)
+	list, total, err = s.UserList(ctx, domainID, allOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 2 {
-		t.Fatalf("want 2, got %d", len(list))
+	if len(list) != 2 || total != 2 {
+		t.Fatalf("want 2, got %d items total=%d", len(list), total)
 	}
 	if list[0].Title != "ann" || list[1].Title != "bob" {
 		t.Fatalf("order by title: got %+v", list)
@@ -328,12 +330,13 @@ func TestGroupList_emptyWithItemsIncludingParent(t *testing.T) {
 	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
 		t.Fatal(err)
 	}
-	list, err := s.GroupList(ctx, domainID)
+	allOpts := store.ListOpts{Offset: 0, Limit: 100}
+	list, total, err := s.GroupList(ctx, domainID, allOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 0 {
-		t.Fatalf("want empty, got %d", len(list))
+	if len(list) != 0 || total != 0 {
+		t.Fatalf("want empty, got %d items total=%d", len(list), total)
 	}
 	parentID := uuid.NewString()
 	childID := uuid.NewString()
@@ -343,12 +346,12 @@ func TestGroupList_emptyWithItemsIncludingParent(t *testing.T) {
 	if err := s.GroupCreate(ctx, &store.Group{ID: childID, DomainID: domainID, Title: "C", ParentGroupID: &parentID}); err != nil {
 		t.Fatal(err)
 	}
-	list, err = s.GroupList(ctx, domainID)
+	list, total, err = s.GroupList(ctx, domainID, allOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 2 {
-		t.Fatalf("want 2, got %d", len(list))
+	if len(list) != 2 || total != 2 {
+		t.Fatalf("want 2, got %d items total=%d", len(list), total)
 	}
 	// ORDER BY title: C before P
 	if list[0].ID != childID || list[1].ID != parentID {
@@ -533,12 +536,13 @@ func TestResourceList_emptyAndWithItems(t *testing.T) {
 	if err := s.DomainCreate(ctx, &store.Domain{ID: other, Title: "o"}); err != nil {
 		t.Fatal(err)
 	}
-	list, err := s.ResourceList(ctx, domainID)
+	allOpts := store.ListOpts{Offset: 0, Limit: 100}
+	list, total, err := s.ResourceList(ctx, domainID, allOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 0 {
-		t.Fatalf("want empty, got %d", len(list))
+	if len(list) != 0 || total != 0 {
+		t.Fatalf("want empty, got %d items total=%d", len(list), total)
 	}
 	r1 := uuid.NewString()
 	r2 := uuid.NewString()
@@ -551,12 +555,12 @@ func TestResourceList_emptyAndWithItems(t *testing.T) {
 	if err := s.ResourceCreate(ctx, &store.Resource{ID: uuid.NewString(), DomainID: other, Title: "x"}); err != nil {
 		t.Fatal(err)
 	}
-	list, err = s.ResourceList(ctx, domainID)
+	list, total, err = s.ResourceList(ctx, domainID, allOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 2 {
-		t.Fatalf("want 2, got %d", len(list))
+	if len(list) != 2 || total != 2 {
+		t.Fatalf("want 2, got %d items total=%d", len(list), total)
 	}
 	if list[0].Title != "a" || list[1].Title != "z" {
 		t.Fatalf("order by title: got %+v", list)
@@ -570,12 +574,13 @@ func TestAccessTypeCreateAndList(t *testing.T) {
 	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
 		t.Fatal(err)
 	}
-	list, err := s.AccessTypeList(ctx, domainID)
+	allOpts := store.ListOpts{Offset: 0, Limit: 100}
+	list, total, err := s.AccessTypeList(ctx, domainID, allOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 0 {
-		t.Fatalf("want empty, got %d", len(list))
+	if len(list) != 0 || total != 0 {
+		t.Fatalf("want empty, got %d items total=%d", len(list), total)
 	}
 	a1 := uuid.NewString()
 	a2 := uuid.NewString()
@@ -585,12 +590,12 @@ func TestAccessTypeCreateAndList(t *testing.T) {
 	if err := s.AccessTypeCreate(ctx, &store.AccessType{ID: a2, DomainID: domainID, Title: "read", Bit: 1}); err != nil {
 		t.Fatal(err)
 	}
-	list, err = s.AccessTypeList(ctx, domainID)
+	list, total, err = s.AccessTypeList(ctx, domainID, allOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 2 {
-		t.Fatalf("want 2, got %d", len(list))
+	if len(list) != 2 || total != 2 {
+		t.Fatalf("want 2, got %d items total=%d", len(list), total)
 	}
 	// ORDER BY bit: read(1) then write(4)
 	if list[0].Bit != 1 || list[0].ID != a2 || list[1].Bit != 4 || list[1].ID != a1 {
@@ -641,12 +646,13 @@ func TestPermissionList_emptyAndWithItems(t *testing.T) {
 	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
 		t.Fatal(err)
 	}
-	list, err := s.PermissionList(ctx, domainID)
+	allOpts := store.ListOpts{Offset: 0, Limit: 100}
+	list, total, err := s.PermissionList(ctx, domainID, allOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 0 {
-		t.Fatalf("want empty, got %d", len(list))
+	if len(list) != 0 || total != 0 {
+		t.Fatalf("want empty, got %d items total=%d", len(list), total)
 	}
 	p1 := uuid.NewString()
 	p2 := uuid.NewString()
@@ -663,12 +669,12 @@ func TestPermissionList_emptyAndWithItems(t *testing.T) {
 	if err := s.PermissionCreate(ctx, &store.Permission{ID: uuid.NewString(), DomainID: other, Title: "other", ResourceID: roid, AccessMask: 3}); err != nil {
 		t.Fatal(err)
 	}
-	list, err = s.PermissionList(ctx, domainID)
+	list, total, err = s.PermissionList(ctx, domainID, allOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 2 {
-		t.Fatalf("want 2, got %d", len(list))
+	if len(list) != 2 || total != 2 {
+		t.Fatalf("want 2, got %d items total=%d", len(list), total)
 	}
 	if list[0].Title != "apple" || list[1].Title != "zebra" {
 		t.Fatalf("order by title: got %+v", list)
@@ -1548,5 +1554,105 @@ func TestWrapConstraintError_plainErrorUnchanged(t *testing.T) {
 	}
 	if errors.Is(err, store.ErrFKViolation) || errors.Is(err, store.ErrConflict) {
 		t.Fatal("plain error should not be classified as FK/conflict")
+	}
+}
+
+func TestDomainList_pagination(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	for i := 0; i < 5; i++ {
+		title := string(rune('a' + i))
+		if err := s.DomainCreate(ctx, &store.Domain{ID: uuid.NewString(), Title: title}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, total, err := s.DomainList(ctx, store.ListOpts{Offset: 0, Limit: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 5 {
+		t.Fatalf("total: want 5, got %d", total)
+	}
+	if len(list) != 2 {
+		t.Fatalf("items: want 2, got %d", len(list))
+	}
+	if list[0].Title != "a" || list[1].Title != "b" {
+		t.Fatalf("first page: %+v", list)
+	}
+
+	list, total, err = s.DomainList(ctx, store.ListOpts{Offset: 3, Limit: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 5 || len(list) != 2 {
+		t.Fatalf("page 2: items=%d total=%d", len(list), total)
+	}
+	if list[0].Title != "d" || list[1].Title != "e" {
+		t.Fatalf("page 2 content: %+v", list)
+	}
+
+	list, total, err = s.DomainList(ctx, store.ListOpts{Offset: 10, Limit: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 5 || len(list) != 0 {
+		t.Fatalf("past end: items=%d total=%d", len(list), total)
+	}
+
+	list, total, err = s.DomainList(ctx, store.ListOpts{Offset: 0, Limit: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 5 || len(list) != 1 || list[0].Title != "a" {
+		t.Fatalf("limit 1: items=%d total=%d list=%+v", len(list), total, list)
+	}
+}
+
+func TestUserList_pagination(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 5; i++ {
+		title := string(rune('a' + i))
+		if err := s.UserCreate(ctx, &store.User{ID: uuid.NewString(), DomainID: domainID, Title: title}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, total, err := s.UserList(ctx, domainID, store.ListOpts{Offset: 1, Limit: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 5 || len(list) != 2 {
+		t.Fatalf("items=%d total=%d", len(list), total)
+	}
+	if list[0].Title != "b" || list[1].Title != "c" {
+		t.Fatalf("content: %+v", list)
+	}
+}
+
+func TestSanitizeListOpts(t *testing.T) {
+	tests := []struct {
+		name string
+		in   store.ListOpts
+		want store.ListOpts
+	}{
+		{"zero limit defaults", store.ListOpts{Offset: 0, Limit: 0}, store.ListOpts{Offset: 0, Limit: defaultLimit}},
+		{"negative limit defaults", store.ListOpts{Offset: 0, Limit: -5}, store.ListOpts{Offset: 0, Limit: defaultLimit}},
+		{"over max capped", store.ListOpts{Offset: 0, Limit: 500}, store.ListOpts{Offset: 0, Limit: maxLimit}},
+		{"negative offset zeroed", store.ListOpts{Offset: -3, Limit: 10}, store.ListOpts{Offset: 0, Limit: 10}},
+		{"valid unchanged", store.ListOpts{Offset: 5, Limit: 25}, store.ListOpts{Offset: 5, Limit: 25}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sanitizeListOpts(tt.in)
+			if got != tt.want {
+				t.Fatalf("sanitizeListOpts(%+v) = %+v, want %+v", tt.in, got, tt.want)
+			}
+		})
 	}
 }

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **T34 / #45:** Offset/limit pagination on all six list endpoints (`domains`, `users`, `groups`, `resources`, `access-types`, `permissions`). Query params `offset` (default 0) and `limit` (default 20, max 100). Responses wrapped in `{"data": [...], "meta": {"total", "offset", "limit"}}` envelope with total record count.
 - **T37 / #48:** `GET` / `PATCH` / `DELETE` for domains; `PATCH` / `DELETE` for users, groups, resources, access types, and permissions; `GET` for a single access type. Partial JSON bodies for `PATCH` (see OpenAPI).
 - **T33:** SQLite migration `000002_restrict_foreign_keys` — foreign keys use `ON DELETE RESTRICT` so deletes fail while dependents exist (maps to **400** with `store.ErrFKViolation`), instead of cascading.
 - `govulncheck` in CI and `make vuln` target for dependency vulnerability scanning
@@ -33,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **T34 / #45 (breaking):** List endpoint responses changed from bare JSON arrays to paginated `{"data": [...], "meta": {...}}` envelope. Clients must update to read `data` for items and `meta` for pagination info.
 - Migrated `cmd/server` from `log.Printf` / `log.Fatal` to structured `internal/logger` calls
 - Pinned toolchain to **go1.25.8** via `toolchain` in `go/go.mod` (language `go 1.25.0`) for stdlib security patches
 - Contributor docs: defer valid PR review follow-ups to a named ticket with a tracking note in **`plan/`** (AGENTS, CONTRIBUTING, Cursor rules)

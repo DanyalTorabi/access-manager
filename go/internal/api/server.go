@@ -175,7 +175,12 @@ func (s *Server) domainCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) domainList(w http.ResponseWriter, r *http.Request) {
-	list, err := s.Store.DomainList(r.Context())
+	opts, err := parsePagination(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	list, total, err := s.Store.DomainList(r.Context(), opts)
 	if err != nil {
 		writeInternalErr(w, r, err)
 		return
@@ -183,7 +188,7 @@ func (s *Server) domainList(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []store.Domain{}
 	}
-	writeJSON(w, http.StatusOK, list)
+	writeList(w, list, total, opts)
 }
 
 func (s *Server) domainGet(w http.ResponseWriter, r *http.Request) {
@@ -241,8 +246,13 @@ func (s *Server) userCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) userList(w http.ResponseWriter, r *http.Request) {
+	opts, err := parsePagination(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
 	domainID := chi.URLParam(r, "domainID")
-	list, err := s.Store.UserList(r.Context(), domainID)
+	list, total, err := s.Store.UserList(r.Context(), domainID, opts)
 	if err != nil {
 		writeInternalErr(w, r, err)
 		return
@@ -250,7 +260,7 @@ func (s *Server) userList(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []store.User{}
 	}
-	writeJSON(w, http.StatusOK, list)
+	writeList(w, list, total, opts)
 }
 
 func (s *Server) userGet(w http.ResponseWriter, r *http.Request) {
@@ -316,8 +326,13 @@ func (s *Server) groupCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) groupList(w http.ResponseWriter, r *http.Request) {
+	opts, err := parsePagination(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
 	domainID := chi.URLParam(r, "domainID")
-	list, err := s.Store.GroupList(r.Context(), domainID)
+	list, total, err := s.Store.GroupList(r.Context(), domainID, opts)
 	if err != nil {
 		writeInternalErr(w, r, err)
 		return
@@ -325,7 +340,7 @@ func (s *Server) groupList(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []store.Group{}
 	}
-	writeJSON(w, http.StatusOK, list)
+	writeList(w, list, total, opts)
 }
 
 func (s *Server) groupGet(w http.ResponseWriter, r *http.Request) {
@@ -426,8 +441,13 @@ func (s *Server) resourceCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) resourceList(w http.ResponseWriter, r *http.Request) {
+	opts, err := parsePagination(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
 	domainID := chi.URLParam(r, "domainID")
-	list, err := s.Store.ResourceList(r.Context(), domainID)
+	list, total, err := s.Store.ResourceList(r.Context(), domainID, opts)
 	if err != nil {
 		writeInternalErr(w, r, err)
 		return
@@ -435,7 +455,7 @@ func (s *Server) resourceList(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []store.Resource{}
 	}
-	writeJSON(w, http.StatusOK, list)
+	writeList(w, list, total, opts)
 }
 
 func (s *Server) resourceGet(w http.ResponseWriter, r *http.Request) {
@@ -505,8 +525,13 @@ func (s *Server) accessTypeCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) accessTypeList(w http.ResponseWriter, r *http.Request) {
+	opts, err := parsePagination(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
 	domainID := chi.URLParam(r, "domainID")
-	list, err := s.Store.AccessTypeList(r.Context(), domainID)
+	list, total, err := s.Store.AccessTypeList(r.Context(), domainID, opts)
 	if err != nil {
 		writeInternalErr(w, r, err)
 		return
@@ -514,7 +539,7 @@ func (s *Server) accessTypeList(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []store.AccessType{}
 	}
-	writeJSON(w, http.StatusOK, list)
+	writeList(w, list, total, opts)
 }
 
 func (s *Server) accessTypeGet(w http.ResponseWriter, r *http.Request) {
@@ -601,8 +626,13 @@ func (s *Server) permissionCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) permissionList(w http.ResponseWriter, r *http.Request) {
+	opts, err := parsePagination(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
 	domainID := chi.URLParam(r, "domainID")
-	list, err := s.Store.PermissionList(r.Context(), domainID)
+	list, total, err := s.Store.PermissionList(r.Context(), domainID, opts)
 	if err != nil {
 		writeInternalErr(w, r, err)
 		return
@@ -610,7 +640,7 @@ func (s *Server) permissionList(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []store.Permission{}
 	}
-	writeJSON(w, http.StatusOK, list)
+	writeList(w, list, total, opts)
 }
 
 func (s *Server) permissionGet(w http.ResponseWriter, r *http.Request) {
@@ -872,7 +902,58 @@ func publicInvalidInputMsg(err error) string {
 	return "invalid request"
 }
 
-const maxRequestBodySize = 1 << 20 // 1 MiB
+const (
+	defaultLimit      = 20
+	maxLimit          = 100
+	maxRequestBodySize = 1 << 20 // 1 MiB
+)
+
+type listMeta struct {
+	Total  int `json:"total"`
+	Offset int `json:"offset"`
+	Limit  int `json:"limit"`
+}
+
+type listEnvelope struct {
+	Data any      `json:"data"`
+	Meta listMeta `json:"meta"`
+}
+
+func parsePagination(r *http.Request) (store.ListOpts, error) {
+	opts := store.ListOpts{Offset: 0, Limit: defaultLimit}
+	q := r.URL.Query()
+	if v := q.Get("offset"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return opts, errors.New("offset must be an integer")
+		}
+		if n < 0 {
+			return opts, errors.New("offset must not be negative")
+		}
+		opts.Offset = n
+	}
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return opts, errors.New("limit must be an integer")
+		}
+		if n < 1 {
+			n = 1
+		}
+		if n > maxLimit {
+			n = maxLimit
+		}
+		opts.Limit = n
+	}
+	return opts, nil
+}
+
+func writeList(w http.ResponseWriter, data any, total int, opts store.ListOpts) {
+	writeJSON(w, http.StatusOK, listEnvelope{
+		Data: data,
+		Meta: listMeta{Total: total, Offset: opts.Offset, Limit: opts.Limit},
+	})
+}
 
 func readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
