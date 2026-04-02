@@ -349,12 +349,13 @@ func (s *Server) groupPatch(w http.ResponseWriter, r *http.Request) {
 	params := store.GroupPatchParams{Title: b.Title}
 	if len(b.ParentGroupID) > 0 {
 		params.UpdateParent = true
+		trimmed := bytes.TrimSpace(b.ParentGroupID)
 		switch {
-		case bytes.Equal(b.ParentGroupID, []byte("null")):
+		case bytes.Equal(trimmed, []byte("null")):
 			params.ParentGroupID = nil
 		default:
 			var pid string
-			if err := json.Unmarshal(b.ParentGroupID, &pid); err != nil {
+			if err := json.Unmarshal(trimmed, &pid); err != nil {
 				writeErr(w, http.StatusBadRequest, err)
 				return
 			}
@@ -824,10 +825,18 @@ func writeStoreErr(w http.ResponseWriter, _ *http.Request, err error) {
 	}
 }
 
+const maxRequestBodySize = 1 << 20 // 1 MiB
+
 func readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dst); err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			writeErr(w, http.StatusRequestEntityTooLarge, errors.New("request body too large"))
+			return false
+		}
 		writeErr(w, http.StatusBadRequest, err)
 		return false
 	}

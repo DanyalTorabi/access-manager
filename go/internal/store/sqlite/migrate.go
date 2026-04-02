@@ -5,16 +5,60 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 )
 
-// ensureSQLiteForeignKeysOn reapplies FK enforcement on the connection pool.
-// Migrations (e.g. table rebuilds) may run PRAGMA foreign_keys=OFF; if a migration
-// fails mid-script, restore ON so the process does not keep running with FKs disabled.
-func ensureSQLiteForeignKeysOn(db *sql.DB) {
-	_, _ = db.Exec("PRAGMA foreign_keys=ON")
+var fkPragmaRe = regexp.MustCompile(`(?i)^\s*PRAGMA\s+foreign_keys\s*=`)
+
+// splitFKPragmas removes PRAGMA foreign_keys lines from a migration body and
+// returns whether any of them disable FK checks (OFF / 0). The cleaned body
+// contains only non-PRAGMA-foreign_keys statements. This lets the migration
+// runner execute those PRAGMAs at the connection level (they are no-ops
+// inside a transaction per SQLite docs).
+func splitFKPragmas(body string) (disableFK bool, cleaned string) {
+	var kept []string
+	for _, line := range strings.Split(body, "\n") {
+		if fkPragmaRe.MatchString(line) {
+			lower := strings.ToLower(line)
+			if strings.Contains(lower, "off") || strings.Contains(lower, "= 0") || strings.Contains(lower, "=0") {
+				disableFK = true
+			}
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return disableFK, strings.Join(kept, "\n")
+}
+
+// applyMigration runs a single versioned migration inside a transaction.
+// PRAGMA foreign_keys statements are extracted and executed at the connection
+// level because they are no-ops inside a transaction in SQLite.
+func applyMigration(db *sql.DB, v int, raw string) error {
+	disableFK, body := splitFKPragmas(raw)
+	if disableFK {
+		if _, err := db.Exec("PRAGMA foreign_keys=OFF"); err != nil {
+			return fmt.Errorf("disable fk for migration %d: %w", v, err)
+		}
+	}
+	// Always restore FK enforcement after this migration, regardless of outcome.
+	defer func() { _, _ = db.Exec("PRAGMA foreign_keys=ON") }()
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(body); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("exec migration %d: %w", v, err)
+	}
+	if _, err := tx.Exec(`INSERT INTO schema_migrations (version) VALUES (?)`, v); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("record migration %d: %w", v, err)
+	}
+	return tx.Commit()
 }
 
 // MigrateUp applies all pending *.up.sql migrations in dir (filenames like 000001_name.up.sql).
@@ -55,27 +99,11 @@ func MigrateUp(db *sql.DB, dir string) error {
 		if v <= cur {
 			continue
 		}
-		path := files[v]
-		body, err := os.ReadFile(path)
+		body, err := os.ReadFile(files[v])
 		if err != nil {
 			return fmt.Errorf("read migration %d: %w", v, err)
 		}
-		tx, err := db.Begin()
-		if err != nil {
-			return err
-		}
-		if _, err := tx.Exec(string(body)); err != nil {
-			_ = tx.Rollback()
-			ensureSQLiteForeignKeysOn(db)
-			return fmt.Errorf("exec migration %d: %w", v, err)
-		}
-		if _, err := tx.Exec(`INSERT INTO schema_migrations (version) VALUES (?)`, v); err != nil {
-			_ = tx.Rollback()
-			ensureSQLiteForeignKeysOn(db)
-			return fmt.Errorf("record migration %d: %w", v, err)
-		}
-		if err := tx.Commit(); err != nil {
-			ensureSQLiteForeignKeysOn(db)
+		if err := applyMigration(db, v, string(body)); err != nil {
 			return err
 		}
 	}

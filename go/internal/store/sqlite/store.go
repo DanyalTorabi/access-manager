@@ -108,16 +108,11 @@ func (s *Store) DomainPatch(ctx context.Context, id string, title *string) (*sto
 	if title == nil {
 		return nil, fmt.Errorf("%w: empty patch", store.ErrInvalidInput)
 	}
-	res, err := s.db.ExecContext(ctx, `UPDATE domains SET title = ? WHERE id = ?`, *title, id)
-	if err != nil {
-		return nil, wrapConstraintError(err)
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
+	if _, err := s.DomainGet(ctx, id); err != nil {
 		return nil, err
 	}
-	if n == 0 {
-		return nil, store.ErrNotFound
+	if _, err := s.db.ExecContext(ctx, `UPDATE domains SET title = ? WHERE id = ?`, *title, id); err != nil {
+		return nil, wrapConstraintError(err)
 	}
 	return s.DomainGet(ctx, id)
 }
@@ -176,16 +171,11 @@ func (s *Store) UserPatch(ctx context.Context, domainID, id string, title *strin
 	if title == nil {
 		return nil, fmt.Errorf("%w: empty patch", store.ErrInvalidInput)
 	}
-	res, err := s.db.ExecContext(ctx, `UPDATE users SET title = ? WHERE id = ? AND domain_id = ?`, *title, id, domainID)
-	if err != nil {
-		return nil, wrapConstraintError(err)
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
+	if _, err := s.UserGet(ctx, domainID, id); err != nil {
 		return nil, err
 	}
-	if n == 0 {
-		return nil, store.ErrNotFound
+	if _, err := s.db.ExecContext(ctx, `UPDATE users SET title = ? WHERE id = ? AND domain_id = ?`, *title, id, domainID); err != nil {
+		return nil, wrapConstraintError(err)
 	}
 	return s.UserGet(ctx, domainID, id)
 }
@@ -334,16 +324,8 @@ func (s *Store) GroupPatch(ctx context.Context, domainID, groupID string, p stor
 		return nil, err
 	}
 	if p.Title != nil {
-		res, err := tx.ExecContext(ctx, `UPDATE groups SET title = ? WHERE id = ? AND domain_id = ?`, *p.Title, groupID, domainID)
-		if err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE groups SET title = ? WHERE id = ? AND domain_id = ?`, *p.Title, groupID, domainID); err != nil {
 			return nil, wrapConstraintError(err)
-		}
-		n, err := res.RowsAffected()
-		if err != nil {
-			return nil, err
-		}
-		if n == 0 {
-			return nil, store.ErrNotFound
 		}
 	}
 	if p.UpdateParent {
@@ -411,16 +393,11 @@ func (s *Store) ResourcePatch(ctx context.Context, domainID, id string, title *s
 	if title == nil {
 		return nil, fmt.Errorf("%w: empty patch", store.ErrInvalidInput)
 	}
-	res, err := s.db.ExecContext(ctx, `UPDATE resources SET title = ? WHERE id = ? AND domain_id = ?`, *title, id, domainID)
-	if err != nil {
-		return nil, wrapConstraintError(err)
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
+	if _, err := s.ResourceGet(ctx, domainID, id); err != nil {
 		return nil, err
 	}
-	if n == 0 {
-		return nil, store.ErrNotFound
+	if _, err := s.db.ExecContext(ctx, `UPDATE resources SET title = ? WHERE id = ? AND domain_id = ?`, *title, id, domainID); err != nil {
+		return nil, wrapConstraintError(err)
 	}
 	return s.ResourceGet(ctx, domainID, id)
 }
@@ -483,29 +460,34 @@ func (s *Store) AccessTypePatch(ctx context.Context, domainID, id string, p stor
 	if p.Title == nil && p.Bit == nil {
 		return nil, fmt.Errorf("%w: empty patch", store.ErrInvalidInput)
 	}
-	cur, err := s.AccessTypeGet(ctx, domainID, id)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	title := cur.Title
+	defer func() { _ = tx.Rollback() }()
+	row := tx.QueryRowContext(ctx, `SELECT title, bit FROM access_types WHERE id = ? AND domain_id = ?`, id, domainID)
+	var curTitle string
+	var curBit int64
+	if err := row.Scan(&curTitle, &curBit); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, store.ErrNotFound
+		}
+		return nil, err
+	}
+	title := curTitle
 	if p.Title != nil {
 		title = *p.Title
 	}
-	bit := cur.Bit
+	bit := maskFromSQL(curBit)
 	if p.Bit != nil {
 		bit = *p.Bit
 	}
-	res, err := s.db.ExecContext(ctx, `UPDATE access_types SET title = ?, bit = ? WHERE id = ? AND domain_id = ?`,
-		title, maskToSQL(bit), id, domainID)
-	if err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE access_types SET title = ?, bit = ? WHERE id = ? AND domain_id = ?`,
+		title, maskToSQL(bit), id, domainID); err != nil {
 		return nil, wrapConstraintError(err)
 	}
-	n, err := res.RowsAffected()
-	if err != nil {
+	if err := tx.Commit(); err != nil {
 		return nil, err
-	}
-	if n == 0 {
-		return nil, store.ErrNotFound
 	}
 	return s.AccessTypeGet(ctx, domainID, id)
 }
@@ -568,36 +550,45 @@ func (s *Store) PermissionPatch(ctx context.Context, domainID, id string, p stor
 	if p.Title == nil && p.ResourceID == nil && p.AccessMask == nil {
 		return nil, fmt.Errorf("%w: empty patch", store.ErrInvalidInput)
 	}
-	cur, err := s.PermissionGet(ctx, domainID, id)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	title := cur.Title
+	defer func() { _ = tx.Rollback() }()
+	row := tx.QueryRowContext(ctx, `SELECT title, resource_id, access_mask FROM permissions WHERE id = ? AND domain_id = ?`, id, domainID)
+	var curTitle, curResourceID string
+	var curMask int64
+	if err := row.Scan(&curTitle, &curResourceID, &curMask); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, store.ErrNotFound
+		}
+		return nil, err
+	}
+	title := curTitle
 	if p.Title != nil {
 		title = *p.Title
 	}
-	resourceID := cur.ResourceID
+	resourceID := curResourceID
 	if p.ResourceID != nil {
-		if _, err := s.ResourceGet(ctx, domainID, *p.ResourceID); err != nil {
+		var exists int
+		if err := tx.QueryRowContext(ctx, `SELECT 1 FROM resources WHERE id = ? AND domain_id = ?`, *p.ResourceID, domainID).Scan(&exists); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, store.ErrNotFound
+			}
 			return nil, err
 		}
 		resourceID = *p.ResourceID
 	}
-	mask := cur.AccessMask
+	mask := maskFromSQL(curMask)
 	if p.AccessMask != nil {
 		mask = *p.AccessMask
 	}
-	res, err := s.db.ExecContext(ctx, `UPDATE permissions SET title = ?, resource_id = ?, access_mask = ? WHERE id = ? AND domain_id = ?`,
-		title, resourceID, maskToSQL(mask), id, domainID)
-	if err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE permissions SET title = ?, resource_id = ?, access_mask = ? WHERE id = ? AND domain_id = ?`,
+		title, resourceID, maskToSQL(mask), id, domainID); err != nil {
 		return nil, wrapConstraintError(err)
 	}
-	n, err := res.RowsAffected()
-	if err != nil {
+	if err := tx.Commit(); err != nil {
 		return nil, err
-	}
-	if n == 0 {
-		return nil, store.ErrNotFound
 	}
 	return s.PermissionGet(ctx, domainID, id)
 }
