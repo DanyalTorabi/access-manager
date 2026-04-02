@@ -21,7 +21,7 @@ clients can page through results and know the total record count.
 
 | Layer | Change |
 |-------|--------|
-| `internal/store` | Add `ListOpts` struct; update 6 `*List` signatures to accept `ListOpts` and return `(items, total int, err)` |
+| `internal/store` | Add `ListOpts` struct; update 6 `*List` signatures to accept `ListOpts` and return `(items, total int64, err)` |
 | `internal/store/sqlite` | Add `COUNT(*)` + `LIMIT ? OFFSET ?` to 6 `*List` methods; defensive clamping of `ListOpts` |
 | `internal/api` | Add `parsePagination`, `listEnvelope`, `writeList`; update 6 list handlers |
 

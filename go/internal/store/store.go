@@ -62,7 +62,8 @@ type ListOpts struct {
 	Limit  int
 }
 
-// SanitizeListOpts clamps Limit to [1, MaxLimit] and Offset to >= 0.
+// SanitizeListOpts defaults Limit to DefaultLimit when <= 0, caps it at
+// MaxLimit, and floors Offset at 0.
 func SanitizeListOpts(opts ListOpts) ListOpts {
 	if opts.Limit <= 0 {
 		opts.Limit = DefaultLimit
