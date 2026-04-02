@@ -830,28 +830,39 @@ func writeStoreErr(w http.ResponseWriter, r *http.Request, err error) {
 		status = http.StatusInternalServerError
 		msg = "internal server error"
 	}
-	logStoreErr(r, status, err)
+	logRequestErr(r, status, err)
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
 // writeInternalErr logs the full error and returns a generic 500 to the client.
 // Use for non-store errors (list queries, authz) that should never leak details.
 func writeInternalErr(w http.ResponseWriter, r *http.Request, err error) {
-	logStoreErr(r, http.StatusInternalServerError, err)
+	logRequestErr(r, http.StatusInternalServerError, err)
 	writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
 }
 
-func logStoreErr(r *http.Request, status int, err error) {
-	logger.Error("request error",
+// logRequestErr logs the error with request context. 5xx errors are logged at
+// ERROR level; 4xx at WARN to avoid inflating error-level alerts for expected
+// client mistakes.
+func logRequestErr(r *http.Request, status int, err error) {
+	attrs := []slog.Attr{
 		slog.Int("status", status),
 		slog.String("err", err.Error()),
 		slog.String("method", r.Method),
 		slog.String("path", r.URL.Path),
-	)
+	}
+	if status >= 500 {
+		logger.Error("request error", attrs...)
+	} else {
+		logger.Warn("request error", attrs...)
+	}
 }
 
 // publicInvalidInputMsg extracts the user-friendly detail from a store.ErrInvalidInput
 // wrapped error (e.g. "store: invalid input: cycle detected …" → "cycle detected …").
+// TODO(T36): fragile string-prefix coupling — if intermediate context wrapping is added
+// around ErrInvalidInput the prefix won't match. Replace with a typed InvalidInputError
+// carrying a Detail() method and use errors.As. Tracked on #47.
 func publicInvalidInputMsg(err error) string {
 	full := err.Error()
 	const prefix = "store: invalid input: "
@@ -879,6 +890,9 @@ func readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	return true
 }
 
+// TODO(T36): parseUint64 errors are passed to writeErr, which exposes
+// strconv.ParseUint messages containing user input. Not a SQL leak but not
+// a stable message either. Tracked on #47.
 func parseUint64(s string) (uint64, error) {
 	return strconv.ParseUint(s, 0, 64)
 }

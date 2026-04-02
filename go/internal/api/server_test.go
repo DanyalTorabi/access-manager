@@ -116,6 +116,11 @@ func auditLogEntriesWithAction(t *testing.T, buf, action string) []map[string]an
 	return out
 }
 
+// NOTE: Tests that call logger.Init mutate the package-level logger pointer.
+// This is safe only because no test in this file uses t.Parallel().
+// Do NOT add t.Parallel() without first switching to a logger-injectable
+// Server field or an atomic pointer. Tracked on #47 (T36 follow-ups).
+
 func TestAPI_auditLog_domainCreate(t *testing.T) {
 	var buf bytes.Buffer
 	logger.Init(slog.LevelInfo, &buf)
