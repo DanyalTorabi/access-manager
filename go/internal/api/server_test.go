@@ -116,6 +116,11 @@ func auditLogEntriesWithAction(t *testing.T, buf, action string) []map[string]an
 	return out
 }
 
+// NOTE: Tests that call logger.Init mutate the package-level logger pointer.
+// This is safe only because no test in this file uses t.Parallel().
+// Do NOT add t.Parallel() without first switching to a logger-injectable
+// Server field or an atomic pointer. Tracked on #47 (T36 follow-ups).
+
 func TestAPI_auditLog_domainCreate(t *testing.T) {
 	var buf bytes.Buffer
 	logger.Init(slog.LevelInfo, &buf)
@@ -1717,26 +1722,97 @@ func TestAPI_domainCreate_storeErrorClassified(t *testing.T) {
 
 // --- writeStoreErr unit tests ---
 
+func dummyRequest() *http.Request {
+	return httptest.NewRequest(http.MethodGet, "/test", nil)
+}
+
 func TestWriteStoreErr_allCases(t *testing.T) {
+	var buf bytes.Buffer
+	logger.Init(slog.LevelInfo, &buf)
+	t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
+
 	tests := []struct {
-		name string
-		err  error
-		want int
+		name    string
+		err     error
+		want    int
+		wantMsg string
 	}{
-		{"not found", store.ErrNotFound, http.StatusNotFound},
-		{"fk violation", store.ErrFKViolation, http.StatusBadRequest},
-		{"invalid input", store.ErrInvalidInput, http.StatusBadRequest},
-		{"conflict", store.ErrConflict, http.StatusConflict},
-		{"generic", fmt.Errorf("boom"), http.StatusInternalServerError},
+		{"not found", store.ErrNotFound, http.StatusNotFound, "resource not found"},
+		{"fk violation", store.ErrFKViolation, http.StatusBadRequest, "referenced entity does not exist or is still referenced"},
+		{"invalid input", store.ErrInvalidInput, http.StatusBadRequest, "invalid request"},
+		{"invalid input detail", fmt.Errorf("%w: cycle detected in group parent chain", store.ErrInvalidInput), http.StatusBadRequest, "cycle detected in group parent chain"},
+		{"conflict", store.ErrConflict, http.StatusConflict, "resource already exists"},
+		{"generic", fmt.Errorf("boom"), http.StatusInternalServerError, "internal server error"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			buf.Reset()
 			w := httptest.NewRecorder()
-			writeStoreErr(w, nil, tt.err)
+			writeStoreErr(w, dummyRequest(), tt.err)
 			if w.Code != tt.want {
 				t.Fatalf("writeStoreErr(%v) = %d, want %d", tt.err, w.Code, tt.want)
 			}
+			var body map[string]string
+			if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+				t.Fatalf("decode body: %v", err)
+			}
+			if body["error"] != tt.wantMsg {
+				t.Fatalf("body error = %q, want %q", body["error"], tt.wantMsg)
+			}
+			if !strings.Contains(buf.String(), tt.err.Error()) {
+				t.Fatal("full error not logged")
+			}
 		})
+	}
+}
+
+func TestWriteStoreErr_noSQLLeak(t *testing.T) {
+	var buf bytes.Buffer
+	logger.Init(slog.LevelInfo, &buf)
+	t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
+
+	sqlDetail := "FOREIGN KEY constraint failed (errno 787)"
+	joined := fmt.Errorf("%w\n%s", store.ErrFKViolation, sqlDetail)
+
+	w := httptest.NewRecorder()
+	writeStoreErr(w, dummyRequest(), joined)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d", w.Code)
+	}
+	respBody := w.Body.String()
+	for _, leak := range []string{"FOREIGN KEY", "constraint", "errno", "sqlite"} {
+		if strings.Contains(strings.ToLower(respBody), strings.ToLower(leak)) {
+			t.Fatalf("response body leaked %q: %s", leak, respBody)
+		}
+	}
+	if !strings.Contains(buf.String(), sqlDetail) {
+		t.Fatal("full SQL error not logged server-side")
+	}
+}
+
+func TestWriteInternalErr_generic(t *testing.T) {
+	var buf bytes.Buffer
+	logger.Init(slog.LevelInfo, &buf)
+	t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
+
+	w := httptest.NewRecorder()
+	writeInternalErr(w, dummyRequest(), fmt.Errorf("sql: database is closed"))
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("want 500, got %d", w.Code)
+	}
+	respBytes := w.Body.Bytes()
+	var body map[string]string
+	if err := json.Unmarshal(respBytes, &body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body["error"] != "internal server error" {
+		t.Fatalf("body = %q, want generic", body["error"])
+	}
+	if strings.Contains(string(respBytes), "database is closed") {
+		t.Fatal("raw error leaked to client")
+	}
+	if !strings.Contains(buf.String(), "database is closed") {
+		t.Fatal("full error not logged")
 	}
 }
 

@@ -88,10 +88,21 @@ components:
   schemas:
     ErrorBody:
       type: object
+      description: >-
+        User-facing error envelope. The `error` field contains a short,
+        database-agnostic message suitable for display. Internal details
+        (SQL driver text, stack traces) are never included; operators should
+        consult server logs for diagnostics. Messages are stable per error
+        class (404 → "resource not found", 409 → "resource already exists",
+        500 → "internal server error"). 400 responses may include
+        request-specific validation details (e.g. "cycle detected …").
       required: [error]
       properties:
         error:
           type: string
+          description: Human-readable error message; stable per error class, 400s may vary with validation detail.
+      example:
+        error: resource not found
 
     HealthResponse:
       type: object
