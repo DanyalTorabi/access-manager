@@ -24,10 +24,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Same idea as root Makefile: derive minimum from go.mod (golang/go#75031 covdata).
+      # Use the exact toolchain from go.mod to avoid version mismatch between
+      # the installed Go and the auto-downloaded toolchain (golang/go#75031).
       - name: Set GOTOOLCHAIN from go.mod
         working-directory: ${{ github.workspace }}
-        run: echo "GOTOOLCHAIN=go$(sed -n 's/^go //p' go/go.mod | head -1)+auto" >> "$GITHUB_ENV"
+        run: |
+          TC=$(sed -n 's/^toolchain //p' go/go.mod | head -1)
+          [ -z "$TC" ] && TC="go$(sed -n 's/^go //p' go/go.mod | head -1)"
+          echo "GOTOOLCHAIN=${TC}" >> "$GITHUB_ENV"
 
       - uses: actions/setup-go@v5
         with:
@@ -75,7 +79,10 @@ jobs:
           exit 1
 
       - name: Set GOTOOLCHAIN from go.mod (e2e)
-        run: echo "GOTOOLCHAIN=go$(sed -n 's/^go //p' go/go.mod | head -1)+auto" >> "$GITHUB_ENV"
+        run: |
+          TC=$(sed -n 's/^toolchain //p' go/go.mod | head -1)
+          [ -z "$TC" ] && TC="go$(sed -n 's/^go //p' go/go.mod | head -1)"
+          echo "GOTOOLCHAIN=${TC}" >> "$GITHUB_ENV"
 
       - uses: actions/setup-go@v5
         with:

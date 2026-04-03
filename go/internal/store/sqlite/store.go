@@ -55,6 +55,7 @@ func maskToSQL(m uint64) int64 { return int64(m) }
 
 func maskFromSQL(v int64) uint64 { return uint64(v) }
 
+
 func (s *Store) DomainCreate(ctx context.Context, d *store.Domain) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO domains (id, title) VALUES (?, ?)`, d.ID, d.Title)
 	return wrapConstraintError(err)
@@ -72,21 +73,28 @@ func (s *Store) DomainGet(ctx context.Context, id string) (*store.Domain, error)
 	return &out, nil
 }
 
-func (s *Store) DomainList(ctx context.Context) ([]store.Domain, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id, title FROM domains ORDER BY title`)
+func (s *Store) DomainList(ctx context.Context, opts store.ListOpts) ([]store.Domain, int64, error) {
+	opts = store.SanitizeListOpts(opts)
+	var total int64
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM domains`).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, title FROM domains ORDER BY title LIMIT ? OFFSET ?`,
+		opts.Limit, opts.Offset)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer func() { _ = rows.Close() }()
 	var list []store.Domain
 	for rows.Next() {
 		var d store.Domain
 		if err := rows.Scan(&d.ID, &d.Title); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		list = append(list, d)
 	}
-	return list, rows.Err()
+	return list, total, rows.Err()
 }
 
 func (s *Store) DomainDelete(ctx context.Context, id string) error {
@@ -135,21 +143,28 @@ func (s *Store) UserGet(ctx context.Context, domainID, id string) (*store.User, 
 	return &out, nil
 }
 
-func (s *Store) UserList(ctx context.Context, domainID string) ([]store.User, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id, domain_id, title FROM users WHERE domain_id = ? ORDER BY title`, domainID)
+func (s *Store) UserList(ctx context.Context, domainID string, opts store.ListOpts) ([]store.User, int64, error) {
+	opts = store.SanitizeListOpts(opts)
+	var total int64
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users WHERE domain_id = ?`, domainID).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, domain_id, title FROM users WHERE domain_id = ? ORDER BY title LIMIT ? OFFSET ?`,
+		domainID, opts.Limit, opts.Offset)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer func() { _ = rows.Close() }()
 	var list []store.User
 	for rows.Next() {
 		var u store.User
 		if err := rows.Scan(&u.ID, &u.DomainID, &u.Title); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		list = append(list, u)
 	}
-	return list, rows.Err()
+	return list, total, rows.Err()
 }
 
 func (s *Store) UserDelete(ctx context.Context, domainID, id string) error {
@@ -208,10 +223,17 @@ func (s *Store) GroupGet(ctx context.Context, domainID, id string) (*store.Group
 	return &out, nil
 }
 
-func (s *Store) GroupList(ctx context.Context, domainID string) ([]store.Group, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id, domain_id, title, parent_group_id FROM groups WHERE domain_id = ? ORDER BY title`, domainID)
+func (s *Store) GroupList(ctx context.Context, domainID string, opts store.ListOpts) ([]store.Group, int64, error) {
+	opts = store.SanitizeListOpts(opts)
+	var total int64
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM groups WHERE domain_id = ?`, domainID).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, domain_id, title, parent_group_id FROM groups WHERE domain_id = ? ORDER BY title LIMIT ? OFFSET ?`,
+		domainID, opts.Limit, opts.Offset)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer func() { _ = rows.Close() }()
 	var list []store.Group
@@ -219,14 +241,14 @@ func (s *Store) GroupList(ctx context.Context, domainID string) ([]store.Group, 
 		var g store.Group
 		var parent sql.NullString
 		if err := rows.Scan(&g.ID, &g.DomainID, &g.Title, &parent); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		if parent.Valid {
 			g.ParentGroupID = &parent.String
 		}
 		list = append(list, g)
 	}
-	return list, rows.Err()
+	return list, total, rows.Err()
 }
 
 func groupGetTx(ctx context.Context, tx *sql.Tx, domainID, id string) (*store.Group, error) {
@@ -357,21 +379,28 @@ func (s *Store) ResourceGet(ctx context.Context, domainID, id string) (*store.Re
 	return &out, nil
 }
 
-func (s *Store) ResourceList(ctx context.Context, domainID string) ([]store.Resource, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id, domain_id, title FROM resources WHERE domain_id = ? ORDER BY title`, domainID)
+func (s *Store) ResourceList(ctx context.Context, domainID string, opts store.ListOpts) ([]store.Resource, int64, error) {
+	opts = store.SanitizeListOpts(opts)
+	var total int64
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM resources WHERE domain_id = ?`, domainID).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, domain_id, title FROM resources WHERE domain_id = ? ORDER BY title LIMIT ? OFFSET ?`,
+		domainID, opts.Limit, opts.Offset)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer func() { _ = rows.Close() }()
 	var list []store.Resource
 	for rows.Next() {
 		var r store.Resource
 		if err := rows.Scan(&r.ID, &r.DomainID, &r.Title); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		list = append(list, r)
 	}
-	return list, rows.Err()
+	return list, total, rows.Err()
 }
 
 func (s *Store) ResourceDelete(ctx context.Context, domainID, id string) error {
@@ -408,10 +437,17 @@ func (s *Store) AccessTypeCreate(ctx context.Context, a *store.AccessType) error
 	return wrapConstraintError(err)
 }
 
-func (s *Store) AccessTypeList(ctx context.Context, domainID string) ([]store.AccessType, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id, domain_id, title, bit FROM access_types WHERE domain_id = ? ORDER BY bit`, domainID)
+func (s *Store) AccessTypeList(ctx context.Context, domainID string, opts store.ListOpts) ([]store.AccessType, int64, error) {
+	opts = store.SanitizeListOpts(opts)
+	var total int64
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM access_types WHERE domain_id = ?`, domainID).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, domain_id, title, bit FROM access_types WHERE domain_id = ? ORDER BY bit LIMIT ? OFFSET ?`,
+		domainID, opts.Limit, opts.Offset)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer func() { _ = rows.Close() }()
 	var list []store.AccessType
@@ -419,12 +455,12 @@ func (s *Store) AccessTypeList(ctx context.Context, domainID string) ([]store.Ac
 		var a store.AccessType
 		var bit int64
 		if err := rows.Scan(&a.ID, &a.DomainID, &a.Title, &bit); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		a.Bit = maskFromSQL(bit)
 		list = append(list, a)
 	}
-	return list, rows.Err()
+	return list, total, rows.Err()
 }
 
 func (s *Store) AccessTypeGet(ctx context.Context, domainID, id string) (*store.AccessType, error) {
@@ -512,10 +548,17 @@ func (s *Store) PermissionGet(ctx context.Context, domainID, id string) (*store.
 	return &out, nil
 }
 
-func (s *Store) PermissionList(ctx context.Context, domainID string) ([]store.Permission, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id, domain_id, title, resource_id, access_mask FROM permissions WHERE domain_id = ? ORDER BY title`, domainID)
+func (s *Store) PermissionList(ctx context.Context, domainID string, opts store.ListOpts) ([]store.Permission, int64, error) {
+	opts = store.SanitizeListOpts(opts)
+	var total int64
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM permissions WHERE domain_id = ?`, domainID).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, domain_id, title, resource_id, access_mask FROM permissions WHERE domain_id = ? ORDER BY title LIMIT ? OFFSET ?`,
+		domainID, opts.Limit, opts.Offset)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer func() { _ = rows.Close() }()
 	var list []store.Permission
@@ -523,12 +566,12 @@ func (s *Store) PermissionList(ctx context.Context, domainID string) ([]store.Pe
 		var p store.Permission
 		var m int64
 		if err := rows.Scan(&p.ID, &p.DomainID, &p.Title, &p.ResourceID, &m); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		p.AccessMask = maskFromSQL(m)
 		list = append(list, p)
 	}
-	return list, rows.Err()
+	return list, total, rows.Err()
 }
 
 func (s *Store) PermissionDelete(ctx context.Context, domainID, id string) error {

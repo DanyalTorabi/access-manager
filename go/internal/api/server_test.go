@@ -222,12 +222,15 @@ func TestAPI_domainCreateAndList(t *testing.T) {
 	if res2.StatusCode != http.StatusOK {
 		t.Fatalf("list status %d", res2.StatusCode)
 	}
-	var list []store.Domain
-	if err := json.NewDecoder(res2.Body).Decode(&list); err != nil {
+	var env listResponse[store.Domain]
+	if err := json.NewDecoder(res2.Body).Decode(&env); err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 1 || list[0].ID != created.ID {
-		t.Fatalf("list: %+v", list)
+	if len(env.Data) != 1 || env.Data[0].ID != created.ID {
+		t.Fatalf("list data: %+v", env.Data)
+	}
+	if env.Meta.Total != 1 {
+		t.Fatalf("meta.total: want 1, got %d", env.Meta.Total)
 	}
 }
 
@@ -462,12 +465,15 @@ func TestAPI_userList_empty(t *testing.T) {
 	if res2.StatusCode != http.StatusOK {
 		t.Fatalf("list status %d", res2.StatusCode)
 	}
-	var list []store.User
-	if err := json.NewDecoder(res2.Body).Decode(&list); err != nil {
+	var env listResponse[store.User]
+	if err := json.NewDecoder(res2.Body).Decode(&env); err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 0 {
-		t.Fatalf("want empty list, got %+v", list)
+	if len(env.Data) != 0 {
+		t.Fatalf("want empty list, got %+v", env.Data)
+	}
+	if env.Meta.Total != 0 {
+		t.Fatalf("meta.total: want 0, got %d", env.Meta.Total)
 	}
 }
 
@@ -513,12 +519,12 @@ func TestAPI_groupCreateListGet_notFound(t *testing.T) {
 		b, _ := io.ReadAll(resEmpty.Body)
 		t.Fatalf("list status %d: %s", resEmpty.StatusCode, b)
 	}
-	var empty []store.Group
-	if err := json.NewDecoder(resEmpty.Body).Decode(&empty); err != nil {
+	var emptyEnv listResponse[store.Group]
+	if err := json.NewDecoder(resEmpty.Body).Decode(&emptyEnv); err != nil {
 		t.Fatal(err)
 	}
-	if len(empty) != 0 {
-		t.Fatalf("want empty groups, got %+v", empty)
+	if len(emptyEnv.Data) != 0 {
+		t.Fatalf("want empty groups, got %+v", emptyEnv.Data)
 	}
 
 	var g store.Group
@@ -538,12 +544,12 @@ func TestAPI_groupCreateListGet_notFound(t *testing.T) {
 		b, _ := io.ReadAll(resList.Body)
 		t.Fatalf("list status %d: %s", resList.StatusCode, b)
 	}
-	var list []store.Group
-	if err := json.NewDecoder(resList.Body).Decode(&list); err != nil {
+	var listEnv listResponse[store.Group]
+	if err := json.NewDecoder(resList.Body).Decode(&listEnv); err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 1 || list[0].ID != g.ID {
-		t.Fatalf("list: %+v", list)
+	if len(listEnv.Data) != 1 || listEnv.Data[0].ID != g.ID {
+		t.Fatalf("list: %+v", listEnv.Data)
 	}
 
 	resGet, err := http.Get(base + "/groups/" + g.ID)
@@ -856,12 +862,12 @@ func TestAPI_resourceListGet_notFound(t *testing.T) {
 	if resEmpty.StatusCode != http.StatusOK {
 		t.Fatalf("list status %d", resEmpty.StatusCode)
 	}
-	var empty []store.Resource
-	if err := json.NewDecoder(resEmpty.Body).Decode(&empty); err != nil {
+	var emptyEnv listResponse[store.Resource]
+	if err := json.NewDecoder(resEmpty.Body).Decode(&emptyEnv); err != nil {
 		t.Fatal(err)
 	}
-	if len(empty) != 0 {
-		t.Fatalf("want empty, got %+v", empty)
+	if len(emptyEnv.Data) != 0 {
+		t.Fatalf("want empty, got %+v", emptyEnv.Data)
 	}
 
 	var r store.Resource
@@ -880,12 +886,12 @@ func TestAPI_resourceListGet_notFound(t *testing.T) {
 	if resList.StatusCode != http.StatusOK {
 		t.Fatalf("list status %d", resList.StatusCode)
 	}
-	var list []store.Resource
-	if err := json.NewDecoder(resList.Body).Decode(&list); err != nil {
+	var listEnv listResponse[store.Resource]
+	if err := json.NewDecoder(resList.Body).Decode(&listEnv); err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 1 || list[0].ID != r.ID {
-		t.Fatalf("list: %+v", list)
+	if len(listEnv.Data) != 1 || listEnv.Data[0].ID != r.ID {
+		t.Fatalf("list: %+v", listEnv.Data)
 	}
 
 	resGet, err := http.Get(base + "/resources/" + r.ID)
@@ -948,12 +954,12 @@ func TestAPI_accessTypeCreateList_invalidBit(t *testing.T) {
 	if resList.StatusCode != http.StatusOK {
 		t.Fatalf("list status %d", resList.StatusCode)
 	}
-	var list []store.AccessType
-	if err := json.NewDecoder(resList.Body).Decode(&list); err != nil {
+	var env listResponse[store.AccessType]
+	if err := json.NewDecoder(resList.Body).Decode(&env); err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 1 || list[0].ID != at.ID {
-		t.Fatalf("list: %+v", list)
+	if len(env.Data) != 1 || env.Data[0].ID != at.ID {
+		t.Fatalf("list: %+v", env.Data)
 	}
 }
 
@@ -990,12 +996,12 @@ func TestAPI_permissionListGet_notFound(t *testing.T) {
 	if resEmpty.StatusCode != http.StatusOK {
 		t.Fatalf("list status %d", resEmpty.StatusCode)
 	}
-	var empty []store.Permission
-	if err := json.NewDecoder(resEmpty.Body).Decode(&empty); err != nil {
+	var emptyEnv listResponse[store.Permission]
+	if err := json.NewDecoder(resEmpty.Body).Decode(&emptyEnv); err != nil {
 		t.Fatal(err)
 	}
-	if len(empty) != 0 {
-		t.Fatalf("want empty, got %+v", empty)
+	if len(emptyEnv.Data) != 0 {
+		t.Fatalf("want empty, got %+v", emptyEnv.Data)
 	}
 
 	var resource store.Resource
@@ -1019,12 +1025,12 @@ func TestAPI_permissionListGet_notFound(t *testing.T) {
 	if resList.StatusCode != http.StatusOK {
 		t.Fatalf("list status %d", resList.StatusCode)
 	}
-	var list []store.Permission
-	if err := json.NewDecoder(resList.Body).Decode(&list); err != nil {
+	var listEnv listResponse[store.Permission]
+	if err := json.NewDecoder(resList.Body).Decode(&listEnv); err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 1 || list[0].ID != perm.ID {
-		t.Fatalf("list: %+v", list)
+	if len(listEnv.Data) != 1 || listEnv.Data[0].ID != perm.ID {
+		t.Fatalf("list: %+v", listEnv.Data)
 	}
 
 	resGet, err := http.Get(base + "/permissions/" + perm.ID)
@@ -1585,12 +1591,15 @@ func TestAPI_domainList_empty(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("status %d", res.StatusCode)
 	}
-	var list []store.Domain
-	if err := json.NewDecoder(res.Body).Decode(&list); err != nil {
+	var env listResponse[store.Domain]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 0 {
-		t.Fatalf("want empty list, got %d items", len(list))
+	if len(env.Data) != 0 {
+		t.Fatalf("want empty list, got %d items", len(env.Data))
+	}
+	if env.Meta.Total != 0 {
+		t.Fatalf("meta.total: want 0, got %d", env.Meta.Total)
 	}
 }
 
@@ -1605,12 +1614,12 @@ func TestAPI_groupList_empty(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("status %d", res.StatusCode)
 	}
-	var list []store.Group
-	if err := json.NewDecoder(res.Body).Decode(&list); err != nil {
+	var env listResponse[store.Group]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 0 {
-		t.Fatalf("want empty list, got %d items", len(list))
+	if len(env.Data) != 0 {
+		t.Fatalf("want empty list, got %d items", len(env.Data))
 	}
 }
 
@@ -1625,12 +1634,12 @@ func TestAPI_resourceList_empty(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("status %d", res.StatusCode)
 	}
-	var list []store.Resource
-	if err := json.NewDecoder(res.Body).Decode(&list); err != nil {
+	var env listResponse[store.Resource]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 0 {
-		t.Fatalf("want empty list, got %d items", len(list))
+	if len(env.Data) != 0 {
+		t.Fatalf("want empty list, got %d items", len(env.Data))
 	}
 }
 
@@ -1645,12 +1654,12 @@ func TestAPI_permissionList_empty(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("status %d", res.StatusCode)
 	}
-	var list []store.Permission
-	if err := json.NewDecoder(res.Body).Decode(&list); err != nil {
+	var env listResponse[store.Permission]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 0 {
-		t.Fatalf("want empty list, got %d items", len(list))
+	if len(env.Data) != 0 {
+		t.Fatalf("want empty list, got %d items", len(env.Data))
 	}
 }
 
@@ -1665,13 +1674,23 @@ func TestAPI_accessTypeList_empty(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("status %d", res.StatusCode)
 	}
-	var list []store.AccessType
-	if err := json.NewDecoder(res.Body).Decode(&list); err != nil {
+	var env listResponse[store.AccessType]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 0 {
-		t.Fatalf("want empty list, got %d items", len(list))
+	if len(env.Data) != 0 {
+		t.Fatalf("want empty list, got %d items", len(env.Data))
 	}
+}
+
+// listResponse is a generic envelope for paginated list responses in tests.
+type listResponse[T any] struct {
+	Data []T `json:"data"`
+	Meta struct {
+		Total  int64 `json:"total"`
+		Offset int   `json:"offset"`
+		Limit  int   `json:"limit"`
+	} `json:"meta"`
 }
 
 // mustCreateDomain is a test helper that creates a domain and returns its ID.
@@ -2186,5 +2205,577 @@ func TestAPI_patchEmptyBody(t *testing.T) {
 	_ = res.Body.Close()
 	if res.StatusCode != http.StatusBadRequest {
 		t.Fatalf("empty patch want 400, got %d", res.StatusCode)
+	}
+}
+
+// --- pagination tests ---
+
+func TestAPI_domainList_pagination(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	for i := 0; i < 5; i++ {
+		title := fmt.Sprintf("dom-%c", 'a'+i)
+		mustPostJSON201(t, ts.URL+"/api/v1/domains", fmt.Sprintf(`{"title":%q}`, title))
+	}
+
+	res, err := http.Get(ts.URL + "/api/v1/domains?offset=1&limit=2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var env listResponse[store.Domain]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Meta.Total != 5 {
+		t.Fatalf("meta.total: want 5, got %d", env.Meta.Total)
+	}
+	if env.Meta.Offset != 1 || env.Meta.Limit != 2 {
+		t.Fatalf("meta: offset=%d limit=%d", env.Meta.Offset, env.Meta.Limit)
+	}
+	if len(env.Data) != 2 {
+		t.Fatalf("data len: want 2, got %d", len(env.Data))
+	}
+}
+
+func TestAPI_domainList_defaultPagination(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"one"}`)
+
+	res, err := http.Get(ts.URL + "/api/v1/domains")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("status %d", res.StatusCode)
+	}
+	var env listResponse[store.Domain]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Meta.Offset != 0 || env.Meta.Limit != 20 {
+		t.Fatalf("defaults: offset=%d limit=%d", env.Meta.Offset, env.Meta.Limit)
+	}
+	if env.Meta.Total != 1 || len(env.Data) != 1 {
+		t.Fatalf("total=%d len=%d", env.Meta.Total, len(env.Data))
+	}
+}
+
+func TestAPI_pagination_invalidOffset(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	tests := []struct {
+		name string
+		qs   string
+	}{
+		{"non-integer offset", "?offset=abc"},
+		{"negative offset", "?offset=-1"},
+		{"non-integer limit", "?limit=xyz"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := http.Get(ts.URL + "/api/v1/domains" + tt.qs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _ = io.ReadAll(res.Body)
+			_ = res.Body.Close()
+			if res.StatusCode != http.StatusBadRequest {
+				t.Fatalf("want 400, got %d", res.StatusCode)
+			}
+		})
+	}
+}
+
+func TestAPI_pagination_limitClamping(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"d"}`)
+
+	res, err := http.Get(ts.URL + "/api/v1/domains?limit=999")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("status %d", res.StatusCode)
+	}
+	var env listResponse[store.Domain]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Meta.Limit != 100 {
+		t.Fatalf("limit should be clamped to 100, got %d", env.Meta.Limit)
+	}
+}
+
+func TestAPI_pagination_offsetPastEnd(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"d"}`)
+
+	res, err := http.Get(ts.URL + "/api/v1/domains?offset=100")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("status %d", res.StatusCode)
+	}
+	var env listResponse[store.Domain]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Meta.Total != 1 {
+		t.Fatalf("total: want 1, got %d", env.Meta.Total)
+	}
+	if len(env.Data) != 0 {
+		t.Fatalf("data: want empty, got %d", len(env.Data))
+	}
+}
+
+func TestAPI_patchEmptyBody_allEntities(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	dom := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + dom
+
+	rBody := mustPostJSON201(t, base+"/resources", `{"title":"r"}`)
+	var resrc store.Resource
+	if err := json.Unmarshal(rBody, &resrc); err != nil {
+		t.Fatal(err)
+	}
+
+	atBody := mustPostJSON201(t, base+"/access-types", `{"title":"read","bit":"0x1"}`)
+	var at store.AccessType
+	if err := json.Unmarshal(atBody, &at); err != nil {
+		t.Fatal(err)
+	}
+
+	pBody := mustPostJSON201(t, base+"/permissions", `{"title":"p","resource_id":"`+resrc.ID+`","access_mask":"0x1"}`)
+	var perm store.Permission
+	if err := json.Unmarshal(pBody, &perm); err != nil {
+		t.Fatal(err)
+	}
+
+	gBody := mustPostJSON201(t, base+"/groups", `{"title":"g"}`)
+	var grp store.Group
+	if err := json.Unmarshal(gBody, &grp); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name string
+		path string
+	}{
+		{"domain", ts.URL + "/api/v1/domains/" + dom},
+		{"resource", base + "/resources/" + resrc.ID},
+		{"accessType", base + "/access-types/" + at.ID},
+		{"permission", base + "/permissions/" + perm.ID},
+		{"group", base + "/groups/" + grp.ID},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, _ := http.NewRequest(http.MethodPatch, tt.path, strings.NewReader(`{}`))
+			req.Header.Set("Content-Type", "application/json")
+			res, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _ = io.ReadAll(res.Body)
+			_ = res.Body.Close()
+			if res.StatusCode != http.StatusBadRequest {
+				t.Fatalf("want 400, got %d", res.StatusCode)
+			}
+		})
+	}
+}
+
+func TestAPI_accessTypePatch_invalidBit(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	dom := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + dom
+	atBody := mustPostJSON201(t, base+"/access-types", `{"title":"read","bit":"0x1"}`)
+	var at store.AccessType
+	if err := json.Unmarshal(atBody, &at); err != nil {
+		t.Fatal(err)
+	}
+
+	req, _ := http.NewRequest(http.MethodPatch, base+"/access-types/"+at.ID,
+		strings.NewReader(`{"bit":"notanumber"}`))
+	req.Header.Set("Content-Type", "application/json")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("want 400 for invalid bit, got %d", res.StatusCode)
+	}
+}
+
+func TestAPI_accessTypePatch_bitOnly(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	dom := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + dom
+	atBody := mustPostJSON201(t, base+"/access-types", `{"title":"read","bit":"0x1"}`)
+	var at store.AccessType
+	if err := json.Unmarshal(atBody, &at); err != nil {
+		t.Fatal(err)
+	}
+
+	req, _ := http.NewRequest(http.MethodPatch, base+"/access-types/"+at.ID,
+		strings.NewReader(`{"bit":"0x4"}`))
+	req.Header.Set("Content-Type", "application/json")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("want 200, got %d: %s", res.StatusCode, b)
+	}
+	var got store.AccessType
+	if err := json.Unmarshal(b, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Bit != 4 {
+		t.Fatalf("bit: want 4, got %d", got.Bit)
+	}
+}
+
+func TestAPI_permissionPatch_invalidMask(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	dom := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + dom
+	rBody := mustPostJSON201(t, base+"/resources", `{"title":"r"}`)
+	var resrc store.Resource
+	if err := json.Unmarshal(rBody, &resrc); err != nil {
+		t.Fatal(err)
+	}
+	pBody := mustPostJSON201(t, base+"/permissions", `{"title":"p","resource_id":"`+resrc.ID+`","access_mask":"0x1"}`)
+	var perm store.Permission
+	if err := json.Unmarshal(pBody, &perm); err != nil {
+		t.Fatal(err)
+	}
+
+	req, _ := http.NewRequest(http.MethodPatch, base+"/permissions/"+perm.ID,
+		strings.NewReader(`{"access_mask":"bad"}`))
+	req.Header.Set("Content-Type", "application/json")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d", res.StatusCode)
+	}
+}
+
+func TestAPI_permissionPatch_maskAndResource(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	dom := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + dom
+	r1Body := mustPostJSON201(t, base+"/resources", `{"title":"r1"}`)
+	var r1 store.Resource
+	if err := json.Unmarshal(r1Body, &r1); err != nil {
+		t.Fatal(err)
+	}
+	r2Body := mustPostJSON201(t, base+"/resources", `{"title":"r2"}`)
+	var r2 store.Resource
+	if err := json.Unmarshal(r2Body, &r2); err != nil {
+		t.Fatal(err)
+	}
+	pBody := mustPostJSON201(t, base+"/permissions", `{"title":"p","resource_id":"`+r1.ID+`","access_mask":"0x1"}`)
+	var perm store.Permission
+	if err := json.Unmarshal(pBody, &perm); err != nil {
+		t.Fatal(err)
+	}
+
+	req, _ := http.NewRequest(http.MethodPatch, base+"/permissions/"+perm.ID,
+		strings.NewReader(`{"access_mask":"0xFF","resource_id":"`+r2.ID+`"}`))
+	req.Header.Set("Content-Type", "application/json")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("want 200, got %d: %s", res.StatusCode, b)
+	}
+	var got store.Permission
+	if err := json.Unmarshal(b, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.AccessMask != 0xFF || got.ResourceID != r2.ID {
+		t.Fatalf("got mask=%#x resource=%s", got.AccessMask, got.ResourceID)
+	}
+}
+
+func TestAPI_readJSON_tooLargeBody(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	bigBody := `{"title":"` + strings.Repeat("x", 2*1024*1024) + `"}`
+	res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(bigBody))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusRequestEntityTooLarge {
+		t.Fatalf("want 413, got %d", res.StatusCode)
+	}
+}
+
+func TestAPI_groupPatch_parentGroupIDInvalid(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	dom := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + dom
+	gBody := mustPostJSON201(t, base+"/groups", `{"title":"g"}`)
+	var grp store.Group
+	if err := json.Unmarshal(gBody, &grp); err != nil {
+		t.Fatal(err)
+	}
+
+	req, _ := http.NewRequest(http.MethodPatch, base+"/groups/"+grp.ID,
+		strings.NewReader(`{"parent_group_id":123}`))
+	req.Header.Set("Content-Type", "application/json")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("want 400 for numeric parent_group_id, got %d", res.StatusCode)
+	}
+}
+
+func TestAPI_groupPatch_clearParent(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	dom := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + dom
+	g1Body := mustPostJSON201(t, base+"/groups", `{"title":"g1"}`)
+	g2Body := mustPostJSON201(t, base+"/groups", `{"title":"g2"}`)
+	var g1, g2 store.Group
+	if err := json.Unmarshal(g1Body, &g1); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(g2Body, &g2); err != nil {
+		t.Fatal(err)
+	}
+
+	reqSet, _ := http.NewRequest(http.MethodPatch, base+"/groups/"+g2.ID,
+		strings.NewReader(`{"parent_group_id":"`+g1.ID+`"}`))
+	reqSet.Header.Set("Content-Type", "application/json")
+	res, err := http.DefaultClient.Do(reqSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("set parent: want 200, got %d", res.StatusCode)
+	}
+
+	reqClear, _ := http.NewRequest(http.MethodPatch, base+"/groups/"+g2.ID,
+		strings.NewReader(`{"parent_group_id":null}`))
+	reqClear.Header.Set("Content-Type", "application/json")
+	res, err = http.DefaultClient.Do(reqClear)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("clear parent: want 200, got %d: %s", res.StatusCode, b)
+	}
+	var got store.Group
+	if err := json.Unmarshal(b, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.ParentGroupID != nil {
+		t.Fatalf("parent should be nil, got %v", got.ParentGroupID)
+	}
+}
+
+func TestAPI_domainPatch_malformedJSON(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	dom := mustCreateDomain(t, ts)
+	req, _ := http.NewRequest(http.MethodPatch, ts.URL+"/api/v1/domains/"+dom,
+		strings.NewReader(`{broken`))
+	req.Header.Set("Content-Type", "application/json")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d", res.StatusCode)
+	}
+}
+
+func TestAPI_resourcePatch_emptyAndNotFound(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	dom := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + dom
+	rBody := mustPostJSON201(t, base+"/resources", `{"title":"r"}`)
+	var resrc store.Resource
+	if err := json.Unmarshal(rBody, &resrc); err != nil {
+		t.Fatal(err)
+	}
+
+	reqEmpty, _ := http.NewRequest(http.MethodPatch, base+"/resources/"+resrc.ID,
+		strings.NewReader(`{}`))
+	reqEmpty.Header.Set("Content-Type", "application/json")
+	res, err := http.DefaultClient.Do(reqEmpty)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("empty patch: want 400, got %d", res.StatusCode)
+	}
+
+	reqNF, _ := http.NewRequest(http.MethodPatch, base+"/resources/"+uuid.NewString(),
+		strings.NewReader(`{"title":"x"}`))
+	reqNF.Header.Set("Content-Type", "application/json")
+	res, err = http.DefaultClient.Do(reqNF)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusNotFound {
+		t.Fatalf("not found patch: want 404, got %d", res.StatusCode)
+	}
+}
+
+func TestAPI_pagination_invalidOffset_otherEndpoints(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	dom := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + dom
+
+	endpoints := []struct {
+		name string
+		path string
+	}{
+		{"users", base + "/users"},
+		{"groups", base + "/groups"},
+		{"resources", base + "/resources"},
+		{"accessTypes", base + "/access-types"},
+		{"permissions", base + "/permissions"},
+	}
+	for _, ep := range endpoints {
+		t.Run(ep.name, func(t *testing.T) {
+			res, err := http.Get(ep.path + "?offset=abc")
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _ = io.ReadAll(res.Body)
+			_ = res.Body.Close()
+			if res.StatusCode != http.StatusBadRequest {
+				t.Fatalf("want 400, got %d", res.StatusCode)
+			}
+		})
+	}
+}
+
+func TestAPI_scopedList_pagination(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	dom := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + dom
+
+	for i := 0; i < 5; i++ {
+		title := fmt.Sprintf("u-%c", 'a'+i)
+		mustPostJSON201(t, base+"/users", fmt.Sprintf(`{"title":%q}`, title))
+	}
+	for i := 0; i < 3; i++ {
+		title := fmt.Sprintf("g-%c", 'a'+i)
+		mustPostJSON201(t, base+"/groups", fmt.Sprintf(`{"title":%q}`, title))
+	}
+	for i := 0; i < 4; i++ {
+		title := fmt.Sprintf("r-%c", 'a'+i)
+		mustPostJSON201(t, base+"/resources", fmt.Sprintf(`{"title":%q}`, title))
+	}
+
+	tests := []struct {
+		name      string
+		path      string
+		wantTotal int64
+	}{
+		{"users", base + "/users?offset=1&limit=2", 5},
+		{"groups", base + "/groups?offset=0&limit=2", 3},
+		{"resources", base + "/resources?offset=2&limit=2", 4},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := http.Get(tt.path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = res.Body.Close() }()
+			if res.StatusCode != http.StatusOK {
+				b, _ := io.ReadAll(res.Body)
+				t.Fatalf("status %d: %s", res.StatusCode, b)
+			}
+			var env struct {
+				Meta struct {
+					Total  int64 `json:"total"`
+					Offset int   `json:"offset"`
+					Limit  int   `json:"limit"`
+				} `json:"meta"`
+			}
+			if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+				t.Fatal(err)
+			}
+			if env.Meta.Total != tt.wantTotal {
+				t.Fatalf("total: want %d, got %d", tt.wantTotal, env.Meta.Total)
+			}
+			if env.Meta.Limit != 2 {
+				t.Fatalf("limit: want 2, got %d", env.Meta.Limit)
+			}
+		})
+	}
+}
+
+func TestAPI_parsePagination(t *testing.T) {
+	tests := []struct {
+		name       string
+		qs         string
+		wantOffset int
+		wantLimit  int
+		wantErr    bool
+	}{
+		{"defaults", "", 0, 20, false},
+		{"explicit", "offset=5&limit=10", 5, 10, false},
+		{"limit clamped low", "limit=0", 0, 1, false},
+		{"limit clamped high", "limit=200", 0, 100, false},
+		{"bad offset", "offset=abc", 0, 0, true},
+		{"negative offset", "offset=-1", 0, 0, true},
+		{"bad limit", "limit=xyz", 0, 0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/test?"+tt.qs, nil)
+			opts, err := parsePagination(req)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("want error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if opts.Offset != tt.wantOffset || opts.Limit != tt.wantLimit {
+				t.Fatalf("offset=%d limit=%d, want %d/%d", opts.Offset, opts.Limit, tt.wantOffset, tt.wantLimit)
+			}
+		})
 	}
 }
