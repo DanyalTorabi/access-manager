@@ -1687,9 +1687,11 @@ func TestAPI_accessTypeList_empty(t *testing.T) {
 type listResponse[T any] struct {
 	Data []T `json:"data"`
 	Meta struct {
-		Total  int64 `json:"total"`
-		Offset int   `json:"offset"`
-		Limit  int   `json:"limit"`
+		Total  int64  `json:"total"`
+		Offset int    `json:"offset"`
+		Limit  int    `json:"limit"`
+		Sort   string `json:"sort"`
+		Order  string `json:"order"`
 	} `json:"meta"`
 }
 
@@ -1697,6 +1699,16 @@ type listResponse[T any] struct {
 func mustCreateDomain(t *testing.T, ts *httptest.Server) string {
 	t.Helper()
 	b := mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"test-domain"}`)
+	var out struct{ ID string }
+	if err := json.Unmarshal(b, &out); err != nil {
+		t.Fatal(err)
+	}
+	return out.ID
+}
+
+func mustCreateResource(t *testing.T, ts *httptest.Server, domainID, title string) string {
+	t.Helper()
+	b := mustPostJSON201(t, ts.URL+"/api/v1/domains/"+domainID+"/resources", fmt.Sprintf(`{"title":%q}`, title))
 	var out struct{ ID string }
 	if err := json.Unmarshal(b, &out); err != nil {
 		t.Fatal(err)
@@ -3165,5 +3177,178 @@ func TestAPI_domainList_searchType(t *testing.T) {
 	defer func() { _ = res3.Body.Close() }()
 	if res3.StatusCode != http.StatusBadRequest {
 		t.Fatalf("invalid search_type: want 400, got %d", res3.StatusCode)
+	}
+}
+
+func TestAPI_parseSortOrder(t *testing.T) {
+	tests := []struct {
+		name      string
+		qs        string
+		allowed   []string
+		wantSort  string
+		wantOrder store.SortOrder
+		wantErr   bool
+	}{
+		{"defaults", "", store.DomainSortFields, "title", store.OrderAsc, false},
+		{"explicit asc", "sort=title&order=asc", store.DomainSortFields, "title", store.OrderAsc, false},
+		{"explicit desc", "sort=title&order=desc", store.DomainSortFields, "title", store.OrderDesc, false},
+		{"order only", "order=desc", store.DomainSortFields, "title", store.OrderDesc, false},
+		{"sort only", "sort=title", store.DomainSortFields, "title", store.OrderAsc, false},
+		{"permission resource_id", "sort=resource_id", store.PermissionSortFields, "resource_id", store.OrderAsc, false},
+		{"invalid sort", "sort=unknown", store.DomainSortFields, "", "", true},
+		{"invalid order", "order=random", store.DomainSortFields, "", "", true},
+		{"sort trimmed", "sort=%20title%20", store.DomainSortFields, "title", store.OrderAsc, false},
+		{"order trimmed", "order=%20desc%20", store.DomainSortFields, "title", store.OrderDesc, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/test?"+tt.qs, nil)
+			sort, order, err := parseSortOrder(req, tt.allowed)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("want error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if sort != tt.wantSort {
+				t.Fatalf("sort=%q, want %q", sort, tt.wantSort)
+			}
+			if order != tt.wantOrder {
+				t.Fatalf("order=%q, want %q", order, tt.wantOrder)
+			}
+		})
+	}
+}
+
+func TestAPI_domainList_sortMeta(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"one"}`)
+
+	res, err := http.Get(ts.URL + "/api/v1/domains")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("status %d", res.StatusCode)
+	}
+	var env listResponse[store.Domain]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Meta.Sort != "title" {
+		t.Fatalf("meta.sort: want title, got %q", env.Meta.Sort)
+	}
+	if env.Meta.Order != "asc" {
+		t.Fatalf("meta.order: want asc, got %q", env.Meta.Order)
+	}
+}
+
+func TestAPI_domainList_sortDesc(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	for _, title := range []string{"Alpha", "Beta", "Charlie"} {
+		mustPostJSON201(t, ts.URL+"/api/v1/domains", fmt.Sprintf(`{"title":%q}`, title))
+	}
+
+	res, err := http.Get(ts.URL + "/api/v1/domains?sort=title&order=desc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var env listResponse[store.Domain]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if len(env.Data) != 3 {
+		t.Fatalf("want 3 items, got %d", len(env.Data))
+	}
+	if env.Data[0].Title != "Charlie" || env.Data[2].Title != "Alpha" {
+		t.Fatalf("order: got %q, %q, %q", env.Data[0].Title, env.Data[1].Title, env.Data[2].Title)
+	}
+	if env.Meta.Sort != "title" || env.Meta.Order != "desc" {
+		t.Fatalf("meta: sort=%q order=%q", env.Meta.Sort, env.Meta.Order)
+	}
+}
+
+func TestAPI_domainList_invalidSort(t *testing.T) {
+	ts, _ := newTestAPI(t)
+
+	res, err := http.Get(ts.URL + "/api/v1/domains?sort=unknown_field")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d", res.StatusCode)
+	}
+}
+
+func TestAPI_domainList_invalidOrder(t *testing.T) {
+	ts, _ := newTestAPI(t)
+
+	res, err := http.Get(ts.URL + "/api/v1/domains?order=random")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d", res.StatusCode)
+	}
+}
+
+func TestAPI_permissionList_sortByResourceID(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domainID := mustCreateDomain(t, ts)
+
+	resA := mustCreateResource(t, ts, domainID, "Resource A")
+	resB := mustCreateResource(t, ts, domainID, "Resource B")
+
+	mustPostJSON201(t, ts.URL+"/api/v1/domains/"+domainID+"/permissions",
+		fmt.Sprintf(`{"title":"perm-b","resource_id":%q,"access_mask":"1"}`, resB))
+	mustPostJSON201(t, ts.URL+"/api/v1/domains/"+domainID+"/permissions",
+		fmt.Sprintf(`{"title":"perm-a","resource_id":%q,"access_mask":"2"}`, resA))
+
+	res, err := http.Get(ts.URL + "/api/v1/domains/" + domainID + "/permissions?sort=resource_id&order=asc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var env listResponse[store.Permission]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if len(env.Data) != 2 {
+		t.Fatalf("want 2, got %d", len(env.Data))
+	}
+	if env.Data[0].ResourceID > env.Data[1].ResourceID {
+		t.Fatalf("expected ascending resource_id order: %s > %s", env.Data[0].ResourceID, env.Data[1].ResourceID)
+	}
+	if env.Meta.Sort != "resource_id" || env.Meta.Order != "asc" {
+		t.Fatalf("meta: sort=%q order=%q", env.Meta.Sort, env.Meta.Order)
+	}
+}
+
+func TestAPI_permissionList_invalidSort(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domainID := mustCreateDomain(t, ts)
+
+	res, err := http.Get(ts.URL + "/api/v1/domains/" + domainID + "/permissions?sort=access_mask")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d", res.StatusCode)
 	}
 }

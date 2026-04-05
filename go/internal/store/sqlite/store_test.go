@@ -2125,11 +2125,12 @@ func TestSanitizeListOpts(t *testing.T) {
 		in   store.ListOpts
 		want store.ListOpts
 	}{
-		{"zero limit defaults", store.ListOpts{Offset: 0, Limit: 0}, store.ListOpts{Offset: 0, Limit: store.DefaultLimit}},
-		{"negative limit defaults", store.ListOpts{Offset: 0, Limit: -5}, store.ListOpts{Offset: 0, Limit: store.DefaultLimit}},
-		{"over max capped", store.ListOpts{Offset: 0, Limit: 500}, store.ListOpts{Offset: 0, Limit: store.MaxLimit}},
-		{"negative offset zeroed", store.ListOpts{Offset: -3, Limit: 10}, store.ListOpts{Offset: 0, Limit: 10}},
-		{"valid unchanged", store.ListOpts{Offset: 5, Limit: 25}, store.ListOpts{Offset: 5, Limit: 25}},
+		{"zero limit defaults", store.ListOpts{Offset: 0, Limit: 0}, store.ListOpts{Offset: 0, Limit: store.DefaultLimit, Order: store.OrderAsc}},
+		{"negative limit defaults", store.ListOpts{Offset: 0, Limit: -5}, store.ListOpts{Offset: 0, Limit: store.DefaultLimit, Order: store.OrderAsc}},
+		{"over max capped", store.ListOpts{Offset: 0, Limit: 500}, store.ListOpts{Offset: 0, Limit: store.MaxLimit, Order: store.OrderAsc}},
+		{"negative offset zeroed", store.ListOpts{Offset: -3, Limit: 10}, store.ListOpts{Offset: 0, Limit: 10, Order: store.OrderAsc}},
+		{"valid unchanged", store.ListOpts{Offset: 5, Limit: 25}, store.ListOpts{Offset: 5, Limit: 25, Order: store.OrderAsc}},
+		{"order preserved when set", store.ListOpts{Offset: 0, Limit: 10, Order: store.OrderDesc}, store.ListOpts{Offset: 0, Limit: 10, Order: store.OrderDesc}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

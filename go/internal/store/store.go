@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 )
 
 var (
@@ -65,12 +67,47 @@ const (
 	SearchEndsWith   SearchType = "ends_with"
 )
 
-// ListOpts controls pagination and optional title search for list queries.
+// SortOrder controls ascending vs descending sort direction.
+type SortOrder string
+
+const (
+	OrderAsc  SortOrder = "asc"
+	OrderDesc SortOrder = "desc"
+)
+
+// Per-entity allowed sort fields. The first element is the default.
+var (
+	DomainSortFields     = []string{"title"}
+	UserSortFields       = []string{"title"}
+	GroupSortFields      = []string{"title"}
+	ResourceSortFields   = []string{"title"}
+	AccessTypeSortFields = []string{"title"}
+	PermissionSortFields = []string{"title", "resource_id"}
+)
+
+// ValidateSort returns a validated sort field. An empty input defaults to
+// allowed[0]. An unrecognised field produces a descriptive error listing
+// the accepted values.
+func ValidateSort(sort string, allowed []string) (string, error) {
+	if sort == "" {
+		return allowed[0], nil
+	}
+	for _, f := range allowed {
+		if sort == f {
+			return sort, nil
+		}
+	}
+	return "", fmt.Errorf("sort must be one of: %s", strings.Join(allowed, ", "))
+}
+
+// ListOpts controls pagination, optional title search, and sorting for list queries.
 type ListOpts struct {
 	Offset     int
 	Limit      int
 	Search     string     // case-insensitive match on title; empty = no filter
 	SearchType SearchType // defaults to SearchContains when empty
+	Sort       string     // validated per entity before reaching store
+	Order      SortOrder  // defaults to OrderAsc
 }
 
 // GroupListOpts extends ListOpts with group-specific filters.
@@ -86,7 +123,7 @@ type PermissionListOpts struct {
 }
 
 // SanitizeListOpts defaults Limit to DefaultLimit when <= 0, caps it at
-// MaxLimit, and floors Offset at 0.
+// MaxLimit, floors Offset at 0, and defaults Order to OrderAsc.
 func SanitizeListOpts(opts ListOpts) ListOpts {
 	if opts.Limit <= 0 {
 		opts.Limit = DefaultLimit
@@ -96,6 +133,9 @@ func SanitizeListOpts(opts ListOpts) ListOpts {
 	}
 	if opts.Offset < 0 {
 		opts.Offset = 0
+	}
+	if opts.Order == "" {
+		opts.Order = OrderAsc
 	}
 	return opts
 }

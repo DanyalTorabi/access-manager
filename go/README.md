@@ -89,6 +89,28 @@ REST routes live under **`/api/v1`** with domain-scoped segments, for example:
 - Domain-scoped CRUD includes `PATCH` / `DELETE` for users, groups, resources, permissions, and access types (plus `GET` for a single access type). Deletes fail with **400** when SQLite foreign keys block removal.
 - `GET /api/v1/domains/{domainID}/authz/check?user_id=&resource_id=&access_bit=`
 
+### Pagination, filtering, and sorting
+
+All list endpoints support `offset`, `limit`, `search`, and `search_type` query parameters for pagination and title filtering. They also support **`sort`** and **`order`** for client-controlled ordering:
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| `sort` | `title` | Field to sort by. Allowed values are entity-specific (see below). |
+| `order` | `asc` | `asc` or `desc`. |
+
+**Allowed sort fields per entity:**
+
+| Endpoint | Sortable fields |
+|----------|----------------|
+| /domains | `title` |
+| /users | `title` |
+| /groups | `title` |
+| /resources | `title` |
+| /access-types | `title` |
+| /permissions | `title`, `resource_id` |
+
+Invalid `sort` or `order` values return **400**. The applied sort and order are echoed in the response `meta` alongside `total`, `offset`, and `limit`.
+
 ### Authentication
 
 When **`API_BEARER_TOKEN`** (or YAML **`api_bearer_token`**) is non-empty, clients must send:

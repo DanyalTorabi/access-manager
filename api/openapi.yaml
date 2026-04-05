@@ -120,11 +120,27 @@ components:
         enum: [contains, starts_with, ends_with]
         default: contains
       description: How to match the search term against title. Only applies when `search` is non-empty.
+    sortParam:
+      name: sort
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Field to sort by (entity-specific; see endpoint description for allowed values). Defaults to `title`.
+    orderParam:
+      name: order
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: asc
+      description: Sort direction.
 
   schemas:
     ListMeta:
       type: object
-      required: [total, offset, limit]
+      required: [total, offset, limit, sort, order]
       properties:
         total:
           type: integer
@@ -134,6 +150,13 @@ components:
           type: integer
         limit:
           type: integer
+        sort:
+          type: string
+          description: The sort field applied (entity-specific).
+        order:
+          type: string
+          enum: [asc, desc]
+          description: The sort direction applied.
 
     ErrorBody:
       type: object
@@ -393,11 +416,14 @@ paths:
     get:
       tags: [Domains]
       summary: List domains
+      description: "Allowed sort fields: `title` (default)."
       parameters:
         - $ref: "#/components/parameters/offsetParam"
         - $ref: "#/components/parameters/limitParam"
         - $ref: "#/components/parameters/searchParam"
         - $ref: "#/components/parameters/searchTypeParam"
+        - $ref: "#/components/parameters/sortParam"
+        - $ref: "#/components/parameters/orderParam"
       responses:
         "200":
           description: OK
@@ -534,11 +560,14 @@ paths:
     get:
       tags: [Users]
       summary: List users in domain
+      description: "Allowed sort fields: `title` (default)."
       parameters:
         - $ref: "#/components/parameters/offsetParam"
         - $ref: "#/components/parameters/limitParam"
         - $ref: "#/components/parameters/searchParam"
         - $ref: "#/components/parameters/searchTypeParam"
+        - $ref: "#/components/parameters/sortParam"
+        - $ref: "#/components/parameters/orderParam"
       responses:
         "200":
           description: OK
@@ -675,11 +704,14 @@ paths:
     get:
       tags: [Groups]
       summary: List groups
+      description: "Allowed sort fields: `title` (default)."
       parameters:
         - $ref: "#/components/parameters/offsetParam"
         - $ref: "#/components/parameters/limitParam"
         - $ref: "#/components/parameters/searchParam"
         - $ref: "#/components/parameters/searchTypeParam"
+        - $ref: "#/components/parameters/sortParam"
+        - $ref: "#/components/parameters/orderParam"
         - name: parent_group_id
           in: query
           required: false
@@ -852,11 +884,14 @@ paths:
     get:
       tags: [Resources]
       summary: List resources
+      description: "Allowed sort fields: `title` (default)."
       parameters:
         - $ref: "#/components/parameters/offsetParam"
         - $ref: "#/components/parameters/limitParam"
         - $ref: "#/components/parameters/searchParam"
         - $ref: "#/components/parameters/searchTypeParam"
+        - $ref: "#/components/parameters/sortParam"
+        - $ref: "#/components/parameters/orderParam"
       responses:
         "200":
           description: OK
@@ -993,11 +1028,14 @@ paths:
     get:
       tags: [AccessTypes]
       summary: List access types
+      description: "Allowed sort fields: `title` (default)."
       parameters:
         - $ref: "#/components/parameters/offsetParam"
         - $ref: "#/components/parameters/limitParam"
         - $ref: "#/components/parameters/searchParam"
         - $ref: "#/components/parameters/searchTypeParam"
+        - $ref: "#/components/parameters/sortParam"
+        - $ref: "#/components/parameters/orderParam"
       responses:
         "200":
           description: OK
@@ -1133,11 +1171,14 @@ paths:
     get:
       tags: [Permissions]
       summary: List permissions
+      description: "Allowed sort fields: `title` (default), `resource_id`."
       parameters:
         - $ref: "#/components/parameters/offsetParam"
         - $ref: "#/components/parameters/limitParam"
         - $ref: "#/components/parameters/searchParam"
         - $ref: "#/components/parameters/searchTypeParam"
+        - $ref: "#/components/parameters/sortParam"
+        - $ref: "#/components/parameters/orderParam"
         - name: resource_id
           in: query
           required: false

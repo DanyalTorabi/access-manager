@@ -60,6 +60,31 @@ var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 
 func escapeLikePattern(s string) string { return likeEscaper.Replace(s) }
 
+var (
+	domainSortColumns     = map[string]string{"title": "title"}
+	userSortColumns       = map[string]string{"title": "title"}
+	groupSortColumns      = map[string]string{"title": "title"}
+	resourceSortColumns   = map[string]string{"title": "title"}
+	accessTypeSortColumns = map[string]string{"title": "title"}
+	permissionSortColumns = map[string]string{"title": "title", "resource_id": "resource_id"}
+)
+
+// orderByClause returns a safe " ORDER BY <col> <dir>" clause.
+// sort must already be validated against the allow-list. If the field is
+// missing from allowed (defensive, or empty from direct store calls),
+// it falls back to fallbackCol.
+func orderByClause(sort string, order store.SortOrder, allowed map[string]string, fallbackCol string) string {
+	col, ok := allowed[sort]
+	if !ok {
+		col = fallbackCol
+	}
+	dir := "ASC"
+	if order == store.OrderDesc {
+		dir = "DESC"
+	}
+	return " ORDER BY " + col + " " + dir
+}
+
 func likePattern(search string, st store.SearchType) string {
 	escaped := escapeLikePattern(search)
 	switch st {
@@ -108,7 +133,7 @@ func (s *Store) DomainList(ctx context.Context, opts store.ListOpts) ([]store.Do
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, title FROM domains`+where+` ORDER BY title LIMIT ? OFFSET ?`,
+		`SELECT id, title FROM domains`+where+orderByClause(opts.Sort, opts.Order, domainSortColumns, "title")+` LIMIT ? OFFSET ?`,
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
@@ -186,7 +211,7 @@ func (s *Store) UserList(ctx context.Context, domainID string, opts store.ListOp
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title FROM users `+where+` ORDER BY title LIMIT ? OFFSET ?`,
+		`SELECT id, domain_id, title FROM users `+where+orderByClause(opts.Sort, opts.Order, userSortColumns, "title")+` LIMIT ? OFFSET ?`,
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
@@ -278,7 +303,7 @@ func (s *Store) GroupList(ctx context.Context, domainID string, opts store.Group
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title, parent_group_id FROM groups `+where+` ORDER BY title LIMIT ? OFFSET ?`,
+		`SELECT id, domain_id, title, parent_group_id FROM groups `+where+orderByClause(opts.Sort, opts.Order, groupSortColumns, "title")+` LIMIT ? OFFSET ?`,
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
@@ -442,7 +467,7 @@ func (s *Store) ResourceList(ctx context.Context, domainID string, opts store.Li
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title FROM resources `+where+` ORDER BY title LIMIT ? OFFSET ?`,
+		`SELECT id, domain_id, title FROM resources `+where+orderByClause(opts.Sort, opts.Order, resourceSortColumns, "title")+` LIMIT ? OFFSET ?`,
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
@@ -508,7 +533,7 @@ func (s *Store) AccessTypeList(ctx context.Context, domainID string, opts store.
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title, bit FROM access_types `+where+` ORDER BY bit LIMIT ? OFFSET ?`,
+		`SELECT id, domain_id, title, bit FROM access_types `+where+orderByClause(opts.Sort, opts.Order, accessTypeSortColumns, "title")+` LIMIT ? OFFSET ?`,
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
@@ -631,7 +656,7 @@ func (s *Store) PermissionList(ctx context.Context, domainID string, opts store.
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title, resource_id, access_mask FROM permissions `+where+` ORDER BY title LIMIT ? OFFSET ?`,
+		`SELECT id, domain_id, title, resource_id, access_mask FROM permissions `+where+orderByClause(opts.Sort, opts.Order, permissionSortColumns, "title")+` LIMIT ? OFFSET ?`,
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
