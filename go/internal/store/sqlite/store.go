@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/dtorabi/access-manager/internal/access"
@@ -69,7 +70,9 @@ func likePattern(search string, st store.SearchType) string {
 	case store.SearchEndsWith:
 		return "%" + escaped
 	default:
-		panic("store/sqlite: unknown SearchType: " + string(st))
+		// Unknown SearchType — likely a call-site typo. Log and fall back to contains.
+		slog.Warn("unknown SearchType, falling back to contains", "search_type", string(st))
+		return "%" + escaped + "%"
 	}
 }
 
