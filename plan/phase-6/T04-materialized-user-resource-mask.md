@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T4** — Materialized `user_resource_mask` for hot path
+**T4** — Materialized `user_resource_mask` for hot path (GitHub [#15](https://github.com/DanyalTorabi/access-manager/issues/15))
 
 ## Phase
 

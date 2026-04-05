@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T2** — Optional group ancestor permission inheritance
+**T2** — Optional group ancestor permission inheritance (GitHub [#13](https://github.com/DanyalTorabi/access-manager/issues/13))
 
 ## Phase
 

@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T22** — Environments: dev / PR / staging / prod
+**T22** — Environments: dev / PR / staging / prod (GitHub [#33](https://github.com/DanyalTorabi/access-manager/issues/33))
 
 ## Phase
 

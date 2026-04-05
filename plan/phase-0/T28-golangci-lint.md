@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T28** — golangci-lint
+**T28** — golangci-lint (GitHub [#39](https://github.com/DanyalTorabi/access-manager/issues/39))
 
 ## Phase
 

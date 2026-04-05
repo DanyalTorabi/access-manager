@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T31** — Handler error classification
+**T31** — Handler error classification (GitHub [#42](https://github.com/DanyalTorabi/access-manager/issues/42))
 
 ## Phase
 

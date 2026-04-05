@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T12** — Test coverage
+**T12** — Test coverage (GitHub [#23](https://github.com/DanyalTorabi/access-manager/issues/23))
 
 ## Phase
 

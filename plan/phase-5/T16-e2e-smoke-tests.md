@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T16** — E2E / smoke tests
+**T16** — E2E / smoke tests (GitHub [#27](https://github.com/DanyalTorabi/access-manager/issues/27))
 
 ## Phase
 

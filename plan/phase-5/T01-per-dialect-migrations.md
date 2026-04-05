@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T1** — Per-dialect migrations
+**T1** — Per-dialect migrations (GitHub [#12](https://github.com/DanyalTorabi/access-manager/issues/12))
 
 ## Phase
 

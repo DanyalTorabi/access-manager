@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T27** — Graceful shutdown & concurrency safety
+**T27** — Graceful shutdown & concurrency safety (GitHub [#38](https://github.com/DanyalTorabi/access-manager/issues/38))
 
 ## Phase
 

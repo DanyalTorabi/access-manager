@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T29** — Monorepo layout: Go implementation lives under **`go/`**
+**T29** — Monorepo layout: Go implementation lives under **`go/`** (GitHub [#40](https://github.com/DanyalTorabi/access-manager/issues/40))
 
 ## Phase
 

@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T15** — CHANGELOG
+**T15** — CHANGELOG (GitHub [#26](https://github.com/DanyalTorabi/access-manager/issues/26))
 
 ## Phase
 

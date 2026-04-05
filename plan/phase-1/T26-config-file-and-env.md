@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T26** — Config: file + env
+**T26** — Config: file + env (GitHub [#37](https://github.com/DanyalTorabi/access-manager/issues/37))
 
 ## Phase
 

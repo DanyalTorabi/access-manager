@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T5** — Authz benchmarks / load tests
+**T5** — Authz benchmarks / load tests (GitHub [#16](https://github.com/DanyalTorabi/access-manager/issues/16))
 
 ## Phase
 

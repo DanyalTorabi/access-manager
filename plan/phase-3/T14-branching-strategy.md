@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T14** — Branching strategy
+**T14** — Branching strategy (GitHub [#25](https://github.com/DanyalTorabi/access-manager/issues/25))
 
 ## Phase
 

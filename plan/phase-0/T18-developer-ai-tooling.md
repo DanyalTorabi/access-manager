@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T18** — Developer AI / editor tooling
+**T18** — Developer AI / editor tooling (GitHub [#29](https://github.com/DanyalTorabi/access-manager/issues/29))
 
 ## Phase
 

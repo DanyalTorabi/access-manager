@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T13** — CI/CD (curriculum-aligned)
+**T13** — CI/CD (curriculum-aligned) (GitHub [#24](https://github.com/DanyalTorabi/access-manager/issues/24))
 
 ## Phase
 

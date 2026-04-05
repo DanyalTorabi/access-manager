@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T11** — Integration tests
+**T11** — Integration tests (GitHub [#22](https://github.com/DanyalTorabi/access-manager/issues/22))
 
 ## Phase
 
