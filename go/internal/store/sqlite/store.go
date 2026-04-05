@@ -62,12 +62,14 @@ func escapeLikePattern(s string) string { return likeEscaper.Replace(s) }
 func likePattern(search string, st store.SearchType) string {
 	escaped := escapeLikePattern(search)
 	switch st {
+	case store.SearchContains, "":
+		return "%" + escaped + "%"
 	case store.SearchStartsWith:
 		return escaped + "%"
 	case store.SearchEndsWith:
 		return "%" + escaped
 	default:
-		return "%" + escaped + "%"
+		panic("store/sqlite: unknown SearchType: " + string(st))
 	}
 }
 
