@@ -3145,6 +3145,10 @@ func TestAPI_domainList_searchType(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = res2.Body.Close() }()
+	if res2.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res2.Body)
+		t.Fatalf("ends_with status %d: %s", res2.StatusCode, b)
+	}
 	var env2 listResponse[store.Domain]
 	if err := json.NewDecoder(res2.Body).Decode(&env2); err != nil {
 		t.Fatal(err)
