@@ -946,16 +946,17 @@ func parseListOpts(r *http.Request) (store.ListOpts, error) {
 	if utf8.RuneCountInString(opts.Search) > 255 {
 		return opts, errors.New("search must be at most 255 characters")
 	}
-	if v := strings.TrimSpace(q.Get("search_type")); v != "" {
-		st := store.SearchType(v)
-		switch st {
-		case store.SearchContains, store.SearchStartsWith, store.SearchEndsWith:
-			opts.SearchType = st
-		default:
-			return opts, errors.New("search_type must be contains, starts_with, or ends_with")
+	opts.SearchType = store.SearchContains
+	if opts.Search != "" {
+		if v := strings.TrimSpace(q.Get("search_type")); v != "" {
+			st := store.SearchType(v)
+			switch st {
+			case store.SearchContains, store.SearchStartsWith, store.SearchEndsWith:
+				opts.SearchType = st
+			default:
+				return opts, errors.New("search_type must be contains, starts_with, or ends_with")
+			}
 		}
-	} else {
-		opts.SearchType = store.SearchContains
 	}
 	return opts, nil
 }

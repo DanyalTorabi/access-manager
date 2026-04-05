@@ -3084,12 +3084,13 @@ func TestAPI_parseListOpts(t *testing.T) {
 		{"search with pagination", "search=foo&offset=2&limit=5", 2, 5, "foo", store.SearchContains, false},
 		{"search at max length", "search=" + strings.Repeat("a", 255), 0, 20, strings.Repeat("a", 255), store.SearchContains, false},
 		{"search too long", "search=" + strings.Repeat("a", 256), 0, 0, "", "", true},
-		{"search_type contains", "search_type=contains", 0, 20, "", store.SearchContains, false},
-		{"search_type starts_with", "search_type=starts_with", 0, 20, "", store.SearchStartsWith, false},
-		{"search_type ends_with", "search_type=ends_with", 0, 20, "", store.SearchEndsWith, false},
-		{"search_type invalid", "search_type=regex", 0, 0, "", "", true},
-		{"search_type trimmed", "search_type=%20starts_with%20", 0, 20, "", store.SearchStartsWith, false},
-		{"search with type", "search=foo&search_type=ends_with", 0, 20, "foo", store.SearchEndsWith, false},
+		{"search_type ignored without search", "search_type=starts_with", 0, 20, "", store.SearchContains, false},
+		{"search_type invalid ignored without search", "search_type=regex", 0, 20, "", store.SearchContains, false},
+		{"search with type contains", "search=foo&search_type=contains", 0, 20, "foo", store.SearchContains, false},
+		{"search with type starts_with", "search=foo&search_type=starts_with", 0, 20, "foo", store.SearchStartsWith, false},
+		{"search with type ends_with", "search=foo&search_type=ends_with", 0, 20, "foo", store.SearchEndsWith, false},
+		{"search with type invalid", "search=foo&search_type=regex", 0, 0, "", "", true},
+		{"search with type trimmed", "search=foo&search_type=%20ends_with%20", 0, 20, "foo", store.SearchEndsWith, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
