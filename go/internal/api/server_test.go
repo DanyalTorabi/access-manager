@@ -3038,6 +3038,30 @@ func TestAPI_accessTypeList_search(t *testing.T) {
 	}
 }
 
+func TestAPI_domainList_searchEscapesWildcards(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"100% done"}`)
+	mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"normal"}`)
+	mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"test_case"}`)
+
+	res, err := http.Get(ts.URL + "/api/v1/domains?search=%25")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var env listResponse[store.Domain]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Meta.Total != 1 || len(env.Data) != 1 {
+		t.Fatalf("search for literal %%: want 1 result, got total=%d len=%d", env.Meta.Total, len(env.Data))
+	}
+}
+
 func TestAPI_parseListOpts(t *testing.T) {
 	tests := []struct {
 		name       string

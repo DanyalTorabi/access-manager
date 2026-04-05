@@ -2502,3 +2502,43 @@ func TestDomainList_searchWithPagination(t *testing.T) {
 		t.Fatalf("last page: want total=5 items=1, got total=%d items=%d", total, len(list))
 	}
 }
+
+func TestDomainList_searchEscapesWildcards(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	for _, title := range []string{"100% done", "normal", "test_case"} {
+		if err := s.DomainCreate(ctx, &store.Domain{ID: uuid.NewString(), Title: title}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, total, err := s.DomainList(ctx, store.ListOpts{Limit: 100, Search: "%"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 1 || len(list) != 1 {
+		t.Fatalf("search for literal %%: want 1, got %d items total=%d", len(list), total)
+	}
+	if list[0].Title != "100% done" {
+		t.Fatalf("unexpected title: %s", list[0].Title)
+	}
+
+	list, total, err = s.DomainList(ctx, store.ListOpts{Limit: 100, Search: "_"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 1 || len(list) != 1 {
+		t.Fatalf("search for literal _: want 1, got %d items total=%d", len(list), total)
+	}
+	if list[0].Title != "test_case" {
+		t.Fatalf("unexpected title: %s", list[0].Title)
+	}
+
+	list, total, err = s.DomainList(ctx, store.ListOpts{Limit: 100, Search: `\`})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 0 || len(list) != 0 {
+		t.Fatalf("search for literal backslash: want 0, got %d items total=%d", len(list), total)
+	}
+}

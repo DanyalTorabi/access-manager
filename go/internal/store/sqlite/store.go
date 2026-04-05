@@ -55,6 +55,10 @@ func maskToSQL(m uint64) int64 { return int64(m) }
 
 func maskFromSQL(v int64) uint64 { return uint64(v) }
 
+var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+
+func escapeLikePattern(s string) string { return likeEscaper.Replace(s) }
+
 
 func (s *Store) DomainCreate(ctx context.Context, d *store.Domain) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO domains (id, title) VALUES (?, ?)`, d.ID, d.Title)
@@ -79,8 +83,8 @@ func (s *Store) DomainList(ctx context.Context, opts store.ListOpts) ([]store.Do
 	where := ""
 	var args []any
 	if opts.Search != "" {
-		where = " WHERE title LIKE ?"
-		args = append(args, "%"+opts.Search+"%")
+		where = ` WHERE title LIKE ? ESCAPE '\'`
+		args = append(args, "%"+escapeLikePattern(opts.Search)+"%")
 	}
 
 	var total int64
@@ -157,8 +161,8 @@ func (s *Store) UserList(ctx context.Context, domainID string, opts store.ListOp
 	where := "WHERE domain_id = ?"
 	args := []any{domainID}
 	if opts.Search != "" {
-		where += " AND title LIKE ?"
-		args = append(args, "%"+opts.Search+"%")
+		where += ` AND title LIKE ? ESCAPE '\'`
+		args = append(args, "%"+escapeLikePattern(opts.Search)+"%")
 	}
 
 	var total int64
@@ -245,8 +249,8 @@ func (s *Store) GroupList(ctx context.Context, domainID string, opts store.Group
 	where := "WHERE domain_id = ?"
 	args := []any{domainID}
 	if opts.Search != "" {
-		where += " AND title LIKE ?"
-		args = append(args, "%"+opts.Search+"%")
+		where += ` AND title LIKE ? ESCAPE '\'`
+		args = append(args, "%"+escapeLikePattern(opts.Search)+"%")
 	}
 	if opts.ParentGroupID != nil {
 		where += " AND parent_group_id = ?"
@@ -413,8 +417,8 @@ func (s *Store) ResourceList(ctx context.Context, domainID string, opts store.Li
 	where := "WHERE domain_id = ?"
 	args := []any{domainID}
 	if opts.Search != "" {
-		where += " AND title LIKE ?"
-		args = append(args, "%"+opts.Search+"%")
+		where += ` AND title LIKE ? ESCAPE '\'`
+		args = append(args, "%"+escapeLikePattern(opts.Search)+"%")
 	}
 
 	var total int64
@@ -479,8 +483,8 @@ func (s *Store) AccessTypeList(ctx context.Context, domainID string, opts store.
 	where := "WHERE domain_id = ?"
 	args := []any{domainID}
 	if opts.Search != "" {
-		where += " AND title LIKE ?"
-		args = append(args, "%"+opts.Search+"%")
+		where += ` AND title LIKE ? ESCAPE '\'`
+		args = append(args, "%"+escapeLikePattern(opts.Search)+"%")
 	}
 
 	var total int64
@@ -598,8 +602,8 @@ func (s *Store) PermissionList(ctx context.Context, domainID string, opts store.
 	where := "WHERE domain_id = ?"
 	args := []any{domainID}
 	if opts.Search != "" {
-		where += " AND title LIKE ?"
-		args = append(args, "%"+opts.Search+"%")
+		where += ` AND title LIKE ? ESCAPE '\'`
+		args = append(args, "%"+escapeLikePattern(opts.Search)+"%")
 	}
 	if opts.ResourceID != nil {
 		where += " AND resource_id = ?"

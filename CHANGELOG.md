@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **T35:** Title substring search (`?search=`) on all six list endpoints (case-insensitive `LIKE`). Entity-specific filters: `?parent_group_id=` on groups, `?resource_id=` on permissions. Filters apply to both paged results and `meta.total`.
+- **T35 / #46:** Title substring search (`?search=`) on all six list endpoints (`LIKE` with escaped wildcards). Entity-specific filters: `?parent_group_id=` on groups, `?resource_id=` on permissions. Filters apply to both paged results and `meta.total`.
 - **T34 / #45:** Offset/limit pagination on all six list endpoints (`domains`, `users`, `groups`, `resources`, `access-types`, `permissions`). Query params `offset` (default 0) and `limit` (default 20, max 100). Responses wrapped in `{"data": [...], "meta": {"total", "offset", "limit"}}` envelope with total record count.
 - **T37 / #48:** `GET` / `PATCH` / `DELETE` for domains; `PATCH` / `DELETE` for users, groups, resources, access types, and permissions; `GET` for a single access type. Partial JSON bodies for `PATCH` (see OpenAPI).
 - **T33:** SQLite migration `000002_restrict_foreign_keys` — foreign keys use `ON DELETE RESTRICT` so deletes fail while dependents exist (maps to **400** with `store.ErrFKViolation`), instead of cascading.
