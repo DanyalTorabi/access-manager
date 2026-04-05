@@ -56,11 +56,21 @@ const (
 	MaxLimit     = 100
 )
 
+// SearchType controls how the search term is matched against the title column.
+type SearchType string
+
+const (
+	SearchContains   SearchType = "contains"
+	SearchStartsWith SearchType = "starts_with"
+	SearchEndsWith   SearchType = "ends_with"
+)
+
 // ListOpts controls pagination and optional title search for list queries.
 type ListOpts struct {
-	Offset int
-	Limit  int
-	Search string // case-insensitive substring match on title; empty = no filter
+	Offset     int
+	Limit      int
+	Search     string     // case-insensitive match on title; empty = no filter
+	SearchType SearchType // defaults to SearchContains when empty
 }
 
 // GroupListOpts extends ListOpts with group-specific filters.

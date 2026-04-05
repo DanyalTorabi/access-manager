@@ -3064,25 +3064,32 @@ func TestAPI_domainList_searchEscapesWildcards(t *testing.T) {
 
 func TestAPI_parseListOpts(t *testing.T) {
 	tests := []struct {
-		name       string
-		qs         string
-		wantOffset int
-		wantLimit  int
-		wantSearch string
-		wantErr    bool
+		name           string
+		qs             string
+		wantOffset     int
+		wantLimit      int
+		wantSearch     string
+		wantSearchType store.SearchType
+		wantErr        bool
 	}{
-		{"defaults", "", 0, 20, "", false},
-		{"explicit", "offset=5&limit=10", 5, 10, "", false},
-		{"limit clamped low", "limit=0", 0, 1, "", false},
-		{"limit clamped high", "limit=200", 0, 100, "", false},
-		{"bad offset", "offset=abc", 0, 0, "", true},
-		{"negative offset", "offset=-1", 0, 0, "", true},
-		{"bad limit", "limit=xyz", 0, 0, "", true},
-		{"search param", "search=hello", 0, 20, "hello", false},
-		{"search trimmed", "search=%20hi%20", 0, 20, "hi", false},
-		{"search with pagination", "search=foo&offset=2&limit=5", 2, 5, "foo", false},
-		{"search at max length", "search=" + strings.Repeat("a", 255), 0, 20, strings.Repeat("a", 255), false},
-		{"search too long", "search=" + strings.Repeat("a", 256), 0, 0, "", true},
+		{"defaults", "", 0, 20, "", store.SearchContains, false},
+		{"explicit", "offset=5&limit=10", 5, 10, "", store.SearchContains, false},
+		{"limit clamped low", "limit=0", 0, 1, "", store.SearchContains, false},
+		{"limit clamped high", "limit=200", 0, 100, "", store.SearchContains, false},
+		{"bad offset", "offset=abc", 0, 0, "", "", true},
+		{"negative offset", "offset=-1", 0, 0, "", "", true},
+		{"bad limit", "limit=xyz", 0, 0, "", "", true},
+		{"search param", "search=hello", 0, 20, "hello", store.SearchContains, false},
+		{"search trimmed", "search=%20hi%20", 0, 20, "hi", store.SearchContains, false},
+		{"search with pagination", "search=foo&offset=2&limit=5", 2, 5, "foo", store.SearchContains, false},
+		{"search at max length", "search=" + strings.Repeat("a", 255), 0, 20, strings.Repeat("a", 255), store.SearchContains, false},
+		{"search too long", "search=" + strings.Repeat("a", 256), 0, 0, "", "", true},
+		{"search_type contains", "search_type=contains", 0, 20, "", store.SearchContains, false},
+		{"search_type starts_with", "search_type=starts_with", 0, 20, "", store.SearchStartsWith, false},
+		{"search_type ends_with", "search_type=ends_with", 0, 20, "", store.SearchEndsWith, false},
+		{"search_type invalid", "search_type=regex", 0, 0, "", "", true},
+		{"search_type trimmed", "search_type=%20starts_with%20", 0, 20, "", store.SearchStartsWith, false},
+		{"search with type", "search=foo&search_type=ends_with", 0, 20, "foo", store.SearchEndsWith, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -3103,6 +3110,55 @@ func TestAPI_parseListOpts(t *testing.T) {
 			if opts.Search != tt.wantSearch {
 				t.Fatalf("search=%q, want %q", opts.Search, tt.wantSearch)
 			}
+			if opts.SearchType != tt.wantSearchType {
+				t.Fatalf("search_type=%q, want %q", opts.SearchType, tt.wantSearchType)
+			}
 		})
+	}
+}
+
+func TestAPI_domainList_searchType(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	for _, title := range []string{"Alpha", "Alphabet", "Beta"} {
+		mustPostJSON201(t, ts.URL+"/api/v1/domains", fmt.Sprintf(`{"title":%q}`, title))
+	}
+
+	res, err := http.Get(ts.URL + "/api/v1/domains?search=Alpha&search_type=starts_with")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var env listResponse[store.Domain]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Meta.Total != 2 || len(env.Data) != 2 {
+		t.Fatalf("starts_with Alpha: want 2, got total=%d len=%d", env.Meta.Total, len(env.Data))
+	}
+
+	res2, err := http.Get(ts.URL + "/api/v1/domains?search=bet&search_type=ends_with")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res2.Body.Close() }()
+	var env2 listResponse[store.Domain]
+	if err := json.NewDecoder(res2.Body).Decode(&env2); err != nil {
+		t.Fatal(err)
+	}
+	if env2.Meta.Total != 1 {
+		t.Fatalf("ends_with bet: want 1, got total=%d", env2.Meta.Total)
+	}
+
+	res3, err := http.Get(ts.URL + "/api/v1/domains?search=foo&search_type=invalid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res3.Body.Close() }()
+	if res3.StatusCode != http.StatusBadRequest {
+		t.Fatalf("invalid search_type: want 400, got %d", res3.StatusCode)
 	}
 }
