@@ -330,7 +330,7 @@ func TestGroupList_emptyWithItemsIncludingParent(t *testing.T) {
 	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
 		t.Fatal(err)
 	}
-	allOpts := store.ListOpts{Offset: 0, Limit: 100}
+	allOpts := store.GroupListOpts{ListOpts: store.ListOpts{Offset: 0, Limit: 100}}
 	list, total, err := s.GroupList(ctx, domainID, allOpts)
 	if err != nil {
 		t.Fatal(err)
@@ -646,7 +646,7 @@ func TestPermissionList_emptyAndWithItems(t *testing.T) {
 	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
 		t.Fatal(err)
 	}
-	allOpts := store.ListOpts{Offset: 0, Limit: 100}
+	allOpts := store.PermissionListOpts{ListOpts: store.ListOpts{Offset: 0, Limit: 100}}
 	list, total, err := s.PermissionList(ctx, domainID, allOpts)
 	if err != nil {
 		t.Fatal(err)
@@ -1649,7 +1649,7 @@ func TestGroupList_pagination(t *testing.T) {
 		}
 	}
 
-	list, total, err := s.GroupList(ctx, domainID, store.ListOpts{Offset: 1, Limit: 2})
+	list, total, err := s.GroupList(ctx, domainID, store.GroupListOpts{ListOpts: store.ListOpts{Offset: 1, Limit: 2}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1660,7 +1660,7 @@ func TestGroupList_pagination(t *testing.T) {
 		t.Fatalf("content: %+v", list)
 	}
 
-	list, total, err = s.GroupList(ctx, domainID, store.ListOpts{Offset: 10, Limit: 5})
+	list, total, err = s.GroupList(ctx, domainID, store.GroupListOpts{ListOpts: store.ListOpts{Offset: 10, Limit: 5}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1747,7 +1747,7 @@ func TestPermissionList_pagination(t *testing.T) {
 		}
 	}
 
-	list, total, err := s.PermissionList(ctx, domainID, store.ListOpts{Offset: 1, Limit: 2})
+	list, total, err := s.PermissionList(ctx, domainID, store.PermissionListOpts{ListOpts: store.ListOpts{Offset: 1, Limit: 2}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1755,7 +1755,7 @@ func TestPermissionList_pagination(t *testing.T) {
 		t.Fatalf("items=%d total=%d", len(list), total)
 	}
 
-	list, total, err = s.PermissionList(ctx, domainID, store.ListOpts{Offset: 10, Limit: 5})
+	list, total, err = s.PermissionList(ctx, domainID, store.PermissionListOpts{ListOpts: store.ListOpts{Offset: 10, Limit: 5}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1882,7 +1882,7 @@ func TestStore_closedDB_methods(t *testing.T) {
 		}
 	})
 	t.Run("GroupList", func(t *testing.T) {
-		if _, _, err := s.GroupList(ctx, domainID, allOpts); err == nil {
+		if _, _, err := s.GroupList(ctx, domainID, store.GroupListOpts{ListOpts: allOpts}); err == nil {
 			t.Fatal("want error")
 		}
 	})
@@ -1962,7 +1962,7 @@ func TestStore_closedDB_methods(t *testing.T) {
 		}
 	})
 	t.Run("PermissionList", func(t *testing.T) {
-		if _, _, err := s.PermissionList(ctx, domainID, allOpts); err == nil {
+		if _, _, err := s.PermissionList(ctx, domainID, store.PermissionListOpts{ListOpts: allOpts}); err == nil {
 			t.Fatal("want error")
 		}
 	})
@@ -2138,5 +2138,367 @@ func TestSanitizeListOpts(t *testing.T) {
 				t.Fatalf("SanitizeListOpts(%+v) = %+v, want %+v", tt.in, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestDomainList_search(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	for _, title := range []string{"Alpha", "Beta", "Alphabet"} {
+		if err := s.DomainCreate(ctx, &store.Domain{ID: uuid.NewString(), Title: title}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, total, err := s.DomainList(ctx, store.ListOpts{Limit: 100, Search: "alph"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 2 || len(list) != 2 {
+		t.Fatalf("want 2, got %d items total=%d", len(list), total)
+	}
+	if list[0].Title != "Alpha" || list[1].Title != "Alphabet" {
+		t.Fatalf("unexpected titles: %+v", list)
+	}
+
+	list, total, err = s.DomainList(ctx, store.ListOpts{Limit: 100, Search: "xyz"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 0 || len(list) != 0 {
+		t.Fatalf("want 0, got %d items total=%d", len(list), total)
+	}
+
+	list, total, err = s.DomainList(ctx, store.ListOpts{Limit: 100, Search: ""})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 3 {
+		t.Fatalf("empty search should return all, got total=%d", total)
+	}
+}
+
+func TestUserList_search(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, title := range []string{"Alice", "Bob", "Alicia"} {
+		if err := s.UserCreate(ctx, &store.User{ID: uuid.NewString(), DomainID: domainID, Title: title}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, total, err := s.UserList(ctx, domainID, store.ListOpts{Limit: 100, Search: "ali"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 2 || len(list) != 2 {
+		t.Fatalf("want 2, got %d items total=%d", len(list), total)
+	}
+}
+
+func TestGroupList_search(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, title := range []string{"Admins", "Editors", "Admin-sub"} {
+		if err := s.GroupCreate(ctx, &store.Group{ID: uuid.NewString(), DomainID: domainID, Title: title}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, total, err := s.GroupList(ctx, domainID, store.GroupListOpts{
+		ListOpts: store.ListOpts{Limit: 100, Search: "admin"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 2 || len(list) != 2 {
+		t.Fatalf("want 2, got %d items total=%d", len(list), total)
+	}
+}
+
+func TestGroupList_filterByParentGroupID(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	parentID := uuid.NewString()
+	child1 := uuid.NewString()
+	child2 := uuid.NewString()
+	root2 := uuid.NewString()
+	if err := s.GroupCreate(ctx, &store.Group{ID: parentID, DomainID: domainID, Title: "parent"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GroupCreate(ctx, &store.Group{ID: child1, DomainID: domainID, Title: "child1", ParentGroupID: &parentID}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GroupCreate(ctx, &store.Group{ID: child2, DomainID: domainID, Title: "child2", ParentGroupID: &parentID}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GroupCreate(ctx, &store.Group{ID: root2, DomainID: domainID, Title: "root2"}); err != nil {
+		t.Fatal(err)
+	}
+
+	list, total, err := s.GroupList(ctx, domainID, store.GroupListOpts{
+		ListOpts:      store.ListOpts{Limit: 100},
+		ParentGroupID: &parentID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 2 || len(list) != 2 {
+		t.Fatalf("want 2 children, got %d items total=%d", len(list), total)
+	}
+	if list[0].ID != child1 || list[1].ID != child2 {
+		t.Fatalf("unexpected children: %+v", list)
+	}
+
+	list, total, err = s.GroupList(ctx, domainID, store.GroupListOpts{
+		ListOpts: store.ListOpts{Limit: 100},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 4 {
+		t.Fatalf("no filter should return all 4, got total=%d", total)
+	}
+}
+
+func TestGroupList_searchAndParentCombined(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	parentID := uuid.NewString()
+	if err := s.GroupCreate(ctx, &store.Group{ID: parentID, DomainID: domainID, Title: "root"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GroupCreate(ctx, &store.Group{ID: uuid.NewString(), DomainID: domainID, Title: "dev-team", ParentGroupID: &parentID}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GroupCreate(ctx, &store.Group{ID: uuid.NewString(), DomainID: domainID, Title: "ops-team", ParentGroupID: &parentID}); err != nil {
+		t.Fatal(err)
+	}
+
+	list, total, err := s.GroupList(ctx, domainID, store.GroupListOpts{
+		ListOpts:      store.ListOpts{Limit: 100, Search: "dev"},
+		ParentGroupID: &parentID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 1 || len(list) != 1 {
+		t.Fatalf("want 1, got %d items total=%d", len(list), total)
+	}
+	if list[0].Title != "dev-team" {
+		t.Fatalf("unexpected title: %s", list[0].Title)
+	}
+}
+
+func TestResourceList_search(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, title := range []string{"Document", "Image", "Documentation"} {
+		if err := s.ResourceCreate(ctx, &store.Resource{ID: uuid.NewString(), DomainID: domainID, Title: title}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, total, err := s.ResourceList(ctx, domainID, store.ListOpts{Limit: 100, Search: "doc"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 2 || len(list) != 2 {
+		t.Fatalf("want 2, got %d items total=%d", len(list), total)
+	}
+}
+
+func TestAccessTypeList_search(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	for i, title := range []string{"read", "write", "readonly"} {
+		if err := s.AccessTypeCreate(ctx, &store.AccessType{
+			ID: uuid.NewString(), DomainID: domainID, Title: title, Bit: uint64(1 << i),
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, total, err := s.AccessTypeList(ctx, domainID, store.ListOpts{Limit: 100, Search: "read"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 2 || len(list) != 2 {
+		t.Fatalf("want 2, got %d items total=%d", len(list), total)
+	}
+}
+
+func TestPermissionList_search(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	rid := uuid.NewString()
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, title := range []string{"can-read", "can-write", "can-read-all"} {
+		if err := s.PermissionCreate(ctx, &store.Permission{
+			ID: uuid.NewString(), DomainID: domainID, Title: title, ResourceID: rid, AccessMask: 1,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, total, err := s.PermissionList(ctx, domainID, store.PermissionListOpts{
+		ListOpts: store.ListOpts{Limit: 100, Search: "can-read"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 2 || len(list) != 2 {
+		t.Fatalf("want 2, got %d items total=%d", len(list), total)
+	}
+}
+
+func TestPermissionList_filterByResourceID(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	r1 := uuid.NewString()
+	r2 := uuid.NewString()
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: r1, DomainID: domainID, Title: "res1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: r2, DomainID: domainID, Title: "res2"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: uuid.NewString(), DomainID: domainID, Title: "p1", ResourceID: r1, AccessMask: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: uuid.NewString(), DomainID: domainID, Title: "p2", ResourceID: r1, AccessMask: 2}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: uuid.NewString(), DomainID: domainID, Title: "p3", ResourceID: r2, AccessMask: 4}); err != nil {
+		t.Fatal(err)
+	}
+
+	list, total, err := s.PermissionList(ctx, domainID, store.PermissionListOpts{
+		ListOpts:   store.ListOpts{Limit: 100},
+		ResourceID: &r1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 2 || len(list) != 2 {
+		t.Fatalf("want 2 for r1, got %d items total=%d", len(list), total)
+	}
+
+	list, total, err = s.PermissionList(ctx, domainID, store.PermissionListOpts{
+		ListOpts:   store.ListOpts{Limit: 100},
+		ResourceID: &r2,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 1 || len(list) != 1 {
+		t.Fatalf("want 1 for r2, got %d items total=%d", len(list), total)
+	}
+}
+
+func TestPermissionList_searchAndResourceCombined(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	r1 := uuid.NewString()
+	r2 := uuid.NewString()
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: r1, DomainID: domainID, Title: "res1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: r2, DomainID: domainID, Title: "res2"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: uuid.NewString(), DomainID: domainID, Title: "read-doc", ResourceID: r1, AccessMask: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: uuid.NewString(), DomainID: domainID, Title: "write-doc", ResourceID: r1, AccessMask: 2}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: uuid.NewString(), DomainID: domainID, Title: "read-img", ResourceID: r2, AccessMask: 1}); err != nil {
+		t.Fatal(err)
+	}
+
+	list, total, err := s.PermissionList(ctx, domainID, store.PermissionListOpts{
+		ListOpts:   store.ListOpts{Limit: 100, Search: "read"},
+		ResourceID: &r1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 1 || len(list) != 1 {
+		t.Fatalf("want 1, got %d items total=%d", len(list), total)
+	}
+	if list[0].Title != "read-doc" {
+		t.Fatalf("unexpected title: %s", list[0].Title)
+	}
+}
+
+func TestDomainList_searchWithPagination(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	for i := 0; i < 5; i++ {
+		title := "test-" + string(rune('a'+i))
+		if err := s.DomainCreate(ctx, &store.Domain{ID: uuid.NewString(), Title: title}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.DomainCreate(ctx, &store.Domain{ID: uuid.NewString(), Title: "other"}); err != nil {
+		t.Fatal(err)
+	}
+
+	list, total, err := s.DomainList(ctx, store.ListOpts{Limit: 2, Offset: 0, Search: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 5 {
+		t.Fatalf("total should be 5 (all matching), got %d", total)
+	}
+	if len(list) != 2 {
+		t.Fatalf("page size should be 2, got %d", len(list))
+	}
+
+	list, total, err = s.DomainList(ctx, store.ListOpts{Limit: 2, Offset: 4, Search: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 5 || len(list) != 1 {
+		t.Fatalf("last page: want total=5 items=1, got total=%d items=%d", total, len(list))
 	}
 }
