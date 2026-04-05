@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T32** — Duplicate constraint handling
+**T32** — Duplicate constraint handling (GitHub [#43](https://github.com/DanyalTorabi/access-manager/issues/43))
 
 ## Phase
 

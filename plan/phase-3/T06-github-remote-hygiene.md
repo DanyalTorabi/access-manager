@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T6** — GitHub remote + repo hygiene
+**T6** — GitHub remote + repo hygiene (GitHub [#17](https://github.com/DanyalTorabi/access-manager/issues/17))
 
 ## Phase
 

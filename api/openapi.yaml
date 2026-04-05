@@ -84,8 +84,48 @@ components:
       schema:
         type: string
         format: uuid
+    offsetParam:
+      name: offset
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      description: Number of items to skip (pagination).
+    limitParam:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Maximum items to return (clamped to 1–100).
+    searchParam:
+      name: search
+      in: query
+      required: false
+      schema:
+        type: string
+        maxLength: 255
+      description: Case-insensitive substring match on title. LIKE wildcards (`%`, `_`) are treated as literals.
 
   schemas:
+    ListMeta:
+      type: object
+      required: [total, offset, limit]
+      properties:
+        total:
+          type: integer
+          format: int64
+          description: Total number of records matching the filter (before pagination).
+        offset:
+          type: integer
+        limit:
+          type: integer
+
     ErrorBody:
       type: object
       description: >-
@@ -344,15 +384,31 @@ paths:
     get:
       tags: [Domains]
       summary: List domains
+      parameters:
+        - $ref: "#/components/parameters/offsetParam"
+        - $ref: "#/components/parameters/limitParam"
+        - $ref: "#/components/parameters/searchParam"
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Domain"
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Domain"
+                  meta:
+                    $ref: "#/components/schemas/ListMeta"
+        "400":
+          description: Bad request (invalid pagination or search params)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "401":
           description: Unauthorized (when bearer required)
           content:
@@ -468,15 +524,31 @@ paths:
     get:
       tags: [Users]
       summary: List users in domain
+      parameters:
+        - $ref: "#/components/parameters/offsetParam"
+        - $ref: "#/components/parameters/limitParam"
+        - $ref: "#/components/parameters/searchParam"
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/User"
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+                  meta:
+                    $ref: "#/components/schemas/ListMeta"
+        "400":
+          description: Bad request (invalid pagination or search params)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "401":
           description: Unauthorized
           content:
@@ -592,15 +664,38 @@ paths:
     get:
       tags: [Groups]
       summary: List groups
+      parameters:
+        - $ref: "#/components/parameters/offsetParam"
+        - $ref: "#/components/parameters/limitParam"
+        - $ref: "#/components/parameters/searchParam"
+        - name: parent_group_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Filter groups by parent group ID.
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Group"
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Group"
+                  meta:
+                    $ref: "#/components/schemas/ListMeta"
+        "400":
+          description: Bad request (invalid pagination or search params)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "401":
           description: Unauthorized
           content:
@@ -745,15 +840,31 @@ paths:
     get:
       tags: [Resources]
       summary: List resources
+      parameters:
+        - $ref: "#/components/parameters/offsetParam"
+        - $ref: "#/components/parameters/limitParam"
+        - $ref: "#/components/parameters/searchParam"
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Resource"
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Resource"
+                  meta:
+                    $ref: "#/components/schemas/ListMeta"
+        "400":
+          description: Bad request (invalid pagination or search params)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "401":
           description: Unauthorized
           content:
@@ -869,15 +980,31 @@ paths:
     get:
       tags: [AccessTypes]
       summary: List access types
+      parameters:
+        - $ref: "#/components/parameters/offsetParam"
+        - $ref: "#/components/parameters/limitParam"
+        - $ref: "#/components/parameters/searchParam"
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/AccessType"
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AccessType"
+                  meta:
+                    $ref: "#/components/schemas/ListMeta"
+        "400":
+          description: Bad request (invalid pagination or search params)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "401":
           description: Unauthorized
           content:
@@ -992,15 +1119,38 @@ paths:
     get:
       tags: [Permissions]
       summary: List permissions
+      parameters:
+        - $ref: "#/components/parameters/offsetParam"
+        - $ref: "#/components/parameters/limitParam"
+        - $ref: "#/components/parameters/searchParam"
+        - name: resource_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Filter permissions by resource ID.
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Permission"
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Permission"
+                  meta:
+                    $ref: "#/components/schemas/ListMeta"
+        "400":
+          description: Bad request (invalid pagination or search params)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "401":
           description: Unauthorized
           content:

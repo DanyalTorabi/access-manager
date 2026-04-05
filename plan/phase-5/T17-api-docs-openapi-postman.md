@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T17** — API docs & contract testing
+**T17** — API docs & contract testing (GitHub [#28](https://github.com/DanyalTorabi/access-manager/issues/28))
 
 ## Phase
 

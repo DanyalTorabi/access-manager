@@ -56,10 +56,23 @@ const (
 	MaxLimit     = 100
 )
 
-// ListOpts controls pagination for list queries.
+// ListOpts controls pagination and optional title search for list queries.
 type ListOpts struct {
 	Offset int
 	Limit  int
+	Search string // case-insensitive substring match on title; empty = no filter
+}
+
+// GroupListOpts extends ListOpts with group-specific filters.
+type GroupListOpts struct {
+	ListOpts
+	ParentGroupID *string // nil = no filter; non-nil = WHERE parent_group_id = ?
+}
+
+// PermissionListOpts extends ListOpts with permission-specific filters.
+type PermissionListOpts struct {
+	ListOpts
+	ResourceID *string // nil = no filter; non-nil = WHERE resource_id = ?
 }
 
 // SanitizeListOpts defaults Limit to DefaultLimit when <= 0, caps it at
@@ -122,7 +135,7 @@ type Store interface {
 
 	GroupCreate(ctx context.Context, g *Group) error
 	GroupGet(ctx context.Context, domainID, id string) (*Group, error)
-	GroupList(ctx context.Context, domainID string, opts ListOpts) ([]Group, int64, error)
+	GroupList(ctx context.Context, domainID string, opts GroupListOpts) ([]Group, int64, error)
 	GroupSetParent(ctx context.Context, domainID, groupID string, parentID *string) error
 	GroupDelete(ctx context.Context, domainID, id string) error
 	GroupPatch(ctx context.Context, domainID, id string, p GroupPatchParams) (*Group, error)
@@ -141,7 +154,7 @@ type Store interface {
 
 	PermissionCreate(ctx context.Context, p *Permission) error
 	PermissionGet(ctx context.Context, domainID, id string) (*Permission, error)
-	PermissionList(ctx context.Context, domainID string, opts ListOpts) ([]Permission, int64, error)
+	PermissionList(ctx context.Context, domainID string, opts PermissionListOpts) ([]Permission, int64, error)
 	PermissionDelete(ctx context.Context, domainID, id string) error
 	PermissionPatch(ctx context.Context, domainID, id string, p PermissionPatchParams) (*Permission, error)
 

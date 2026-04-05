@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T23** — Observability
+**T23** — Observability (GitHub [#34](https://github.com/DanyalTorabi/access-manager/issues/34))
 
 ## Phase
 

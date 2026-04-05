@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T7** — API authentication middleware
+**T7** — API authentication middleware (GitHub [#18](https://github.com/DanyalTorabi/access-manager/issues/18))
 
 ## Phase
 

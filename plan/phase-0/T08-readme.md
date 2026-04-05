@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T8** — README
+**T8** — README (GitHub [#19](https://github.com/DanyalTorabi/access-manager/issues/19))
 
 ## Phase
 

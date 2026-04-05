@@ -55,6 +55,10 @@ func maskToSQL(m uint64) int64 { return int64(m) }
 
 func maskFromSQL(v int64) uint64 { return uint64(v) }
 
+var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+
+func escapeLikePattern(s string) string { return likeEscaper.Replace(s) }
+
 
 func (s *Store) DomainCreate(ctx context.Context, d *store.Domain) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO domains (id, title) VALUES (?, ?)`, d.ID, d.Title)
@@ -75,13 +79,21 @@ func (s *Store) DomainGet(ctx context.Context, id string) (*store.Domain, error)
 
 func (s *Store) DomainList(ctx context.Context, opts store.ListOpts) ([]store.Domain, int64, error) {
 	opts = store.SanitizeListOpts(opts)
+
+	where := ""
+	var args []any
+	if opts.Search != "" {
+		where = ` WHERE title LIKE ? ESCAPE '\'`
+		args = append(args, "%"+escapeLikePattern(opts.Search)+"%")
+	}
+
 	var total int64
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM domains`).Scan(&total); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM domains`+where, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, title FROM domains ORDER BY title LIMIT ? OFFSET ?`,
-		opts.Limit, opts.Offset)
+		`SELECT id, title FROM domains`+where+` ORDER BY title LIMIT ? OFFSET ?`,
+		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -145,13 +157,21 @@ func (s *Store) UserGet(ctx context.Context, domainID, id string) (*store.User, 
 
 func (s *Store) UserList(ctx context.Context, domainID string, opts store.ListOpts) ([]store.User, int64, error) {
 	opts = store.SanitizeListOpts(opts)
+
+	where := "WHERE domain_id = ?"
+	args := []any{domainID}
+	if opts.Search != "" {
+		where += ` AND title LIKE ? ESCAPE '\'`
+		args = append(args, "%"+escapeLikePattern(opts.Search)+"%")
+	}
+
 	var total int64
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users WHERE domain_id = ?`, domainID).Scan(&total); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users `+where, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title FROM users WHERE domain_id = ? ORDER BY title LIMIT ? OFFSET ?`,
-		domainID, opts.Limit, opts.Offset)
+		`SELECT id, domain_id, title FROM users `+where+` ORDER BY title LIMIT ? OFFSET ?`,
+		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -223,15 +243,27 @@ func (s *Store) GroupGet(ctx context.Context, domainID, id string) (*store.Group
 	return &out, nil
 }
 
-func (s *Store) GroupList(ctx context.Context, domainID string, opts store.ListOpts) ([]store.Group, int64, error) {
-	opts = store.SanitizeListOpts(opts)
+func (s *Store) GroupList(ctx context.Context, domainID string, opts store.GroupListOpts) ([]store.Group, int64, error) {
+	opts.ListOpts = store.SanitizeListOpts(opts.ListOpts)
+
+	where := "WHERE domain_id = ?"
+	args := []any{domainID}
+	if opts.Search != "" {
+		where += ` AND title LIKE ? ESCAPE '\'`
+		args = append(args, "%"+escapeLikePattern(opts.Search)+"%")
+	}
+	if opts.ParentGroupID != nil {
+		where += " AND parent_group_id = ?"
+		args = append(args, *opts.ParentGroupID)
+	}
+
 	var total int64
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM groups WHERE domain_id = ?`, domainID).Scan(&total); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM groups `+where, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title, parent_group_id FROM groups WHERE domain_id = ? ORDER BY title LIMIT ? OFFSET ?`,
-		domainID, opts.Limit, opts.Offset)
+		`SELECT id, domain_id, title, parent_group_id FROM groups `+where+` ORDER BY title LIMIT ? OFFSET ?`,
+		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -381,13 +413,21 @@ func (s *Store) ResourceGet(ctx context.Context, domainID, id string) (*store.Re
 
 func (s *Store) ResourceList(ctx context.Context, domainID string, opts store.ListOpts) ([]store.Resource, int64, error) {
 	opts = store.SanitizeListOpts(opts)
+
+	where := "WHERE domain_id = ?"
+	args := []any{domainID}
+	if opts.Search != "" {
+		where += ` AND title LIKE ? ESCAPE '\'`
+		args = append(args, "%"+escapeLikePattern(opts.Search)+"%")
+	}
+
 	var total int64
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM resources WHERE domain_id = ?`, domainID).Scan(&total); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM resources `+where, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title FROM resources WHERE domain_id = ? ORDER BY title LIMIT ? OFFSET ?`,
-		domainID, opts.Limit, opts.Offset)
+		`SELECT id, domain_id, title FROM resources `+where+` ORDER BY title LIMIT ? OFFSET ?`,
+		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -439,13 +479,21 @@ func (s *Store) AccessTypeCreate(ctx context.Context, a *store.AccessType) error
 
 func (s *Store) AccessTypeList(ctx context.Context, domainID string, opts store.ListOpts) ([]store.AccessType, int64, error) {
 	opts = store.SanitizeListOpts(opts)
+
+	where := "WHERE domain_id = ?"
+	args := []any{domainID}
+	if opts.Search != "" {
+		where += ` AND title LIKE ? ESCAPE '\'`
+		args = append(args, "%"+escapeLikePattern(opts.Search)+"%")
+	}
+
 	var total int64
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM access_types WHERE domain_id = ?`, domainID).Scan(&total); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM access_types `+where, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title, bit FROM access_types WHERE domain_id = ? ORDER BY bit LIMIT ? OFFSET ?`,
-		domainID, opts.Limit, opts.Offset)
+		`SELECT id, domain_id, title, bit FROM access_types `+where+` ORDER BY bit LIMIT ? OFFSET ?`,
+		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -548,15 +596,27 @@ func (s *Store) PermissionGet(ctx context.Context, domainID, id string) (*store.
 	return &out, nil
 }
 
-func (s *Store) PermissionList(ctx context.Context, domainID string, opts store.ListOpts) ([]store.Permission, int64, error) {
-	opts = store.SanitizeListOpts(opts)
+func (s *Store) PermissionList(ctx context.Context, domainID string, opts store.PermissionListOpts) ([]store.Permission, int64, error) {
+	opts.ListOpts = store.SanitizeListOpts(opts.ListOpts)
+
+	where := "WHERE domain_id = ?"
+	args := []any{domainID}
+	if opts.Search != "" {
+		where += ` AND title LIKE ? ESCAPE '\'`
+		args = append(args, "%"+escapeLikePattern(opts.Search)+"%")
+	}
+	if opts.ResourceID != nil {
+		where += " AND resource_id = ?"
+		args = append(args, *opts.ResourceID)
+	}
+
 	var total int64
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM permissions WHERE domain_id = ?`, domainID).Scan(&total); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM permissions `+where, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title, resource_id, access_mask FROM permissions WHERE domain_id = ? ORDER BY title LIMIT ? OFFSET ?`,
-		domainID, opts.Limit, opts.Offset)
+		`SELECT id, domain_id, title, resource_id, access_mask FROM permissions `+where+` ORDER BY title LIMIT ? OFFSET ?`,
+		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
 	}

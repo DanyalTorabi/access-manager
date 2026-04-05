@@ -9,16 +9,20 @@ Work lands on **`main`** through **pull requests**. Once GitHub Actions CI is co
 
 ## Branch naming
 
-Use **prefix / short-kebab-description**:
+Use **author / prefix / short-kebab-description** (all lowercase):
+
+| Segment | Rule |
+|---------|------|
+| `author/` | Short personal identifier (e.g. first name or username), so reviewers know who owns the branch |
+| `prefix/` | One of the prefixes below |
+| description | Lowercase kebab-case; optionally include a ticket id |
 
 | Prefix | Use |
 |--------|-----|
-| `feature/` | New behavior or larger changes, e.g. `feature/T13-ci-workflow`, `feature/openapi-spec` |
-| `fix/` | Bug fixes, e.g. `fix/authz-empty-domain` |
-| `docs/` | Documentation only, e.g. `docs/t14-branching` |
-| `chore/` | Tooling, CI config, deps without product behavior change, e.g. `chore/lint-config` |
-
-Optional: include a ticket id (`feature/T19-docker`).
+| `feature/` | New behavior or larger changes, e.g. `danyal/feature/t13-ci-workflow` |
+| `fix/` | Bug fixes, e.g. `danyal/fix/authz-empty-domain` |
+| `docs/` | Documentation only, e.g. `danyal/docs/t14-branching` |
+| `chore/` | Tooling, CI config, deps without product behavior change, e.g. `danyal/chore/lint-config` |
 
 ## Pull requests
 

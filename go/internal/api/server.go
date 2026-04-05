@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/dtorabi/access-manager/internal/access"
 	"github.com/dtorabi/access-manager/internal/logger"
@@ -175,7 +176,7 @@ func (s *Server) domainCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) domainList(w http.ResponseWriter, r *http.Request) {
-	opts, err := parsePagination(r)
+	opts, err := parseListOpts(r)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
@@ -246,7 +247,7 @@ func (s *Server) userCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) userList(w http.ResponseWriter, r *http.Request) {
-	opts, err := parsePagination(r)
+	opts, err := parseListOpts(r)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
@@ -326,7 +327,7 @@ func (s *Server) groupCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) groupList(w http.ResponseWriter, r *http.Request) {
-	opts, err := parsePagination(r)
+	opts, err := parseGroupListOpts(r)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
@@ -340,7 +341,7 @@ func (s *Server) groupList(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []store.Group{}
 	}
-	writeList(w, list, total, opts)
+	writeList(w, list, total, opts.ListOpts)
 }
 
 func (s *Server) groupGet(w http.ResponseWriter, r *http.Request) {
@@ -441,7 +442,7 @@ func (s *Server) resourceCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) resourceList(w http.ResponseWriter, r *http.Request) {
-	opts, err := parsePagination(r)
+	opts, err := parseListOpts(r)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
@@ -525,7 +526,7 @@ func (s *Server) accessTypeCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) accessTypeList(w http.ResponseWriter, r *http.Request) {
-	opts, err := parsePagination(r)
+	opts, err := parseListOpts(r)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
@@ -626,7 +627,7 @@ func (s *Server) permissionCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) permissionList(w http.ResponseWriter, r *http.Request) {
-	opts, err := parsePagination(r)
+	opts, err := parsePermissionListOpts(r)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
@@ -640,7 +641,7 @@ func (s *Server) permissionList(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []store.Permission{}
 	}
-	writeList(w, list, total, opts)
+	writeList(w, list, total, opts.ListOpts)
 }
 
 func (s *Server) permissionGet(w http.ResponseWriter, r *http.Request) {
@@ -915,7 +916,7 @@ type listEnvelope struct {
 	Meta listMeta `json:"meta"`
 }
 
-func parsePagination(r *http.Request) (store.ListOpts, error) {
+func parseListOpts(r *http.Request) (store.ListOpts, error) {
 	opts := store.ListOpts{Offset: 0, Limit: store.DefaultLimit}
 	q := r.URL.Query()
 	if v := q.Get("offset"); v != "" {
@@ -941,7 +942,35 @@ func parsePagination(r *http.Request) (store.ListOpts, error) {
 		}
 		opts.Limit = n
 	}
+	opts.Search = strings.TrimSpace(q.Get("search"))
+	if utf8.RuneCountInString(opts.Search) > 255 {
+		return opts, errors.New("search must be at most 255 characters")
+	}
 	return opts, nil
+}
+
+func parseGroupListOpts(r *http.Request) (store.GroupListOpts, error) {
+	base, err := parseListOpts(r)
+	if err != nil {
+		return store.GroupListOpts{}, err
+	}
+	out := store.GroupListOpts{ListOpts: base}
+	if v := strings.TrimSpace(r.URL.Query().Get("parent_group_id")); v != "" {
+		out.ParentGroupID = &v
+	}
+	return out, nil
+}
+
+func parsePermissionListOpts(r *http.Request) (store.PermissionListOpts, error) {
+	base, err := parseListOpts(r)
+	if err != nil {
+		return store.PermissionListOpts{}, err
+	}
+	out := store.PermissionListOpts{ListOpts: base}
+	if v := strings.TrimSpace(r.URL.Query().Get("resource_id")); v != "" {
+		out.ResourceID = &v
+	}
+	return out, nil
 }
 
 func writeList(w http.ResponseWriter, data any, total int64, opts store.ListOpts) {

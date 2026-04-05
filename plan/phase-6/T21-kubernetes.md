@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T21** — Kubernetes
+**T21** — Kubernetes (GitHub [#32](https://github.com/DanyalTorabi/access-manager/issues/32))
 
 ## Phase
 

@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T20** — Security review
+**T20** — Security review (GitHub [#31](https://github.com/DanyalTorabi/access-manager/issues/31))
 
 ## Phase
 

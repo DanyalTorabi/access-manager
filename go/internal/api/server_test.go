@@ -2744,26 +2744,350 @@ func TestAPI_scopedList_pagination(t *testing.T) {
 	}
 }
 
-func TestAPI_parsePagination(t *testing.T) {
+func TestAPI_domainList_search(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	for _, title := range []string{"Alpha", "Beta", "Alphabet"} {
+		mustPostJSON201(t, ts.URL+"/api/v1/domains", fmt.Sprintf(`{"title":%q}`, title))
+	}
+
+	res, err := http.Get(ts.URL + "/api/v1/domains?search=alph")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var env listResponse[store.Domain]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Meta.Total != 2 || len(env.Data) != 2 {
+		t.Fatalf("want 2 results, got total=%d len=%d", env.Meta.Total, len(env.Data))
+	}
+}
+
+func TestAPI_domainList_searchNoMatch(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"Alpha"}`)
+
+	res, err := http.Get(ts.URL + "/api/v1/domains?search=zzz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("status %d", res.StatusCode)
+	}
+	var env listResponse[store.Domain]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Meta.Total != 0 || len(env.Data) != 0 {
+		t.Fatalf("want 0 results, got total=%d len=%d", env.Meta.Total, len(env.Data))
+	}
+}
+
+func TestAPI_domainList_searchEmptyIgnored(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"one"}`)
+
+	res, err := http.Get(ts.URL + "/api/v1/domains?search=")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("status %d", res.StatusCode)
+	}
+	var env listResponse[store.Domain]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Meta.Total != 1 {
+		t.Fatalf("empty search should return all, got total=%d", env.Meta.Total)
+	}
+}
+
+func TestAPI_domainList_searchWithPagination(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	for i := 0; i < 5; i++ {
+		mustPostJSON201(t, ts.URL+"/api/v1/domains", fmt.Sprintf(`{"title":"test-%c"}`, 'a'+i))
+	}
+	mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"other"}`)
+
+	res, err := http.Get(ts.URL + "/api/v1/domains?search=test&limit=2&offset=0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var env listResponse[store.Domain]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Meta.Total != 5 {
+		t.Fatalf("total should be 5 (all matching), got %d", env.Meta.Total)
+	}
+	if len(env.Data) != 2 {
+		t.Fatalf("page size should be 2, got %d", len(env.Data))
+	}
+}
+
+func TestAPI_userList_search(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domID := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + domID
+	for _, title := range []string{"Alice", "Bob", "Alicia"} {
+		mustPostJSON201(t, base+"/users", fmt.Sprintf(`{"title":%q}`, title))
+	}
+
+	res, err := http.Get(base + "/users?search=ali")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var env listResponse[store.User]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Meta.Total != 2 || len(env.Data) != 2 {
+		t.Fatalf("want 2, got total=%d len=%d", env.Meta.Total, len(env.Data))
+	}
+}
+
+func TestAPI_groupList_search(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domID := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + domID
+	for _, title := range []string{"Admins", "Editors", "Admin-sub"} {
+		mustPostJSON201(t, base+"/groups", fmt.Sprintf(`{"title":%q}`, title))
+	}
+
+	res, err := http.Get(base + "/groups?search=admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var env listResponse[store.Group]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Meta.Total != 2 || len(env.Data) != 2 {
+		t.Fatalf("want 2, got total=%d len=%d", env.Meta.Total, len(env.Data))
+	}
+}
+
+func TestAPI_groupList_filterByParentGroupID(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domID := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + domID
+
+	var parent store.Group
+	if err := json.Unmarshal(mustPostJSON201(t, base+"/groups", `{"title":"parent"}`), &parent); err != nil {
+		t.Fatal(err)
+	}
+	mustPostJSON201(t, base+"/groups", fmt.Sprintf(`{"title":"child1","parent_group_id":%q}`, parent.ID))
+	mustPostJSON201(t, base+"/groups", fmt.Sprintf(`{"title":"child2","parent_group_id":%q}`, parent.ID))
+	mustPostJSON201(t, base+"/groups", `{"title":"other-root"}`)
+
+	res, err := http.Get(base + "/groups?parent_group_id=" + parent.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var env listResponse[store.Group]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Meta.Total != 2 || len(env.Data) != 2 {
+		t.Fatalf("want 2 children, got total=%d len=%d", env.Meta.Total, len(env.Data))
+	}
+}
+
+func TestAPI_permissionList_search(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domID := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + domID
+
+	var r store.Resource
+	if err := json.Unmarshal(mustPostJSON201(t, base+"/resources", `{"title":"res"}`), &r); err != nil {
+		t.Fatal(err)
+	}
+	for _, title := range []string{"can-read", "can-write", "can-read-all"} {
+		mustPostJSON201(t, base+"/permissions", fmt.Sprintf(`{"title":%q,"resource_id":%q,"access_mask":"1"}`, title, r.ID))
+	}
+
+	res, err := http.Get(base + "/permissions?search=can-read")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var env listResponse[store.Permission]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Meta.Total != 2 || len(env.Data) != 2 {
+		t.Fatalf("want 2, got total=%d len=%d", env.Meta.Total, len(env.Data))
+	}
+}
+
+func TestAPI_permissionList_filterByResourceID(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domID := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + domID
+
+	var r1, r2 store.Resource
+	if err := json.Unmarshal(mustPostJSON201(t, base+"/resources", `{"title":"res1"}`), &r1); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(mustPostJSON201(t, base+"/resources", `{"title":"res2"}`), &r2); err != nil {
+		t.Fatal(err)
+	}
+	mustPostJSON201(t, base+"/permissions", fmt.Sprintf(`{"title":"p1","resource_id":%q,"access_mask":"1"}`, r1.ID))
+	mustPostJSON201(t, base+"/permissions", fmt.Sprintf(`{"title":"p2","resource_id":%q,"access_mask":"2"}`, r1.ID))
+	mustPostJSON201(t, base+"/permissions", fmt.Sprintf(`{"title":"p3","resource_id":%q,"access_mask":"4"}`, r2.ID))
+
+	res, err := http.Get(base + "/permissions?resource_id=" + r1.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var env listResponse[store.Permission]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Meta.Total != 2 || len(env.Data) != 2 {
+		t.Fatalf("want 2 for r1, got total=%d len=%d", env.Meta.Total, len(env.Data))
+	}
+}
+
+func TestAPI_resourceList_search(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domID := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + domID
+	for _, title := range []string{"Document", "Image", "Documentation"} {
+		mustPostJSON201(t, base+"/resources", fmt.Sprintf(`{"title":%q}`, title))
+	}
+
+	res, err := http.Get(base + "/resources?search=doc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var env listResponse[store.Resource]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Meta.Total != 2 || len(env.Data) != 2 {
+		t.Fatalf("want 2, got total=%d len=%d", env.Meta.Total, len(env.Data))
+	}
+}
+
+func TestAPI_accessTypeList_search(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domID := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + domID
+	for i, title := range []string{"read", "write", "readonly"} {
+		mustPostJSON201(t, base+"/access-types", fmt.Sprintf(`{"title":%q,"bit":"%d"}`, title, 1<<i))
+	}
+
+	res, err := http.Get(base + "/access-types?search=read")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var env listResponse[store.AccessType]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Meta.Total != 2 || len(env.Data) != 2 {
+		t.Fatalf("want 2, got total=%d len=%d", env.Meta.Total, len(env.Data))
+	}
+}
+
+func TestAPI_domainList_searchEscapesWildcards(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"100% done"}`)
+	mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"normal"}`)
+	mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"test_case"}`)
+
+	res, err := http.Get(ts.URL + "/api/v1/domains?search=%25")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var env listResponse[store.Domain]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Meta.Total != 1 || len(env.Data) != 1 {
+		t.Fatalf("search for literal %%: want 1 result, got total=%d len=%d", env.Meta.Total, len(env.Data))
+	}
+}
+
+func TestAPI_parseListOpts(t *testing.T) {
 	tests := []struct {
 		name       string
 		qs         string
 		wantOffset int
 		wantLimit  int
+		wantSearch string
 		wantErr    bool
 	}{
-		{"defaults", "", 0, 20, false},
-		{"explicit", "offset=5&limit=10", 5, 10, false},
-		{"limit clamped low", "limit=0", 0, 1, false},
-		{"limit clamped high", "limit=200", 0, 100, false},
-		{"bad offset", "offset=abc", 0, 0, true},
-		{"negative offset", "offset=-1", 0, 0, true},
-		{"bad limit", "limit=xyz", 0, 0, true},
+		{"defaults", "", 0, 20, "", false},
+		{"explicit", "offset=5&limit=10", 5, 10, "", false},
+		{"limit clamped low", "limit=0", 0, 1, "", false},
+		{"limit clamped high", "limit=200", 0, 100, "", false},
+		{"bad offset", "offset=abc", 0, 0, "", true},
+		{"negative offset", "offset=-1", 0, 0, "", true},
+		{"bad limit", "limit=xyz", 0, 0, "", true},
+		{"search param", "search=hello", 0, 20, "hello", false},
+		{"search trimmed", "search=%20hi%20", 0, 20, "hi", false},
+		{"search with pagination", "search=foo&offset=2&limit=5", 2, 5, "foo", false},
+		{"search at max length", "search=" + strings.Repeat("a", 255), 0, 20, strings.Repeat("a", 255), false},
+		{"search too long", "search=" + strings.Repeat("a", 256), 0, 0, "", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/test?"+tt.qs, nil)
-			opts, err := parsePagination(req)
+			opts, err := parseListOpts(req)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("want error")
@@ -2775,6 +3099,9 @@ func TestAPI_parsePagination(t *testing.T) {
 			}
 			if opts.Offset != tt.wantOffset || opts.Limit != tt.wantLimit {
 				t.Fatalf("offset=%d limit=%d, want %d/%d", opts.Offset, opts.Limit, tt.wantOffset, tt.wantLimit)
+			}
+			if opts.Search != tt.wantSearch {
+				t.Fatalf("search=%q, want %q", opts.Search, tt.wantSearch)
 			}
 		})
 	}

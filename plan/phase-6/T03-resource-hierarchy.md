@@ -2,7 +2,7 @@
 
 ## Ticket
 
-**T3** — Resource hierarchy
+**T3** — Resource hierarchy (GitHub [#14](https://github.com/DanyalTorabi/access-manager/issues/14))
 
 ## Phase
 
