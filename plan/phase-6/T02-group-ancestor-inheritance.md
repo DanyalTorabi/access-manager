@@ -32,6 +32,10 @@ When enabled, users inherit **group_permissions** from **ancestor groups** (walk
 
 - User in child group receives permission attached only to parent group when feature on.
 
+## Deferred from PR #61
+
+- Root-group filter: allow `?parent_group_id=null` (or a sentinel) to list only root groups (`parent_group_id IS NULL`). Currently the filter only matches a concrete UUID.
+
 ## Out of scope
 
 - Cross-domain inheritance.
