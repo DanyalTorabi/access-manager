@@ -942,6 +942,9 @@ func parseListOpts(r *http.Request) (store.ListOpts, error) {
 		opts.Limit = n
 	}
 	opts.Search = strings.TrimSpace(q.Get("search"))
+	if len(opts.Search) > 255 {
+		return opts, errors.New("search must be at most 255 characters")
+	}
 	return opts, nil
 }
 
@@ -951,7 +954,7 @@ func parseGroupListOpts(r *http.Request) (store.GroupListOpts, error) {
 		return store.GroupListOpts{}, err
 	}
 	out := store.GroupListOpts{ListOpts: base}
-	if v := r.URL.Query().Get("parent_group_id"); v != "" {
+	if v := strings.TrimSpace(r.URL.Query().Get("parent_group_id")); v != "" {
 		out.ParentGroupID = &v
 	}
 	return out, nil
@@ -963,7 +966,7 @@ func parsePermissionListOpts(r *http.Request) (store.PermissionListOpts, error) 
 		return store.PermissionListOpts{}, err
 	}
 	out := store.PermissionListOpts{ListOpts: base}
-	if v := r.URL.Query().Get("resource_id"); v != "" {
+	if v := strings.TrimSpace(r.URL.Query().Get("resource_id")); v != "" {
 		out.ResourceID = &v
 	}
 	return out, nil

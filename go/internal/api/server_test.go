@@ -3081,6 +3081,8 @@ func TestAPI_parseListOpts(t *testing.T) {
 		{"search param", "search=hello", 0, 20, "hello", false},
 		{"search trimmed", "search=%20hi%20", 0, 20, "hi", false},
 		{"search with pagination", "search=foo&offset=2&limit=5", 2, 5, "foo", false},
+		{"search at max length", "search=" + strings.Repeat("a", 255), 0, 20, strings.Repeat("a", 255), false},
+		{"search too long", "search=" + strings.Repeat("a", 256), 0, 0, "", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
