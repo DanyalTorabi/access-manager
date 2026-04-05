@@ -62,7 +62,7 @@ Match effort to change size.
 
 ## Commits and pull requests (AI assistants)
 
-When starting work on a new ticket or task, **create a topic branch** from up-to-date **`main`** before making any file changes (see [docs/branching.md](docs/branching.md) for naming: `feature/`, `fix/`, `docs/`, `chore/`). Verify the current branch first (`git branch --show-current`); if already on the wrong branch, stash, switch, create, and pop.
+When starting work on a new ticket or task, **create a topic branch** from up-to-date **`main`** before making any file changes (see [docs/branching.md](docs/branching.md) for naming: `author/prefix/description`, all lowercase, e.g. `danyal/feature/t35-list-filtering`). Verify the current branch first (`git branch --show-current`); if already on the wrong branch, stash, switch, create, and pop.
 
 By default, **do not** run `git commit`, `git push`, or `gh pr create`. Provide a **proposed commit message** and **PR body** (Summary, Ticket, Checklist per [`.github/pull_request_template.md`](.github/pull_request_template.md)) for the human to paste. Run those git/`gh` commands only when the human **explicitly** asks you to.
 
