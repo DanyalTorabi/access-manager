@@ -2542,3 +2542,64 @@ func TestDomainList_searchEscapesWildcards(t *testing.T) {
 		t.Fatalf("search for literal backslash: want 0, got %d items total=%d", len(list), total)
 	}
 }
+
+func TestDomainList_searchType(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	for _, title := range []string{"Alpha", "Alphabet", "Beta"} {
+		if err := s.DomainCreate(ctx, &store.Domain{ID: uuid.NewString(), Title: title}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, total, err := s.DomainList(ctx, store.ListOpts{Limit: 100, Search: "Alpha", SearchType: store.SearchStartsWith})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 2 || len(list) != 2 {
+		t.Fatalf("starts_with Alpha: want 2, got %d items total=%d", len(list), total)
+	}
+
+	list, total, err = s.DomainList(ctx, store.ListOpts{Limit: 100, Search: "bet", SearchType: store.SearchEndsWith})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 1 || len(list) != 1 {
+		t.Fatalf("ends_with bet: want 1, got %d items total=%d", len(list), total)
+	}
+	if list[0].Title != "Alphabet" {
+		t.Fatalf("unexpected title: %s", list[0].Title)
+	}
+
+	_, total, err = s.DomainList(ctx, store.ListOpts{Limit: 100, Search: "lph", SearchType: store.SearchContains})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 2 {
+		t.Fatalf("contains lph: want 2, got total=%d", total)
+	}
+
+	_, total, err = s.DomainList(ctx, store.ListOpts{Limit: 100, Search: "lph"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 2 {
+		t.Fatalf("empty SearchType (default contains) lph: want 2, got total=%d", total)
+	}
+
+	_, total, err = s.DomainList(ctx, store.ListOpts{Limit: 100, Search: "Alp", SearchType: store.SearchEndsWith})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 0 {
+		t.Fatalf("ends_with Alp: want 0, got total=%d", total)
+	}
+
+	_, total, err = s.DomainList(ctx, store.ListOpts{Limit: 100, Search: "eta", SearchType: store.SearchStartsWith})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 0 {
+		t.Fatalf("starts_with eta: want 0, got total=%d", total)
+	}
+}

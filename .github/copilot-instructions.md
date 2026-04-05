@@ -36,6 +36,15 @@
 - Deferred work must reference a ticket: `// TODO(T14): ...`.
 - Keep functions focused; extract testable helpers from `main()`.
 
+## Code Review Scope
+
+When reviewing a PR, always review **all changed files** — not a partial subset. Cross-cutting concerns (shared helpers, type changes, API contracts) can only be caught by reading the full diff. Specifically:
+
+- If a type or helper is added/changed in one file, verify every call site in the diff uses it correctly.
+- If a query parameter or API contract is added, check that OpenAPI, Postman, tests, and handler code are all consistent.
+- If a constant or enum is introduced, confirm exhaustive handling (switch cases, validation, docs).
+- Do not skip files because they look "low risk" (e.g. docs, CHANGELOG, Postman JSON) — contract mismatches hide there.
+
 ## Pull Request Expectations
 
 - `make test` and `make lint` must pass.

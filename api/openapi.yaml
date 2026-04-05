@@ -110,7 +110,16 @@ components:
       schema:
         type: string
         maxLength: 255
-      description: Case-insensitive substring match on title. LIKE wildcards (`%`, `_`) are treated as literals.
+      description: Case-insensitive match on title. LIKE wildcards (`%`, `_`) are treated as literals. Match mode controlled by `search_type`.
+    searchTypeParam:
+      name: search_type
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [contains, starts_with, ends_with]
+        default: contains
+      description: How to match the search term against title. Only applies when `search` is non-empty.
 
   schemas:
     ListMeta:
@@ -388,6 +397,7 @@ paths:
         - $ref: "#/components/parameters/offsetParam"
         - $ref: "#/components/parameters/limitParam"
         - $ref: "#/components/parameters/searchParam"
+        - $ref: "#/components/parameters/searchTypeParam"
       responses:
         "200":
           description: OK
@@ -528,6 +538,7 @@ paths:
         - $ref: "#/components/parameters/offsetParam"
         - $ref: "#/components/parameters/limitParam"
         - $ref: "#/components/parameters/searchParam"
+        - $ref: "#/components/parameters/searchTypeParam"
       responses:
         "200":
           description: OK
@@ -668,6 +679,7 @@ paths:
         - $ref: "#/components/parameters/offsetParam"
         - $ref: "#/components/parameters/limitParam"
         - $ref: "#/components/parameters/searchParam"
+        - $ref: "#/components/parameters/searchTypeParam"
         - name: parent_group_id
           in: query
           required: false
@@ -844,6 +856,7 @@ paths:
         - $ref: "#/components/parameters/offsetParam"
         - $ref: "#/components/parameters/limitParam"
         - $ref: "#/components/parameters/searchParam"
+        - $ref: "#/components/parameters/searchTypeParam"
       responses:
         "200":
           description: OK
@@ -984,6 +997,7 @@ paths:
         - $ref: "#/components/parameters/offsetParam"
         - $ref: "#/components/parameters/limitParam"
         - $ref: "#/components/parameters/searchParam"
+        - $ref: "#/components/parameters/searchTypeParam"
       responses:
         "200":
           description: OK
@@ -1123,6 +1137,7 @@ paths:
         - $ref: "#/components/parameters/offsetParam"
         - $ref: "#/components/parameters/limitParam"
         - $ref: "#/components/parameters/searchParam"
+        - $ref: "#/components/parameters/searchTypeParam"
         - name: resource_id
           in: query
           required: false

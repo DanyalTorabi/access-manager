@@ -8,9 +8,12 @@ downloading full pages.
 
 ## Design decisions
 
-- **Title search:** `?search=<term>` → case-insensitive `LIKE '%term%'` on `title`.
+- **Title search:** `?search=<term>` → case-insensitive `LIKE` on `title`.
   Empty or whitespace-only value is ignored. Max length 255 characters.
   SQL LIKE wildcards (`%`, `_`, `\`) are escaped before binding.
+- **Search type:** `?search_type=contains|starts_with|ends_with` (default `contains`).
+  Controls LIKE pattern: `contains` = `'%term%'`, `starts_with` = `'term%'`,
+  `ends_with` = `'%term'`. Invalid values return 400. Ignored when `search` is empty.
 - **Entity-specific filters:**
   - Groups: `?parent_group_id=<uuid>` → `WHERE parent_group_id = ?`
   - Permissions: `?resource_id=<uuid>` → `WHERE resource_id = ?`
@@ -26,10 +29,10 @@ downloading full pages.
 
 | Layer | Change |
 |-------|--------|
-| `internal/store` | Add `Search` to `ListOpts`; add `GroupListOpts`, `PermissionListOpts`; update `GroupList`/`PermissionList` signatures |
-| `internal/store/sqlite` | Dynamic `WHERE` with escaped `LIKE` in all 6 `*List` methods; `parent_group_id`/`resource_id` filter in `GroupList`/`PermissionList` |
+| `internal/store` | Add `Search`, `SearchType` to `ListOpts`; add `GroupListOpts`, `PermissionListOpts`; update `GroupList`/`PermissionList` signatures |
+| `internal/store/sqlite` | `likePattern` helper builds `LIKE` arg from `SearchType`; dynamic `WHERE` in all 6 `*List` methods; `parent_group_id`/`resource_id` filter in `GroupList`/`PermissionList` |
 | `internal/api` | Rename `parsePagination` → `parseListOpts`; add `parseGroupListOpts`, `parsePermissionListOpts`; update 6 list handlers |
-| `api/openapi.yaml` | Add `search`, `parent_group_id`, `resource_id` query params; paginated envelope response schemas |
+| `api/openapi.yaml` | Add `search`, `search_type`, `parent_group_id`, `resource_id` query params; paginated envelope response schemas |
 | Postman collection | Add query params to 6 list requests |
 
 ## Security
