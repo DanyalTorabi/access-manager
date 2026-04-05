@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/dtorabi/access-manager/internal/access"
 	"github.com/dtorabi/access-manager/internal/logger"
@@ -942,7 +943,7 @@ func parseListOpts(r *http.Request) (store.ListOpts, error) {
 		opts.Limit = n
 	}
 	opts.Search = strings.TrimSpace(q.Get("search"))
-	if len(opts.Search) > 255 {
+	if utf8.RuneCountInString(opts.Search) > 255 {
 		return opts, errors.New("search must be at most 255 characters")
 	}
 	return opts, nil

@@ -34,7 +34,7 @@
       },
       "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["var json = pm.response.json();", "if (json.ID) pm.collectionVariables.set('domainId', json.ID);"]}}]
     },
-    {"name": "List domains", "request": {"method": "GET", "url": {"raw": "{{baseUrl}}/api/v1/domains?offset=0&limit=20&search=", "host": ["{{baseUrl}}"], "path": ["api","v1","domains"], "query": [{"key": "offset", "value": "0"}, {"key": "limit", "value": "20"}, {"key": "search", "value": "", "description": "Case-insensitive title substring"}]}}},
+    {"name": "List domains", "request": {"method": "GET", "url": {"raw": "{{baseUrl}}/api/v1/domains?offset=0&limit=20&search=", "query": [{"key": "offset", "value": "0"}, {"key": "limit", "value": "20"}, {"key": "search", "value": "", "description": "Case-insensitive title substring"}]}}},
     {"name": "Get domain", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}"}},
     {
       "name": "Patch domain",
@@ -55,7 +55,7 @@
       },
       "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["var json = pm.response.json();", "if (json.ID) pm.collectionVariables.set('userId', json.ID);"]}}]
     },
-    {"name": "List users", "request": {"method": "GET", "url": {"raw": "{{baseUrl}}/api/v1/domains/{{domainId}}/users?offset=0&limit=20&search=", "host": ["{{baseUrl}}"], "path": ["api","v1","domains","{{domainId}}","users"], "query": [{"key": "offset", "value": "0"}, {"key": "limit", "value": "20"}, {"key": "search", "value": "", "description": "Case-insensitive title substring"}]}}},
+    {"name": "List users", "request": {"method": "GET", "url": {"raw": "{{baseUrl}}/api/v1/domains/{{domainId}}/users?offset=0&limit=20&search=", "query": [{"key": "offset", "value": "0"}, {"key": "limit", "value": "20"}, {"key": "search", "value": "", "description": "Case-insensitive title substring"}]}}},
     {"name": "Get user", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}"}},
     {
       "name": "Patch user",
@@ -76,7 +76,7 @@
       },
       "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["var json = pm.response.json();", "if (json.ID) pm.collectionVariables.set('groupId', json.ID);"]}}]
     },
-    {"name": "List groups", "request": {"method": "GET", "url": {"raw": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups?offset=0&limit=20&search=&parent_group_id=", "host": ["{{baseUrl}}"], "path": ["api","v1","domains","{{domainId}}","groups"], "query": [{"key": "offset", "value": "0"}, {"key": "limit", "value": "20"}, {"key": "search", "value": "", "description": "Case-insensitive title substring"}, {"key": "parent_group_id", "value": "", "description": "Filter by parent group UUID"}]}}},
+    {"name": "List groups", "request": {"method": "GET", "url": {"raw": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups?offset=0&limit=20&search=&parent_group_id=", "query": [{"key": "offset", "value": "0"}, {"key": "limit", "value": "20"}, {"key": "search", "value": "", "description": "Case-insensitive title substring"}, {"key": "parent_group_id", "value": "", "description": "Filter by parent group UUID"}]}}},
     {"name": "Get group", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups/{{groupId}}"}},
     {
       "name": "Patch group",
@@ -106,7 +106,7 @@
       },
       "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["var json = pm.response.json();", "if (json.ID) pm.collectionVariables.set('resourceId', json.ID);"]}}]
     },
-    {"name": "List resources", "request": {"method": "GET", "url": {"raw": "{{baseUrl}}/api/v1/domains/{{domainId}}/resources?offset=0&limit=20&search=", "host": ["{{baseUrl}}"], "path": ["api","v1","domains","{{domainId}}","resources"], "query": [{"key": "offset", "value": "0"}, {"key": "limit", "value": "20"}, {"key": "search", "value": "", "description": "Case-insensitive title substring"}]}}},
+    {"name": "List resources", "request": {"method": "GET", "url": {"raw": "{{baseUrl}}/api/v1/domains/{{domainId}}/resources?offset=0&limit=20&search=", "query": [{"key": "offset", "value": "0"}, {"key": "limit", "value": "20"}, {"key": "search", "value": "", "description": "Case-insensitive title substring"}]}}},
     {"name": "Get resource", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/resources/{{resourceId}}"}},
     {
       "name": "Patch resource",
@@ -127,7 +127,7 @@
       },
       "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["var json = pm.response.json();", "if (json.ID) pm.collectionVariables.set('accessTypeId', json.ID);"]}}]
     },
-    {"name": "List access types", "request": {"method": "GET", "url": {"raw": "{{baseUrl}}/api/v1/domains/{{domainId}}/access-types?offset=0&limit=20&search=", "host": ["{{baseUrl}}"], "path": ["api","v1","domains","{{domainId}}","access-types"], "query": [{"key": "offset", "value": "0"}, {"key": "limit", "value": "20"}, {"key": "search", "value": "", "description": "Case-insensitive title substring"}]}}},
+    {"name": "List access types", "request": {"method": "GET", "url": {"raw": "{{baseUrl}}/api/v1/domains/{{domainId}}/access-types?offset=0&limit=20&search=", "query": [{"key": "offset", "value": "0"}, {"key": "limit", "value": "20"}, {"key": "search", "value": "", "description": "Case-insensitive title substring"}]}}},
     {"name": "Get access type", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/access-types/{{accessTypeId}}"}},
     {
       "name": "Patch access type",
@@ -148,7 +148,7 @@
       },
       "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["var json = pm.response.json();", "if (json.ID) pm.collectionVariables.set('permissionId', json.ID);"]}}]
     },
-    {"name": "List permissions", "request": {"method": "GET", "url": {"raw": "{{baseUrl}}/api/v1/domains/{{domainId}}/permissions?offset=0&limit=20&search=&resource_id=", "host": ["{{baseUrl}}"], "path": ["api","v1","domains","{{domainId}}","permissions"], "query": [{"key": "offset", "value": "0"}, {"key": "limit", "value": "20"}, {"key": "search", "value": "", "description": "Case-insensitive title substring"}, {"key": "resource_id", "value": "", "description": "Filter by resource UUID"}]}}},
+    {"name": "List permissions", "request": {"method": "GET", "url": {"raw": "{{baseUrl}}/api/v1/domains/{{domainId}}/permissions?offset=0&limit=20&search=&resource_id=", "query": [{"key": "offset", "value": "0"}, {"key": "limit", "value": "20"}, {"key": "search", "value": "", "description": "Case-insensitive title substring"}, {"key": "resource_id", "value": "", "description": "Filter by resource UUID"}]}}},
     {"name": "Get permission", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/permissions/{{permissionId}}"}},
     {
       "name": "Patch permission",
