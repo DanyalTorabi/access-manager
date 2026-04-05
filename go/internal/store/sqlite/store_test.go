@@ -2169,7 +2169,7 @@ func TestDomainList_search(t *testing.T) {
 		t.Fatalf("want 0, got %d items total=%d", len(list), total)
 	}
 
-	list, total, err = s.DomainList(ctx, store.ListOpts{Limit: 100, Search: ""})
+	_, total, err = s.DomainList(ctx, store.ListOpts{Limit: 100, Search: ""})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2262,7 +2262,7 @@ func TestGroupList_filterByParentGroupID(t *testing.T) {
 		t.Fatalf("unexpected children: %+v", list)
 	}
 
-	list, total, err = s.GroupList(ctx, domainID, store.GroupListOpts{
+	_, total, err = s.GroupList(ctx, domainID, store.GroupListOpts{
 		ListOpts: store.ListOpts{Limit: 100},
 	})
 	if err != nil {
