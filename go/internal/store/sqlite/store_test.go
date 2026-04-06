@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -2125,11 +2126,12 @@ func TestSanitizeListOpts(t *testing.T) {
 		in   store.ListOpts
 		want store.ListOpts
 	}{
-		{"zero limit defaults", store.ListOpts{Offset: 0, Limit: 0}, store.ListOpts{Offset: 0, Limit: store.DefaultLimit}},
-		{"negative limit defaults", store.ListOpts{Offset: 0, Limit: -5}, store.ListOpts{Offset: 0, Limit: store.DefaultLimit}},
-		{"over max capped", store.ListOpts{Offset: 0, Limit: 500}, store.ListOpts{Offset: 0, Limit: store.MaxLimit}},
-		{"negative offset zeroed", store.ListOpts{Offset: -3, Limit: 10}, store.ListOpts{Offset: 0, Limit: 10}},
-		{"valid unchanged", store.ListOpts{Offset: 5, Limit: 25}, store.ListOpts{Offset: 5, Limit: 25}},
+		{"zero limit defaults", store.ListOpts{Offset: 0, Limit: 0}, store.ListOpts{Offset: 0, Limit: store.DefaultLimit, Order: store.OrderAsc}},
+		{"negative limit defaults", store.ListOpts{Offset: 0, Limit: -5}, store.ListOpts{Offset: 0, Limit: store.DefaultLimit, Order: store.OrderAsc}},
+		{"over max capped", store.ListOpts{Offset: 0, Limit: 500}, store.ListOpts{Offset: 0, Limit: store.MaxLimit, Order: store.OrderAsc}},
+		{"negative offset zeroed", store.ListOpts{Offset: -3, Limit: 10}, store.ListOpts{Offset: 0, Limit: 10, Order: store.OrderAsc}},
+		{"valid unchanged", store.ListOpts{Offset: 5, Limit: 25}, store.ListOpts{Offset: 5, Limit: 25, Order: store.OrderAsc}},
+		{"order preserved when set", store.ListOpts{Offset: 0, Limit: 10, Order: store.OrderDesc}, store.ListOpts{Offset: 0, Limit: 10, Order: store.OrderDesc}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2602,4 +2604,353 @@ func TestDomainList_searchType(t *testing.T) {
 	if total != 0 {
 		t.Fatalf("starts_with eta: want 0, got total=%d", total)
 	}
+}
+
+func TestDomainList_sortDesc(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	for _, title := range []string{"Alpha", "Beta", "Charlie"} {
+		if err := s.DomainCreate(ctx, &store.Domain{ID: uuid.NewString(), Title: title}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, _, err := s.DomainList(ctx, store.ListOpts{Limit: 100, Sort: "title", Order: store.OrderDesc})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 3 {
+		t.Fatalf("want 3, got %d", len(list))
+	}
+	if list[0].Title != "Charlie" || list[2].Title != "Alpha" {
+		t.Fatalf("desc order: got %q, %q, %q", list[0].Title, list[1].Title, list[2].Title)
+	}
+}
+
+func TestDomainList_sortAscExplicit(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	for _, title := range []string{"Charlie", "Alpha", "Beta"} {
+		if err := s.DomainCreate(ctx, &store.Domain{ID: uuid.NewString(), Title: title}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, _, err := s.DomainList(ctx, store.ListOpts{Limit: 100, Sort: "title", Order: store.OrderAsc})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if list[0].Title != "Alpha" || list[2].Title != "Charlie" {
+		t.Fatalf("asc order: got %q, %q, %q", list[0].Title, list[1].Title, list[2].Title)
+	}
+}
+
+func TestUserList_sortDesc(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, title := range []string{"Alice", "Bob", "Charlie"} {
+		if err := s.UserCreate(ctx, &store.User{ID: uuid.NewString(), DomainID: domainID, Title: title}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, _, err := s.UserList(ctx, domainID, store.ListOpts{Limit: 100, Sort: "title", Order: store.OrderDesc})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if list[0].Title != "Charlie" || list[2].Title != "Alice" {
+		t.Fatalf("desc order: got %q, %q, %q", list[0].Title, list[1].Title, list[2].Title)
+	}
+}
+
+func TestGroupList_sortDesc(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, title := range []string{"Admins", "Editors", "Viewers"} {
+		if err := s.GroupCreate(ctx, &store.Group{ID: uuid.NewString(), DomainID: domainID, Title: title}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, _, err := s.GroupList(ctx, domainID, store.GroupListOpts{ListOpts: store.ListOpts{Limit: 100, Sort: "title", Order: store.OrderDesc}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if list[0].Title != "Viewers" || list[2].Title != "Admins" {
+		t.Fatalf("desc order: got %q, %q, %q", list[0].Title, list[1].Title, list[2].Title)
+	}
+}
+
+func TestResourceList_sortDesc(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, title := range []string{"Doc", "File", "Repo"} {
+		if err := s.ResourceCreate(ctx, &store.Resource{ID: uuid.NewString(), DomainID: domainID, Title: title}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, _, err := s.ResourceList(ctx, domainID, store.ListOpts{Limit: 100, Sort: "title", Order: store.OrderDesc})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if list[0].Title != "Repo" || list[2].Title != "Doc" {
+		t.Fatalf("desc order: got %q, %q, %q", list[0].Title, list[1].Title, list[2].Title)
+	}
+}
+
+func TestAccessTypeList_sortDesc(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	for i, title := range []string{"Read", "Write", "Execute"} {
+		if err := s.AccessTypeCreate(ctx, &store.AccessType{ID: uuid.NewString(), DomainID: domainID, Title: title, Bit: uint64(1 << i)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, _, err := s.AccessTypeList(ctx, domainID, store.ListOpts{Limit: 100, Sort: "title", Order: store.OrderDesc})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if list[0].Title != "Write" || list[2].Title != "Execute" {
+		t.Fatalf("desc order: got %q, %q, %q", list[0].Title, list[1].Title, list[2].Title)
+	}
+}
+
+func TestPermissionList_sortDesc(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	rid := uuid.NewString()
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, title := range []string{"perm-a", "perm-b", "perm-c"} {
+		if err := s.PermissionCreate(ctx, &store.Permission{ID: uuid.NewString(), DomainID: domainID, Title: title, ResourceID: rid, AccessMask: 1}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, _, err := s.PermissionList(ctx, domainID, store.PermissionListOpts{ListOpts: store.ListOpts{Limit: 100, Sort: "title", Order: store.OrderDesc}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if list[0].Title != "perm-c" || list[2].Title != "perm-a" {
+		t.Fatalf("desc order: got %q, %q, %q", list[0].Title, list[1].Title, list[2].Title)
+	}
+}
+
+func TestPermissionList_sortByResourceID(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	rids := []string{uuid.NewString(), uuid.NewString()}
+	for i, rid := range rids {
+		if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: fmt.Sprintf("r%d", i)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: uuid.NewString(), DomainID: domainID, Title: "p1", ResourceID: rids[1], AccessMask: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: uuid.NewString(), DomainID: domainID, Title: "p2", ResourceID: rids[0], AccessMask: 2}); err != nil {
+		t.Fatal(err)
+	}
+
+	list, _, err := s.PermissionList(ctx, domainID, store.PermissionListOpts{ListOpts: store.ListOpts{Limit: 100, Sort: "resource_id", Order: store.OrderAsc}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("want 2, got %d", len(list))
+	}
+	if list[0].ResourceID > list[1].ResourceID {
+		t.Fatalf("asc resource_id: %s should come before %s", list[0].ResourceID, list[1].ResourceID)
+	}
+
+	list, _, err = s.PermissionList(ctx, domainID, store.PermissionListOpts{ListOpts: store.ListOpts{Limit: 100, Sort: "resource_id", Order: store.OrderDesc}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if list[0].ResourceID < list[1].ResourceID {
+		t.Fatalf("desc resource_id: %s should come after %s", list[0].ResourceID, list[1].ResourceID)
+	}
+}
+
+func TestSortColumns(t *testing.T) {
+	t.Run("no overrides", func(t *testing.T) {
+		cols := sortColumns([]string{"title", "resource_id"}, nil)
+		if len(cols) != 2 {
+			t.Fatalf("want 2 entries, got %d", len(cols))
+		}
+		if cols["title"] != "title" || cols["resource_id"] != "resource_id" {
+			t.Fatalf("unexpected mapping: %v", cols)
+		}
+	})
+
+	t.Run("valid override", func(t *testing.T) {
+		cols := sortColumns([]string{"title"}, map[string]string{"title": "name"})
+		if cols["title"] != "name" {
+			t.Fatalf("want title→name, got title→%s", cols["title"])
+		}
+	})
+
+	t.Run("invalid override key ignored", func(t *testing.T) {
+		cols := sortColumns([]string{"title"}, map[string]string{"unknown": "col"})
+		if _, ok := cols["unknown"]; ok {
+			t.Fatal("override key not in fields should be ignored")
+		}
+		if len(cols) != 1 {
+			t.Fatalf("want 1 entry, got %d", len(cols))
+		}
+	})
+}
+
+func TestOrderByClause(t *testing.T) {
+	allowed := map[string]string{"title": "title", "resource_id": "resource_id"}
+
+	t.Run("known field", func(t *testing.T) {
+		got := orderByClause("title", store.OrderAsc, allowed, "title")
+		want := " ORDER BY title ASC, id ASC"
+		if got != want {
+			t.Fatalf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("empty defaults to fallback", func(t *testing.T) {
+		got := orderByClause("", store.OrderDesc, allowed, "title")
+		want := " ORDER BY title DESC, id DESC"
+		if got != want {
+			t.Fatalf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("unknown non-empty falls back with warning", func(t *testing.T) {
+		got := orderByClause("bogus", store.OrderAsc, allowed, "title")
+		want := " ORDER BY title ASC, id ASC"
+		if got != want {
+			t.Fatalf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("sort by id skips tiebreaker", func(t *testing.T) {
+		a := map[string]string{"id": "id"}
+		got := orderByClause("id", store.OrderAsc, a, "id")
+		want := " ORDER BY id ASC"
+		if got != want {
+			t.Fatalf("got %q, want %q", got, want)
+		}
+	})
+}
+
+func TestList_queryContextError(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	db, err := Open("file:" + filepath.Join(dir, "qctx.db") + "?_pragma=foreign_keys(1)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := MigrateUp(db, testutil.SQLiteMigrationsDir(t)); err != nil {
+		_ = db.Close()
+		t.Fatal(err)
+	}
+	s := New(db)
+
+	domID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	rid := uuid.NewString()
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+
+	opts := store.ListOpts{Limit: 10, Sort: "title", Order: store.OrderAsc}
+
+	dropAndReplace := func(table, viewSQL string) {
+		t.Helper()
+		if _, err := db.ExecContext(ctx, "PRAGMA foreign_keys = OFF"); err != nil {
+			t.Fatalf("disable FK: %v", err)
+		}
+		if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS "+table); err != nil {
+			t.Fatalf("drop %s: %v", table, err)
+		}
+		if _, err := db.ExecContext(ctx, viewSQL); err != nil {
+			t.Fatalf("create view %s: %v", table, err)
+		}
+		if _, err := db.ExecContext(ctx, "PRAGMA foreign_keys = ON"); err != nil {
+			t.Fatalf("enable FK: %v", err)
+		}
+	}
+
+	t.Run("UserList", func(t *testing.T) {
+		dropAndReplace("users", "CREATE VIEW users AS SELECT 'x' AS domain_id")
+		_, _, err := s.UserList(ctx, domID, opts)
+		if err == nil {
+			t.Fatal("want error")
+		}
+	})
+
+	t.Run("GroupList", func(t *testing.T) {
+		dropAndReplace("groups", "CREATE VIEW groups AS SELECT 'x' AS domain_id")
+		_, _, err := s.GroupList(ctx, domID, store.GroupListOpts{ListOpts: opts})
+		if err == nil {
+			t.Fatal("want error")
+		}
+	})
+
+	t.Run("ResourceList", func(t *testing.T) {
+		dropAndReplace("resources", "CREATE VIEW resources AS SELECT 'x' AS domain_id")
+		_, _, err := s.ResourceList(ctx, domID, opts)
+		if err == nil {
+			t.Fatal("want error")
+		}
+	})
+
+	t.Run("AccessTypeList", func(t *testing.T) {
+		dropAndReplace("access_types", "CREATE VIEW access_types AS SELECT 'x' AS domain_id")
+		_, _, err := s.AccessTypeList(ctx, domID, opts)
+		if err == nil {
+			t.Fatal("want error")
+		}
+	})
+
+	t.Run("PermissionList", func(t *testing.T) {
+		dropAndReplace("permissions", "CREATE VIEW permissions AS SELECT 'x' AS domain_id")
+		_, _, err := s.PermissionList(ctx, domID, store.PermissionListOpts{ListOpts: opts})
+		if err == nil {
+			t.Fatal("want error")
+		}
+	})
+
+	t.Run("DomainList", func(t *testing.T) {
+		dropAndReplace("domains", "CREATE VIEW domains AS SELECT 1 AS x")
+		_, _, err := s.DomainList(ctx, opts)
+		if err == nil {
+			t.Fatal("want error")
+		}
+	})
 }

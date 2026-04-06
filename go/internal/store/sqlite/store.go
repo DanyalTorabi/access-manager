@@ -60,6 +60,58 @@ var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 
 func escapeLikePattern(s string) string { return likeEscaper.Replace(s) }
 
+// sortColumns builds a field→column map from the store's allowed sort fields.
+// By default field name == column name; pass overrides for any allowed fields
+// whose column names differ. Override keys not present in fields are ignored.
+func sortColumns(fields []string, overrides map[string]string) map[string]string {
+	cols := make(map[string]string, len(fields))
+	for _, f := range fields {
+		cols[f] = f
+	}
+	for f, col := range overrides {
+		if _, ok := cols[f]; ok {
+			cols[f] = col
+		}
+	}
+	return cols
+}
+
+var (
+	domainSortColumns     = sortColumns(store.DomainSortFields, nil)
+	userSortColumns       = sortColumns(store.UserSortFields, nil)
+	groupSortColumns      = sortColumns(store.GroupSortFields, nil)
+	resourceSortColumns   = sortColumns(store.ResourceSortFields, nil)
+	accessTypeSortColumns = sortColumns(store.AccessTypeSortFields, nil)
+	permissionSortColumns = sortColumns(store.PermissionSortFields, nil)
+)
+
+// orderByClause returns a safe " ORDER BY <col> <dir>, id <dir>" clause.
+// sort should already be validated against the allow-list by the caller.
+// An empty sort falls back to fallbackCol. An unknown non-empty sort also
+// falls back to fallbackCol for compatibility, but emits a warning so
+// call-site bugs are not silently masked.
+// A secondary ", id" tiebreaker is always appended to guarantee
+// deterministic pagination when the primary column has duplicates.
+func orderByClause(sort string, order store.SortOrder, allowed map[string]string, fallbackCol string) string {
+	col := fallbackCol
+	if sort != "" {
+		if mapped, ok := allowed[sort]; ok {
+			col = mapped
+		} else {
+			slog.Warn("unknown sort field, falling back to default", "sort", sort, "fallback", fallbackCol)
+		}
+	}
+	dir := "ASC"
+	if order == store.OrderDesc {
+		dir = "DESC"
+	}
+	clause := " ORDER BY " + col + " " + dir
+	if col != "id" {
+		clause += ", id " + dir
+	}
+	return clause
+}
+
 func likePattern(search string, st store.SearchType) string {
 	escaped := escapeLikePattern(search)
 	switch st {
@@ -108,7 +160,7 @@ func (s *Store) DomainList(ctx context.Context, opts store.ListOpts) ([]store.Do
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, title FROM domains`+where+` ORDER BY title LIMIT ? OFFSET ?`,
+		`SELECT id, title FROM domains`+where+orderByClause(opts.Sort, opts.Order, domainSortColumns, "title")+` LIMIT ? OFFSET ?`, //nolint:gosec // G202: ORDER BY column from allow-list, not user input
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
@@ -186,7 +238,7 @@ func (s *Store) UserList(ctx context.Context, domainID string, opts store.ListOp
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title FROM users `+where+` ORDER BY title LIMIT ? OFFSET ?`,
+		`SELECT id, domain_id, title FROM users `+where+orderByClause(opts.Sort, opts.Order, userSortColumns, "title")+` LIMIT ? OFFSET ?`, //nolint:gosec // G202: ORDER BY column from allow-list, not user input
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
@@ -278,7 +330,7 @@ func (s *Store) GroupList(ctx context.Context, domainID string, opts store.Group
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title, parent_group_id FROM groups `+where+` ORDER BY title LIMIT ? OFFSET ?`,
+		`SELECT id, domain_id, title, parent_group_id FROM groups `+where+orderByClause(opts.Sort, opts.Order, groupSortColumns, "title")+` LIMIT ? OFFSET ?`, //nolint:gosec // G202: ORDER BY column from allow-list, not user input
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
@@ -442,7 +494,7 @@ func (s *Store) ResourceList(ctx context.Context, domainID string, opts store.Li
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title FROM resources `+where+` ORDER BY title LIMIT ? OFFSET ?`,
+		`SELECT id, domain_id, title FROM resources `+where+orderByClause(opts.Sort, opts.Order, resourceSortColumns, "title")+` LIMIT ? OFFSET ?`, //nolint:gosec // G202: ORDER BY column from allow-list, not user input
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
@@ -508,7 +560,7 @@ func (s *Store) AccessTypeList(ctx context.Context, domainID string, opts store.
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title, bit FROM access_types `+where+` ORDER BY bit LIMIT ? OFFSET ?`,
+		`SELECT id, domain_id, title, bit FROM access_types `+where+orderByClause(opts.Sort, opts.Order, accessTypeSortColumns, "title")+` LIMIT ? OFFSET ?`, //nolint:gosec // G202: ORDER BY column from allow-list, not user input
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
@@ -631,7 +683,7 @@ func (s *Store) PermissionList(ctx context.Context, domainID string, opts store.
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title, resource_id, access_mask FROM permissions `+where+` ORDER BY title LIMIT ? OFFSET ?`,
+		`SELECT id, domain_id, title, resource_id, access_mask FROM permissions `+where+orderByClause(opts.Sort, opts.Order, permissionSortColumns, "title")+` LIMIT ? OFFSET ?`, //nolint:gosec // G202: ORDER BY column from allow-list, not user input
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err

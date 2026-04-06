@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -181,6 +182,11 @@ func (s *Server) domainList(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
+	opts.Sort, opts.Order, err = parseSortOrder(r.URL.Query(), store.DomainSortFields)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
 	list, total, err := s.Store.DomainList(r.Context(), opts)
 	if err != nil {
 		writeInternalErr(w, r, err)
@@ -248,6 +254,11 @@ func (s *Server) userCreate(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) userList(w http.ResponseWriter, r *http.Request) {
 	opts, err := parseListOpts(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	opts.Sort, opts.Order, err = parseSortOrder(r.URL.Query(), store.UserSortFields)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
@@ -328,6 +339,11 @@ func (s *Server) groupCreate(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) groupList(w http.ResponseWriter, r *http.Request) {
 	opts, err := parseGroupListOpts(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	opts.Sort, opts.Order, err = parseSortOrder(r.URL.Query(), store.GroupSortFields)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
@@ -447,6 +463,11 @@ func (s *Server) resourceList(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
+	opts.Sort, opts.Order, err = parseSortOrder(r.URL.Query(), store.ResourceSortFields)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
 	domainID := chi.URLParam(r, "domainID")
 	list, total, err := s.Store.ResourceList(r.Context(), domainID, opts)
 	if err != nil {
@@ -527,6 +548,11 @@ func (s *Server) accessTypeCreate(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) accessTypeList(w http.ResponseWriter, r *http.Request) {
 	opts, err := parseListOpts(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	opts.Sort, opts.Order, err = parseSortOrder(r.URL.Query(), store.AccessTypeSortFields)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
@@ -628,6 +654,11 @@ func (s *Server) permissionCreate(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) permissionList(w http.ResponseWriter, r *http.Request) {
 	opts, err := parsePermissionListOpts(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	opts.Sort, opts.Order, err = parseSortOrder(r.URL.Query(), store.PermissionSortFields)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
@@ -906,9 +937,11 @@ func publicInvalidInputMsg(err error) string {
 const maxRequestBodySize = 1 << 20 // 1 MiB
 
 type listMeta struct {
-	Total  int64 `json:"total"`
-	Offset int   `json:"offset"`
-	Limit  int   `json:"limit"`
+	Total  int64  `json:"total"`
+	Offset int    `json:"offset"`
+	Limit  int    `json:"limit"`
+	Sort   string `json:"sort"`
+	Order  string `json:"order"`
 }
 
 type listEnvelope struct {
@@ -985,10 +1018,36 @@ func parsePermissionListOpts(r *http.Request) (store.PermissionListOpts, error) 
 	return out, nil
 }
 
+// parseSortOrder reads sort and order query params, validates them against
+// the allowed sort fields, and returns the validated values.
+func parseSortOrder(q url.Values, allowed []string) (string, store.SortOrder, error) {
+	sortField, err := store.ValidateSort(strings.TrimSpace(q.Get("sort")), allowed)
+	if err != nil {
+		return "", "", err
+	}
+	order := store.OrderAsc
+	if v := strings.TrimSpace(q.Get("order")); v != "" {
+		o := store.SortOrder(v)
+		switch o {
+		case store.OrderAsc, store.OrderDesc:
+			order = o
+		default:
+			return "", "", errors.New("order must be asc or desc")
+		}
+	}
+	return sortField, order, nil
+}
+
 func writeList(w http.ResponseWriter, data any, total int64, opts store.ListOpts) {
 	writeJSON(w, http.StatusOK, listEnvelope{
 		Data: data,
-		Meta: listMeta{Total: total, Offset: opts.Offset, Limit: opts.Limit},
+		Meta: listMeta{
+			Total:  total,
+			Offset: opts.Offset,
+			Limit:  opts.Limit,
+			Sort:   opts.Sort,
+			Order:  string(opts.Order),
+		},
 	})
 }
 
