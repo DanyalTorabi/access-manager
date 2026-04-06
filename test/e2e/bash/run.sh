@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# DEPRECATED: The Go E2E suite (go/e2e/) is now the primary E2E mechanism.
+# This bash script is kept for reference and may be removed in a future PR.
+#
 # T16 — optional curl+jq smoke (same journey as `go test -race -count=1 -tags=e2e ./e2e/...`).
 # Prerequisites: curl, jq (https://jqlang.org).
 # Usage: BASE_URL=http://127.0.0.1:8080 [API_BEARER_TOKEN=...] bash test/e2e/bash/run.sh

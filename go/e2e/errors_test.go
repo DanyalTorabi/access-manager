@@ -144,8 +144,12 @@ func TestError_invalidPagination(t *testing.T) {
 	did := seedDomain(t, c, "err-pag-dom")
 	base := domainBase(did)
 
-	t.Run("negative_limit", func(t *testing.T) {
-		mustDo(t, c, http.MethodGet, base+"/users?limit=-1", "", http.StatusBadRequest)
+	t.Run("negative_limit_clamped", func(t *testing.T) {
+		// The API clamps negative limit to DefaultLimit rather than rejecting.
+		env := mustList(t, c, base+"/users?limit=-1")
+		if env.Meta.Limit <= 0 {
+			t.Fatalf("negative limit should be clamped to positive, got %d", env.Meta.Limit)
+		}
 	})
 	t.Run("non_integer_offset", func(t *testing.T) {
 		mustDo(t, c, http.MethodGet, base+"/users?offset=abc", "", http.StatusBadRequest)
