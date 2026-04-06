@@ -3518,3 +3518,107 @@ func TestAPI_accessTypeList_sortDesc(t *testing.T) {
 		t.Fatalf("meta: sort=%q order=%q", env.Meta.Sort, env.Meta.Order)
 	}
 }
+
+func TestAPI_userList_invalidSort(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domainID := mustCreateDomain(t, ts)
+	res, err := http.Get(ts.URL + "/api/v1/domains/" + domainID + "/users?sort=bad")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d", res.StatusCode)
+	}
+}
+
+func TestAPI_userList_invalidOrder(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domainID := mustCreateDomain(t, ts)
+	res, err := http.Get(ts.URL + "/api/v1/domains/" + domainID + "/users?order=bad")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d", res.StatusCode)
+	}
+}
+
+func TestAPI_groupList_invalidSort(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domainID := mustCreateDomain(t, ts)
+	res, err := http.Get(ts.URL + "/api/v1/domains/" + domainID + "/groups?sort=bad")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d", res.StatusCode)
+	}
+}
+
+func TestAPI_groupList_invalidOrder(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domainID := mustCreateDomain(t, ts)
+	res, err := http.Get(ts.URL + "/api/v1/domains/" + domainID + "/groups?order=bad")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d", res.StatusCode)
+	}
+}
+
+func TestAPI_resourceList_invalidSort(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domainID := mustCreateDomain(t, ts)
+	res, err := http.Get(ts.URL + "/api/v1/domains/" + domainID + "/resources?sort=bad")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d", res.StatusCode)
+	}
+}
+
+func TestAPI_resourceList_invalidOrder(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domainID := mustCreateDomain(t, ts)
+	res, err := http.Get(ts.URL + "/api/v1/domains/" + domainID + "/resources?order=bad")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d", res.StatusCode)
+	}
+}
+
+func TestAPI_accessTypeList_invalidSort(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domainID := mustCreateDomain(t, ts)
+	res, err := http.Get(ts.URL + "/api/v1/domains/" + domainID + "/access-types?sort=bad")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d", res.StatusCode)
+	}
+}
+
+func TestAPI_accessTypeList_invalidOrder(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domainID := mustCreateDomain(t, ts)
+	res, err := http.Get(ts.URL + "/api/v1/domains/" + domainID + "/access-types?order=bad")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d", res.StatusCode)
+	}
+}
