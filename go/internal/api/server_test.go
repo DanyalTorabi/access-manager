@@ -67,22 +67,10 @@ func newTestAPI(t *testing.T) (*httptest.Server, store.Store) {
 	return ts, st
 }
 
-// mustPostJSON201 POSTs JSON and returns the body after asserting http.StatusCreated.
-func mustPostJSON201(t *testing.T, urlStr, body string) []byte {
+// mustPostJSON201 is a convenience wrapper for mustPostJSON with http.StatusCreated.
+func mustPostJSON201(t *testing.T, url, body string) []byte {
 	t.Helper()
-	res, err := http.Post(urlStr, "application/json", strings.NewReader(body))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = res.Body.Close() }()
-	b, err := io.ReadAll(res.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if res.StatusCode != http.StatusCreated {
-		t.Fatalf("POST %s want 201 got %d: %s", urlStr, res.StatusCode, b)
-	}
-	return b
+	return mustPostJSON(t, url, body, http.StatusCreated)
 }
 
 // auditLogEntries returns each newline-delimited JSON object from buf that has audit=true.
