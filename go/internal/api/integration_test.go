@@ -100,7 +100,7 @@ func TestIntegration_concurrentWrites(t *testing.T) {
 	base := domainBase(ts, domID)
 
 	const n = 20
-	errs := make(chan error, n*3)
+	errs := make(chan error, n)
 	var wg sync.WaitGroup
 
 	for i := 0; i < n; i++ {
@@ -109,16 +109,28 @@ func TestIntegration_concurrentWrites(t *testing.T) {
 			defer wg.Done()
 			title := fmt.Sprintf("user-%d", i)
 
-			b := mustPostJSON(t, base+"/users", fmt.Sprintf(`{"title":%q}`, title), http.StatusCreated)
+			b, err := doRequestErr(http.MethodPost, base+"/users",
+				fmt.Sprintf(`{"title":%q}`, title), http.StatusCreated)
+			if err != nil {
+				errs <- err
+				return
+			}
 			var created struct{ ID string }
 			if err := json.Unmarshal(b, &created); err != nil {
-				errs <- fmt.Errorf("create user %d: %w", i, err)
+				errs <- fmt.Errorf("create user %d unmarshal: %w", i, err)
 				return
 			}
 
-			mustPatchJSON(t, base+"/users/"+created.ID,
-				fmt.Sprintf(`{"title":%q}`, title+"-patched"), http.StatusOK)
-			mustDeleteReq(t, base+"/users/"+created.ID, http.StatusNoContent)
+			if _, err := doRequestErr(http.MethodPatch, base+"/users/"+created.ID,
+				fmt.Sprintf(`{"title":%q}`, title+"-patched"), http.StatusOK); err != nil {
+				errs <- err
+				return
+			}
+			if _, err := doRequestErr(http.MethodDelete, base+"/users/"+created.ID,
+				"", http.StatusNoContent); err != nil {
+				errs <- err
+				return
+			}
 		}(i)
 	}
 

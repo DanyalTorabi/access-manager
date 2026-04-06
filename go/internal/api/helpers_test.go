@@ -162,3 +162,33 @@ func revokeUserPerm(t *testing.T, ts *httptest.Server, domainID, userID, permID 
 	t.Helper()
 	mustDeleteReq(t, domainBase(ts, domainID)+"/users/"+userID+"/permissions/"+permID, http.StatusNoContent)
 }
+
+// doRequestErr is a goroutine-safe variant of mustDoRequest that returns the
+// response body and an error instead of calling t.Fatal (which is unsafe from
+// non-test goroutines).
+func doRequestErr(method, url, body string, wantStatus int) ([]byte, error) {
+	var bodyReader io.Reader
+	if body != "" {
+		bodyReader = strings.NewReader(body)
+	}
+	req, err := http.NewRequest(method, url, bodyReader)
+	if err != nil {
+		return nil, fmt.Errorf("%s %s: build request: %w", method, url, err)
+	}
+	if body != "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("%s %s: %w", method, url, err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	b, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("%s %s: read body: %w", method, url, err)
+	}
+	if res.StatusCode != wantStatus {
+		return nil, fmt.Errorf("%s %s: want %d, got %d: %s", method, url, wantStatus, res.StatusCode, b)
+	}
+	return b, nil
+}
