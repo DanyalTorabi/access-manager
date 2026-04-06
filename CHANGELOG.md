@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **T40 / #55:** `access-types` list default sort changed from `bit` to `title` for consistency with other entities. Clients relying on bit-order should add `?sort=bit` (once added) or sort client-side.
 - **T34 / #45 (breaking):** List endpoint responses changed from bare JSON arrays to paginated `{"data": [...], "meta": {...}}` envelope. Clients must update to read `data` for items and `meta` for pagination info.
 - Migrated `cmd/server` from `log.Printf` / `log.Fatal` to structured `internal/logger` calls
 - Pinned toolchain to **go1.25.8** via `toolchain` in `go/go.mod` (language `go 1.25.0`) for stdlib security patches
