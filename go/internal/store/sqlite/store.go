@@ -85,11 +85,13 @@ var (
 	permissionSortColumns = sortColumns(store.PermissionSortFields, nil)
 )
 
-// orderByClause returns a safe " ORDER BY <col> <dir>" clause.
+// orderByClause returns a safe " ORDER BY <col> <dir>, id <dir>" clause.
 // sort should already be validated against the allow-list by the caller.
 // An empty sort falls back to fallbackCol. An unknown non-empty sort also
 // falls back to fallbackCol for compatibility, but emits a warning so
 // call-site bugs are not silently masked.
+// A secondary ", id" tiebreaker is always appended to guarantee
+// deterministic pagination when the primary column has duplicates.
 func orderByClause(sort string, order store.SortOrder, allowed map[string]string, fallbackCol string) string {
 	col := fallbackCol
 	if sort != "" {
@@ -103,7 +105,11 @@ func orderByClause(sort string, order store.SortOrder, allowed map[string]string
 	if order == store.OrderDesc {
 		dir = "DESC"
 	}
-	return " ORDER BY " + col + " " + dir
+	clause := " ORDER BY " + col + " " + dir
+	if col != "id" {
+		clause += ", id " + dir
+	}
+	return clause
 }
 
 func likePattern(search string, st store.SearchType) string {
