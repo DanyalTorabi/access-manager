@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -2602,5 +2603,199 @@ func TestDomainList_searchType(t *testing.T) {
 	}
 	if total != 0 {
 		t.Fatalf("starts_with eta: want 0, got total=%d", total)
+	}
+}
+
+func TestDomainList_sortDesc(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	for _, title := range []string{"Alpha", "Beta", "Charlie"} {
+		if err := s.DomainCreate(ctx, &store.Domain{ID: uuid.NewString(), Title: title}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, _, err := s.DomainList(ctx, store.ListOpts{Limit: 100, Sort: "title", Order: store.OrderDesc})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 3 {
+		t.Fatalf("want 3, got %d", len(list))
+	}
+	if list[0].Title != "Charlie" || list[2].Title != "Alpha" {
+		t.Fatalf("desc order: got %q, %q, %q", list[0].Title, list[1].Title, list[2].Title)
+	}
+}
+
+func TestDomainList_sortAscExplicit(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	for _, title := range []string{"Charlie", "Alpha", "Beta"} {
+		if err := s.DomainCreate(ctx, &store.Domain{ID: uuid.NewString(), Title: title}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, _, err := s.DomainList(ctx, store.ListOpts{Limit: 100, Sort: "title", Order: store.OrderAsc})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if list[0].Title != "Alpha" || list[2].Title != "Charlie" {
+		t.Fatalf("asc order: got %q, %q, %q", list[0].Title, list[1].Title, list[2].Title)
+	}
+}
+
+func TestUserList_sortDesc(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, title := range []string{"Alice", "Bob", "Charlie"} {
+		if err := s.UserCreate(ctx, &store.User{ID: uuid.NewString(), DomainID: domainID, Title: title}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, _, err := s.UserList(ctx, domainID, store.ListOpts{Limit: 100, Sort: "title", Order: store.OrderDesc})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if list[0].Title != "Charlie" || list[2].Title != "Alice" {
+		t.Fatalf("desc order: got %q, %q, %q", list[0].Title, list[1].Title, list[2].Title)
+	}
+}
+
+func TestGroupList_sortDesc(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, title := range []string{"Admins", "Editors", "Viewers"} {
+		if err := s.GroupCreate(ctx, &store.Group{ID: uuid.NewString(), DomainID: domainID, Title: title}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, _, err := s.GroupList(ctx, domainID, store.GroupListOpts{ListOpts: store.ListOpts{Limit: 100, Sort: "title", Order: store.OrderDesc}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if list[0].Title != "Viewers" || list[2].Title != "Admins" {
+		t.Fatalf("desc order: got %q, %q, %q", list[0].Title, list[1].Title, list[2].Title)
+	}
+}
+
+func TestResourceList_sortDesc(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, title := range []string{"Doc", "File", "Repo"} {
+		if err := s.ResourceCreate(ctx, &store.Resource{ID: uuid.NewString(), DomainID: domainID, Title: title}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, _, err := s.ResourceList(ctx, domainID, store.ListOpts{Limit: 100, Sort: "title", Order: store.OrderDesc})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if list[0].Title != "Repo" || list[2].Title != "Doc" {
+		t.Fatalf("desc order: got %q, %q, %q", list[0].Title, list[1].Title, list[2].Title)
+	}
+}
+
+func TestAccessTypeList_sortDesc(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	for i, title := range []string{"Read", "Write", "Execute"} {
+		if err := s.AccessTypeCreate(ctx, &store.AccessType{ID: uuid.NewString(), DomainID: domainID, Title: title, Bit: uint64(1 << i)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, _, err := s.AccessTypeList(ctx, domainID, store.ListOpts{Limit: 100, Sort: "title", Order: store.OrderDesc})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if list[0].Title != "Write" || list[2].Title != "Execute" {
+		t.Fatalf("desc order: got %q, %q, %q", list[0].Title, list[1].Title, list[2].Title)
+	}
+}
+
+func TestPermissionList_sortDesc(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	rid := uuid.NewString()
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, title := range []string{"perm-a", "perm-b", "perm-c"} {
+		if err := s.PermissionCreate(ctx, &store.Permission{ID: uuid.NewString(), DomainID: domainID, Title: title, ResourceID: rid, AccessMask: 1}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, _, err := s.PermissionList(ctx, domainID, store.PermissionListOpts{ListOpts: store.ListOpts{Limit: 100, Sort: "title", Order: store.OrderDesc}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if list[0].Title != "perm-c" || list[2].Title != "perm-a" {
+		t.Fatalf("desc order: got %q, %q, %q", list[0].Title, list[1].Title, list[2].Title)
+	}
+}
+
+func TestPermissionList_sortByResourceID(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	rids := []string{uuid.NewString(), uuid.NewString()}
+	for i, rid := range rids {
+		if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: fmt.Sprintf("r%d", i)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: uuid.NewString(), DomainID: domainID, Title: "p1", ResourceID: rids[1], AccessMask: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: uuid.NewString(), DomainID: domainID, Title: "p2", ResourceID: rids[0], AccessMask: 2}); err != nil {
+		t.Fatal(err)
+	}
+
+	list, _, err := s.PermissionList(ctx, domainID, store.PermissionListOpts{ListOpts: store.ListOpts{Limit: 100, Sort: "resource_id", Order: store.OrderAsc}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("want 2, got %d", len(list))
+	}
+	if list[0].ResourceID > list[1].ResourceID {
+		t.Fatalf("asc resource_id: %s should come before %s", list[0].ResourceID, list[1].ResourceID)
+	}
+
+	list, _, err = s.PermissionList(ctx, domainID, store.PermissionListOpts{ListOpts: store.ListOpts{Limit: 100, Sort: "resource_id", Order: store.OrderDesc}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if list[0].ResourceID < list[1].ResourceID {
+		t.Fatalf("desc resource_id: %s should come after %s", list[0].ResourceID, list[1].ResourceID)
 	}
 }
