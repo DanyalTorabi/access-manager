@@ -3352,3 +3352,37 @@ func TestAPI_permissionList_invalidSort(t *testing.T) {
 		t.Fatalf("want 400, got %d", res.StatusCode)
 	}
 }
+
+func TestAPI_accessTypeList_defaultSortByTitle(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domainID := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + domainID
+
+	mustPostJSON201(t, base+"/access-types", `{"title":"Zebra","bit":"0x1"}`)
+	mustPostJSON201(t, base+"/access-types", `{"title":"Alpha","bit":"0x2"}`)
+	mustPostJSON201(t, base+"/access-types", `{"title":"Middle","bit":"0x4"}`)
+
+	res, err := http.Get(base + "/access-types")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var env listResponse[store.AccessType]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if len(env.Data) != 3 {
+		t.Fatalf("want 3 items, got %d", len(env.Data))
+	}
+	if env.Data[0].Title != "Alpha" || env.Data[1].Title != "Middle" || env.Data[2].Title != "Zebra" {
+		t.Fatalf("expected title-asc order, got %q %q %q",
+			env.Data[0].Title, env.Data[1].Title, env.Data[2].Title)
+	}
+	if env.Meta.Sort != "title" || env.Meta.Order != "asc" {
+		t.Fatalf("meta: sort=%q order=%q", env.Meta.Sort, env.Meta.Order)
+	}
+}
