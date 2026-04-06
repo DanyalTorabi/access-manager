@@ -390,7 +390,9 @@ func TestIntegration_permissionMaskArithmetic(t *testing.T) {
 		assertAuthzCheck(t, base, uid, r2, "0x1", false)
 	})
 
-	// Must run last: revokes p1, which invalidates earlier check_direct_bit* assertions.
+	// WARNING: must run last — revokes p1, mutating shared state.
+	// Do NOT add t.Parallel() or reorder subtests in this function.
+	// If you need independent assertions, copy fixtures into a separate test.
 	t.Run("revoke_and_recheck", func(t *testing.T) {
 		revokeUserPerm(t, ts, did, uid, p1)
 

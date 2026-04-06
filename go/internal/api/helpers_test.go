@@ -8,12 +8,15 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
+
+var testClient = &http.Client{Timeout: 10 * time.Second}
 
 // mustGet performs a GET and asserts the expected status code.
 func mustGet(t *testing.T, url string, wantStatus int) []byte {
 	t.Helper()
-	res, err := http.Get(url)
+	res, err := testClient.Get(url)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +45,7 @@ func mustDoRequest(t *testing.T, method, url, body string, wantStatus int) []byt
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	res, err := http.DefaultClient.Do(req)
+	res, err := testClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +176,7 @@ func doRequestErr(method, url, body string, wantStatus int) ([]byte, error) {
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	res, err := http.DefaultClient.Do(req)
+	res, err := testClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("%s %s: %w", method, url, err)
 	}
