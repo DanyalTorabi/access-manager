@@ -49,14 +49,53 @@ func TestValidateSort(t *testing.T) {
 	}
 }
 
-func TestSanitizeListOpts_orderDefault(t *testing.T) {
-	opts := SanitizeListOpts(ListOpts{Limit: 10})
-	if opts.Order != OrderAsc {
-		t.Fatalf("Order: got %q, want %q", opts.Order, OrderAsc)
-	}
+func TestSanitizeListOpts(t *testing.T) {
+	t.Run("order defaults to asc", func(t *testing.T) {
+		opts := SanitizeListOpts(ListOpts{Limit: 10})
+		if opts.Order != OrderAsc {
+			t.Fatalf("Order: got %q, want %q", opts.Order, OrderAsc)
+		}
+	})
 
-	opts = SanitizeListOpts(ListOpts{Limit: 10, Order: OrderDesc})
-	if opts.Order != OrderDesc {
-		t.Fatalf("Order preserved: got %q, want %q", opts.Order, OrderDesc)
-	}
+	t.Run("order preserved when set", func(t *testing.T) {
+		opts := SanitizeListOpts(ListOpts{Limit: 10, Order: OrderDesc})
+		if opts.Order != OrderDesc {
+			t.Fatalf("Order: got %q, want %q", opts.Order, OrderDesc)
+		}
+	})
+
+	t.Run("limit defaults when zero", func(t *testing.T) {
+		opts := SanitizeListOpts(ListOpts{})
+		if opts.Limit != DefaultLimit {
+			t.Fatalf("Limit: got %d, want %d", opts.Limit, DefaultLimit)
+		}
+	})
+
+	t.Run("limit defaults when negative", func(t *testing.T) {
+		opts := SanitizeListOpts(ListOpts{Limit: -5})
+		if opts.Limit != DefaultLimit {
+			t.Fatalf("Limit: got %d, want %d", opts.Limit, DefaultLimit)
+		}
+	})
+
+	t.Run("limit capped at max", func(t *testing.T) {
+		opts := SanitizeListOpts(ListOpts{Limit: MaxLimit + 50})
+		if opts.Limit != MaxLimit {
+			t.Fatalf("Limit: got %d, want %d", opts.Limit, MaxLimit)
+		}
+	})
+
+	t.Run("negative offset floored to zero", func(t *testing.T) {
+		opts := SanitizeListOpts(ListOpts{Limit: 10, Offset: -3})
+		if opts.Offset != 0 {
+			t.Fatalf("Offset: got %d, want 0", opts.Offset)
+		}
+	})
+
+	t.Run("valid values unchanged", func(t *testing.T) {
+		opts := SanitizeListOpts(ListOpts{Limit: 50, Offset: 10, Order: OrderDesc})
+		if opts.Limit != 50 || opts.Offset != 10 || opts.Order != OrderDesc {
+			t.Fatalf("got Limit=%d Offset=%d Order=%q", opts.Limit, opts.Offset, opts.Order)
+		}
+	})
 }
