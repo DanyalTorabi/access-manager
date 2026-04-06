@@ -60,13 +60,26 @@ var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 
 func escapeLikePattern(s string) string { return likeEscaper.Replace(s) }
 
+// sortColumns builds a field→column map from the store's allowed sort fields.
+// By default field name == column name; pass overrides for any that differ.
+func sortColumns(fields []string, overrides map[string]string) map[string]string {
+	cols := make(map[string]string, len(fields))
+	for _, f := range fields {
+		cols[f] = f
+	}
+	for f, col := range overrides {
+		cols[f] = col
+	}
+	return cols
+}
+
 var (
-	domainSortColumns     = map[string]string{"title": "title"}
-	userSortColumns       = map[string]string{"title": "title"}
-	groupSortColumns      = map[string]string{"title": "title"}
-	resourceSortColumns   = map[string]string{"title": "title"}
-	accessTypeSortColumns = map[string]string{"title": "title"}
-	permissionSortColumns = map[string]string{"title": "title", "resource_id": "resource_id"}
+	domainSortColumns     = sortColumns(store.DomainSortFields, nil)
+	userSortColumns       = sortColumns(store.UserSortFields, nil)
+	groupSortColumns      = sortColumns(store.GroupSortFields, nil)
+	resourceSortColumns   = sortColumns(store.ResourceSortFields, nil)
+	accessTypeSortColumns = sortColumns(store.AccessTypeSortFields, nil)
+	permissionSortColumns = sortColumns(store.PermissionSortFields, nil)
 )
 
 // orderByClause returns a safe " ORDER BY <col> <dir>" clause.
