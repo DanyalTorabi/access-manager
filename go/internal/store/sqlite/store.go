@@ -86,13 +86,18 @@ var (
 )
 
 // orderByClause returns a safe " ORDER BY <col> <dir>" clause.
-// sort must already be validated against the allow-list. If the field is
-// missing from allowed (defensive, or empty from direct store calls),
-// it falls back to fallbackCol.
+// sort should already be validated against the allow-list by the caller.
+// An empty sort falls back to fallbackCol. An unknown non-empty sort also
+// falls back to fallbackCol for compatibility, but emits a warning so
+// call-site bugs are not silently masked.
 func orderByClause(sort string, order store.SortOrder, allowed map[string]string, fallbackCol string) string {
-	col, ok := allowed[sort]
-	if !ok {
-		col = fallbackCol
+	col := fallbackCol
+	if sort != "" {
+		if mapped, ok := allowed[sort]; ok {
+			col = mapped
+		} else {
+			slog.Warn("unknown sort field, falling back to default", "sort", sort, "fallback", fallbackCol)
+		}
 	}
 	dir := "ASC"
 	if order == store.OrderDesc {
