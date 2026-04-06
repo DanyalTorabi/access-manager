@@ -2865,3 +2865,92 @@ func TestOrderByClause(t *testing.T) {
 		}
 	})
 }
+
+func TestList_queryContextError(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	db, err := Open("file:" + filepath.Join(dir, "qctx.db") + "?_pragma=foreign_keys(1)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := MigrateUp(db, testutil.SQLiteMigrationsDir(t)); err != nil {
+		_ = db.Close()
+		t.Fatal(err)
+	}
+	s := New(db)
+
+	domID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	rid := uuid.NewString()
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+
+	opts := store.ListOpts{Limit: 10, Sort: "title", Order: store.OrderAsc}
+
+	dropAndReplace := func(table, viewSQL string) {
+		t.Helper()
+		if _, err := db.ExecContext(ctx, "PRAGMA foreign_keys = OFF"); err != nil {
+			t.Fatalf("disable FK: %v", err)
+		}
+		if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS "+table); err != nil {
+			t.Fatalf("drop %s: %v", table, err)
+		}
+		if _, err := db.ExecContext(ctx, viewSQL); err != nil {
+			t.Fatalf("create view %s: %v", table, err)
+		}
+		if _, err := db.ExecContext(ctx, "PRAGMA foreign_keys = ON"); err != nil {
+			t.Fatalf("enable FK: %v", err)
+		}
+	}
+
+	t.Run("UserList", func(t *testing.T) {
+		dropAndReplace("users", "CREATE VIEW users AS SELECT 'x' AS domain_id")
+		_, _, err := s.UserList(ctx, domID, opts)
+		if err == nil {
+			t.Fatal("want error")
+		}
+	})
+
+	t.Run("GroupList", func(t *testing.T) {
+		dropAndReplace("groups", "CREATE VIEW groups AS SELECT 'x' AS domain_id")
+		_, _, err := s.GroupList(ctx, domID, store.GroupListOpts{ListOpts: opts})
+		if err == nil {
+			t.Fatal("want error")
+		}
+	})
+
+	t.Run("ResourceList", func(t *testing.T) {
+		dropAndReplace("resources", "CREATE VIEW resources AS SELECT 'x' AS domain_id")
+		_, _, err := s.ResourceList(ctx, domID, opts)
+		if err == nil {
+			t.Fatal("want error")
+		}
+	})
+
+	t.Run("AccessTypeList", func(t *testing.T) {
+		dropAndReplace("access_types", "CREATE VIEW access_types AS SELECT 'x' AS domain_id")
+		_, _, err := s.AccessTypeList(ctx, domID, opts)
+		if err == nil {
+			t.Fatal("want error")
+		}
+	})
+
+	t.Run("PermissionList", func(t *testing.T) {
+		dropAndReplace("permissions", "CREATE VIEW permissions AS SELECT 'x' AS domain_id")
+		_, _, err := s.PermissionList(ctx, domID, store.PermissionListOpts{ListOpts: opts})
+		if err == nil {
+			t.Fatal("want error")
+		}
+	})
+
+	t.Run("DomainList", func(t *testing.T) {
+		dropAndReplace("domains", "CREATE VIEW domains AS SELECT 1 AS x")
+		_, _, err := s.DomainList(ctx, opts)
+		if err == nil {
+			t.Fatal("want error")
+		}
+	})
+}
