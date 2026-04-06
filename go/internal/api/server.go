@@ -1021,7 +1021,7 @@ func parsePermissionListOpts(r *http.Request) (store.PermissionListOpts, error) 
 // the allowed sort fields, and returns the validated values.
 func parseSortOrder(r *http.Request, allowed []string) (string, store.SortOrder, error) {
 	q := r.URL.Query()
-	sort, err := store.ValidateSort(strings.TrimSpace(q.Get("sort")), allowed)
+	sortField, err := store.ValidateSort(strings.TrimSpace(q.Get("sort")), allowed)
 	if err != nil {
 		return "", "", err
 	}
@@ -1035,7 +1035,7 @@ func parseSortOrder(r *http.Request, allowed []string) (string, store.SortOrder,
 			return "", "", errors.New("order must be asc or desc")
 		}
 	}
-	return sort, order, nil
+	return sortField, order, nil
 }
 
 func writeList(w http.ResponseWriter, data any, total int64, opts store.ListOpts) {
