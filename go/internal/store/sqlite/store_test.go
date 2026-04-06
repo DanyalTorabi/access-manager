@@ -2799,3 +2799,69 @@ func TestPermissionList_sortByResourceID(t *testing.T) {
 		t.Fatalf("desc resource_id: %s should come after %s", list[0].ResourceID, list[1].ResourceID)
 	}
 }
+
+func TestSortColumns(t *testing.T) {
+	t.Run("no overrides", func(t *testing.T) {
+		cols := sortColumns([]string{"title", "resource_id"}, nil)
+		if len(cols) != 2 {
+			t.Fatalf("want 2 entries, got %d", len(cols))
+		}
+		if cols["title"] != "title" || cols["resource_id"] != "resource_id" {
+			t.Fatalf("unexpected mapping: %v", cols)
+		}
+	})
+
+	t.Run("valid override", func(t *testing.T) {
+		cols := sortColumns([]string{"title"}, map[string]string{"title": "name"})
+		if cols["title"] != "name" {
+			t.Fatalf("want title→name, got title→%s", cols["title"])
+		}
+	})
+
+	t.Run("invalid override key ignored", func(t *testing.T) {
+		cols := sortColumns([]string{"title"}, map[string]string{"unknown": "col"})
+		if _, ok := cols["unknown"]; ok {
+			t.Fatal("override key not in fields should be ignored")
+		}
+		if len(cols) != 1 {
+			t.Fatalf("want 1 entry, got %d", len(cols))
+		}
+	})
+}
+
+func TestOrderByClause(t *testing.T) {
+	allowed := map[string]string{"title": "title", "resource_id": "resource_id"}
+
+	t.Run("known field", func(t *testing.T) {
+		got := orderByClause("title", store.OrderAsc, allowed, "title")
+		want := " ORDER BY title ASC, id ASC"
+		if got != want {
+			t.Fatalf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("empty defaults to fallback", func(t *testing.T) {
+		got := orderByClause("", store.OrderDesc, allowed, "title")
+		want := " ORDER BY title DESC, id DESC"
+		if got != want {
+			t.Fatalf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("unknown non-empty falls back with warning", func(t *testing.T) {
+		got := orderByClause("bogus", store.OrderAsc, allowed, "title")
+		want := " ORDER BY title ASC, id ASC"
+		if got != want {
+			t.Fatalf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("sort by id skips tiebreaker", func(t *testing.T) {
+		a := map[string]string{"id": "id"}
+		got := orderByClause("id", store.OrderAsc, a, "id")
+		want := " ORDER BY id ASC"
+		if got != want {
+			t.Fatalf("got %q, want %q", got, want)
+		}
+	})
+}
