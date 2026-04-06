@@ -133,7 +133,7 @@ func (s *Store) DomainList(ctx context.Context, opts store.ListOpts) ([]store.Do
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, title FROM domains`+where+orderByClause(opts.Sort, opts.Order, domainSortColumns, "title")+` LIMIT ? OFFSET ?`,
+		`SELECT id, title FROM domains`+where+orderByClause(opts.Sort, opts.Order, domainSortColumns, "title")+` LIMIT ? OFFSET ?`, //nolint:gosec // G202: ORDER BY column from allow-list, not user input
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
@@ -211,7 +211,7 @@ func (s *Store) UserList(ctx context.Context, domainID string, opts store.ListOp
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title FROM users `+where+orderByClause(opts.Sort, opts.Order, userSortColumns, "title")+` LIMIT ? OFFSET ?`,
+		`SELECT id, domain_id, title FROM users `+where+orderByClause(opts.Sort, opts.Order, userSortColumns, "title")+` LIMIT ? OFFSET ?`, //nolint:gosec // G202: ORDER BY column from allow-list, not user input
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
@@ -303,7 +303,7 @@ func (s *Store) GroupList(ctx context.Context, domainID string, opts store.Group
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title, parent_group_id FROM groups `+where+orderByClause(opts.Sort, opts.Order, groupSortColumns, "title")+` LIMIT ? OFFSET ?`,
+		`SELECT id, domain_id, title, parent_group_id FROM groups `+where+orderByClause(opts.Sort, opts.Order, groupSortColumns, "title")+` LIMIT ? OFFSET ?`, //nolint:gosec // G202: ORDER BY column from allow-list, not user input
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
@@ -467,7 +467,7 @@ func (s *Store) ResourceList(ctx context.Context, domainID string, opts store.Li
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title FROM resources `+where+orderByClause(opts.Sort, opts.Order, resourceSortColumns, "title")+` LIMIT ? OFFSET ?`,
+		`SELECT id, domain_id, title FROM resources `+where+orderByClause(opts.Sort, opts.Order, resourceSortColumns, "title")+` LIMIT ? OFFSET ?`, //nolint:gosec // G202: ORDER BY column from allow-list, not user input
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
@@ -533,7 +533,7 @@ func (s *Store) AccessTypeList(ctx context.Context, domainID string, opts store.
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title, bit FROM access_types `+where+orderByClause(opts.Sort, opts.Order, accessTypeSortColumns, "title")+` LIMIT ? OFFSET ?`,
+		`SELECT id, domain_id, title, bit FROM access_types `+where+orderByClause(opts.Sort, opts.Order, accessTypeSortColumns, "title")+` LIMIT ? OFFSET ?`, //nolint:gosec // G202: ORDER BY column from allow-list, not user input
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
@@ -656,7 +656,7 @@ func (s *Store) PermissionList(ctx context.Context, domainID string, opts store.
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title, resource_id, access_mask FROM permissions `+where+orderByClause(opts.Sort, opts.Order, permissionSortColumns, "title")+` LIMIT ? OFFSET ?`,
+		`SELECT id, domain_id, title, resource_id, access_mask FROM permissions `+where+orderByClause(opts.Sort, opts.Order, permissionSortColumns, "title")+` LIMIT ? OFFSET ?`, //nolint:gosec // G202: ORDER BY column from allow-list, not user input
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
