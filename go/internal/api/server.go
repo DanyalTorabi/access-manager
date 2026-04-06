@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -181,7 +182,7 @@ func (s *Server) domainList(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
-	opts.Sort, opts.Order, err = parseSortOrder(r, store.DomainSortFields)
+	opts.Sort, opts.Order, err = parseSortOrder(r.URL.Query(), store.DomainSortFields)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
@@ -257,7 +258,7 @@ func (s *Server) userList(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
-	opts.Sort, opts.Order, err = parseSortOrder(r, store.UserSortFields)
+	opts.Sort, opts.Order, err = parseSortOrder(r.URL.Query(), store.UserSortFields)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
@@ -342,7 +343,7 @@ func (s *Server) groupList(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
-	opts.Sort, opts.Order, err = parseSortOrder(r, store.GroupSortFields)
+	opts.Sort, opts.Order, err = parseSortOrder(r.URL.Query(), store.GroupSortFields)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
@@ -462,7 +463,7 @@ func (s *Server) resourceList(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
-	opts.Sort, opts.Order, err = parseSortOrder(r, store.ResourceSortFields)
+	opts.Sort, opts.Order, err = parseSortOrder(r.URL.Query(), store.ResourceSortFields)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
@@ -551,7 +552,7 @@ func (s *Server) accessTypeList(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
-	opts.Sort, opts.Order, err = parseSortOrder(r, store.AccessTypeSortFields)
+	opts.Sort, opts.Order, err = parseSortOrder(r.URL.Query(), store.AccessTypeSortFields)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
@@ -657,7 +658,7 @@ func (s *Server) permissionList(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
-	opts.Sort, opts.Order, err = parseSortOrder(r, store.PermissionSortFields)
+	opts.Sort, opts.Order, err = parseSortOrder(r.URL.Query(), store.PermissionSortFields)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
@@ -1019,8 +1020,7 @@ func parsePermissionListOpts(r *http.Request) (store.PermissionListOpts, error) 
 
 // parseSortOrder reads sort and order query params, validates them against
 // the allowed sort fields, and returns the validated values.
-func parseSortOrder(r *http.Request, allowed []string) (string, store.SortOrder, error) {
-	q := r.URL.Query()
+func parseSortOrder(q url.Values, allowed []string) (string, store.SortOrder, error) {
 	sortField, err := store.ValidateSort(strings.TrimSpace(q.Get("sort")), allowed)
 	if err != nil {
 		return "", "", err

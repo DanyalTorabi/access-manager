@@ -3203,7 +3203,7 @@ func TestAPI_parseSortOrder(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/test?"+tt.qs, nil)
-			sort, order, err := parseSortOrder(req, tt.allowed)
+			sort, order, err := parseSortOrder(req.URL.Query(), tt.allowed)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("want error")
