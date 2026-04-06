@@ -3386,3 +3386,135 @@ func TestAPI_accessTypeList_defaultSortByTitle(t *testing.T) {
 		t.Fatalf("meta: sort=%q order=%q", env.Meta.Sort, env.Meta.Order)
 	}
 }
+
+func TestAPI_userList_sortDesc(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domainID := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + domainID
+
+	for _, title := range []string{"Alice", "Bob", "Charlie"} {
+		mustPostJSON201(t, base+"/users", fmt.Sprintf(`{"title":%q}`, title))
+	}
+
+	res, err := http.Get(base + "/users?sort=title&order=desc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var env listResponse[store.User]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if len(env.Data) != 3 {
+		t.Fatalf("want 3, got %d", len(env.Data))
+	}
+	if env.Data[0].Title != "Charlie" || env.Data[2].Title != "Alice" {
+		t.Fatalf("order: got %q %q %q", env.Data[0].Title, env.Data[1].Title, env.Data[2].Title)
+	}
+	if env.Meta.Sort != "title" || env.Meta.Order != "desc" {
+		t.Fatalf("meta: sort=%q order=%q", env.Meta.Sort, env.Meta.Order)
+	}
+}
+
+func TestAPI_groupList_sortDesc(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domainID := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + domainID
+
+	for _, title := range []string{"Admins", "Editors", "Viewers"} {
+		mustPostJSON201(t, base+"/groups", fmt.Sprintf(`{"title":%q}`, title))
+	}
+
+	res, err := http.Get(base + "/groups?sort=title&order=desc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var env listResponse[store.Group]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if len(env.Data) != 3 {
+		t.Fatalf("want 3, got %d", len(env.Data))
+	}
+	if env.Data[0].Title != "Viewers" || env.Data[2].Title != "Admins" {
+		t.Fatalf("order: got %q %q %q", env.Data[0].Title, env.Data[1].Title, env.Data[2].Title)
+	}
+	if env.Meta.Sort != "title" || env.Meta.Order != "desc" {
+		t.Fatalf("meta: sort=%q order=%q", env.Meta.Sort, env.Meta.Order)
+	}
+}
+
+func TestAPI_resourceList_sortDesc(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domainID := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + domainID
+
+	for _, title := range []string{"Docs", "Files", "Settings"} {
+		mustPostJSON201(t, base+"/resources", fmt.Sprintf(`{"title":%q}`, title))
+	}
+
+	res, err := http.Get(base + "/resources?sort=title&order=desc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var env listResponse[store.Resource]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if len(env.Data) != 3 {
+		t.Fatalf("want 3, got %d", len(env.Data))
+	}
+	if env.Data[0].Title != "Settings" || env.Data[2].Title != "Docs" {
+		t.Fatalf("order: got %q %q %q", env.Data[0].Title, env.Data[1].Title, env.Data[2].Title)
+	}
+	if env.Meta.Sort != "title" || env.Meta.Order != "desc" {
+		t.Fatalf("meta: sort=%q order=%q", env.Meta.Sort, env.Meta.Order)
+	}
+}
+
+func TestAPI_accessTypeList_sortDesc(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domainID := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + domainID
+
+	mustPostJSON201(t, base+"/access-types", `{"title":"Alpha","bit":"0x1"}`)
+	mustPostJSON201(t, base+"/access-types", `{"title":"Beta","bit":"0x2"}`)
+	mustPostJSON201(t, base+"/access-types", `{"title":"Gamma","bit":"0x4"}`)
+
+	res, err := http.Get(base + "/access-types?sort=title&order=desc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var env listResponse[store.AccessType]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if len(env.Data) != 3 {
+		t.Fatalf("want 3, got %d", len(env.Data))
+	}
+	if env.Data[0].Title != "Gamma" || env.Data[2].Title != "Alpha" {
+		t.Fatalf("order: got %q %q %q", env.Data[0].Title, env.Data[1].Title, env.Data[2].Title)
+	}
+	if env.Meta.Sort != "title" || env.Meta.Order != "desc" {
+		t.Fatalf("meta: sort=%q order=%q", env.Meta.Sort, env.Meta.Order)
+	}
+}
