@@ -10,19 +10,22 @@ func TestValidateSort(t *testing.T) {
 	single := []string{"title"}
 
 	tests := []struct {
-		name    string
-		sort    string
-		allowed []string
-		want    string
-		wantErr bool
+		name       string
+		sort       string
+		allowed    []string
+		want       string
+		wantErr    bool
+		errContain string
 	}{
-		{"empty defaults to first", "", multi, "title", false},
-		{"valid first field", "title", multi, "title", false},
-		{"valid second field", "resource_id", multi, "resource_id", false},
-		{"unknown field", "unknown", multi, "", true},
-		{"single allowed empty", "", single, "title", false},
-		{"single allowed valid", "title", single, "title", false},
-		{"single allowed invalid", "other", single, "", true},
+		{"empty defaults to first", "", multi, "title", false, ""},
+		{"valid first field", "title", multi, "title", false, ""},
+		{"valid second field", "resource_id", multi, "resource_id", false, ""},
+		{"unknown field", "unknown", multi, "", true, "sort must be one of"},
+		{"single allowed empty", "", single, "title", false, ""},
+		{"single allowed valid", "title", single, "title", false, ""},
+		{"single allowed invalid", "other", single, "", true, "sort must be one of"},
+		{"nil allowed", "", nil, "", true, "no sortable fields defined"},
+		{"empty allowed slice", "title", []string{}, "", true, "no sortable fields defined"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -31,8 +34,8 @@ func TestValidateSort(t *testing.T) {
 				if err == nil {
 					t.Fatal("want error")
 				}
-				if !strings.Contains(err.Error(), "sort must be one of") {
-					t.Fatalf("error message: %v", err)
+				if !strings.Contains(err.Error(), tt.errContain) {
+					t.Fatalf("error should contain %q, got: %v", tt.errContain, err)
 				}
 				return
 			}

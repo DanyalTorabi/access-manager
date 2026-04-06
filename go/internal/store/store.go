@@ -89,6 +89,9 @@ var (
 // allowed[0]. An unrecognised field produces a descriptive error listing
 // the accepted values.
 func ValidateSort(sort string, allowed []string) (string, error) {
+	if len(allowed) == 0 {
+		return "", fmt.Errorf("no sortable fields defined")
+	}
 	if sort == "" {
 		return allowed[0], nil
 	}
