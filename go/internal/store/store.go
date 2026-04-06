@@ -76,11 +76,14 @@ const (
 )
 
 // Per-entity allowed sort fields. The first element is the default.
+// These slices are treated as read-only; do not append or modify at runtime.
 var (
-	DomainSortFields     = []string{"title"}
-	UserSortFields       = []string{"title"}
-	GroupSortFields      = []string{"title"}
-	ResourceSortFields   = []string{"title"}
+	DomainSortFields   = []string{"title"}
+	UserSortFields     = []string{"title"}
+	GroupSortFields    = []string{"title"}
+	ResourceSortFields = []string{"title"}
+	// AccessTypeSortFields intentionally excludes "bit": bit is an internal
+	// mask position, not a meaningful user-facing ordering criterion.
 	AccessTypeSortFields = []string{"title"}
 	PermissionSortFields = []string{"title", "resource_id"}
 )
