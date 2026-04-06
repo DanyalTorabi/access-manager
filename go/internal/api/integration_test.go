@@ -419,6 +419,81 @@ func assertAuthzCheck(t *testing.T, base, userID, resourceID, bit string, wantAl
 
 // ---------------------------------------------------------------------------
 // 6. Pagination + filtering combined
-// TODO(T39): Add filter + pagination integration tests (T35 filtering landed
-// in #61; these tests should exercise search + offset/limit together).
 // ---------------------------------------------------------------------------
+
+func TestIntegration_paginationWithFiltering(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	did := seedDomain(t, ts, "pagfilter")
+	base := domainBase(ts, did)
+
+	for i := 0; i < 7; i++ {
+		seedUser(t, ts, did, fmt.Sprintf("match-%d", i))
+	}
+	seedUser(t, ts, did, "no-hit-1")
+	seedUser(t, ts, did, "no-hit-2")
+
+	t.Run("filtered_total_reflects_search", func(t *testing.T) {
+		var env listResponse[store.User]
+		if err := json.Unmarshal(mustGet(t, base+"/users?search=match&limit=3&offset=0", http.StatusOK), &env); err != nil {
+			t.Fatal(err)
+		}
+		if env.Meta.Total != 7 {
+			t.Fatalf("total should reflect filtered count (7), got %d", env.Meta.Total)
+		}
+		if len(env.Data) != 3 {
+			t.Fatalf("page size should be 3, got %d", len(env.Data))
+		}
+	})
+
+	t.Run("second_page", func(t *testing.T) {
+		var env listResponse[store.User]
+		if err := json.Unmarshal(mustGet(t, base+"/users?search=match&limit=3&offset=3", http.StatusOK), &env); err != nil {
+			t.Fatal(err)
+		}
+		if env.Meta.Total != 7 {
+			t.Fatalf("total should still be 7, got %d", env.Meta.Total)
+		}
+		if len(env.Data) != 3 {
+			t.Fatalf("second page should have 3 items, got %d", len(env.Data))
+		}
+	})
+
+	t.Run("last_page_partial", func(t *testing.T) {
+		var env listResponse[store.User]
+		if err := json.Unmarshal(mustGet(t, base+"/users?search=match&limit=3&offset=6", http.StatusOK), &env); err != nil {
+			t.Fatal(err)
+		}
+		if env.Meta.Total != 7 {
+			t.Fatalf("total should still be 7, got %d", env.Meta.Total)
+		}
+		if len(env.Data) != 1 {
+			t.Fatalf("last page should have 1 item, got %d", len(env.Data))
+		}
+	})
+
+	t.Run("offset_past_filtered_total", func(t *testing.T) {
+		var env listResponse[store.User]
+		if err := json.Unmarshal(mustGet(t, base+"/users?search=match&limit=10&offset=100", http.StatusOK), &env); err != nil {
+			t.Fatal(err)
+		}
+		if env.Meta.Total != 7 {
+			t.Fatalf("total should still be 7, got %d", env.Meta.Total)
+		}
+		if len(env.Data) != 0 {
+			t.Fatalf("data should be empty past total, got %d items", len(env.Data))
+		}
+	})
+
+	t.Run("no_match_returns_zero", func(t *testing.T) {
+		var env listResponse[store.User]
+		if err := json.Unmarshal(mustGet(t, base+"/users?search=zzzzz&limit=10", http.StatusOK), &env); err != nil {
+			t.Fatal(err)
+		}
+		if env.Meta.Total != 0 {
+			t.Fatalf("total should be 0 for no-match search, got %d", env.Meta.Total)
+		}
+		if len(env.Data) != 0 {
+			t.Fatalf("data should be empty, got %d items", len(env.Data))
+		}
+	})
+}
