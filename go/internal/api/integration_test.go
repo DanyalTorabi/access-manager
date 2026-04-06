@@ -390,6 +390,7 @@ func TestIntegration_permissionMaskArithmetic(t *testing.T) {
 		assertAuthzCheck(t, base, uid, r2, "0x1", false)
 	})
 
+	// Must run last: revokes p1, which invalidates earlier check_direct_bit* assertions.
 	t.Run("revoke_and_recheck", func(t *testing.T) {
 		revokeUserPerm(t, ts, did, uid, p1)
 
