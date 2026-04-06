@@ -161,25 +161,43 @@ func TestIntegration_concurrentMembership(t *testing.T) {
 		uids[i] = seedUser(t, ts, domID, fmt.Sprintf("u-%d", i))
 	}
 
+	addErrs := make(chan error, n)
 	var wg sync.WaitGroup
 	for i := 0; i < n; i++ {
 		wg.Add(1)
 		go func(uid string) {
 			defer wg.Done()
-			addMembership(t, ts, domID, uid, gid)
+			_, err := doRequestErr(http.MethodPost,
+				base+"/users/"+uid+"/groups/"+gid, "", http.StatusNoContent)
+			if err != nil {
+				addErrs <- err
+			}
 		}(uids[i])
 	}
 	wg.Wait()
+	close(addErrs)
+	for err := range addErrs {
+		t.Error(err)
+	}
 
+	delErrs := make(chan error, n)
 	var wg2 sync.WaitGroup
 	for i := 0; i < n; i++ {
 		wg2.Add(1)
 		go func(uid string) {
 			defer wg2.Done()
-			mustDeleteReq(t, base+"/users/"+uid+"/groups/"+gid, http.StatusNoContent)
+			_, err := doRequestErr(http.MethodDelete,
+				base+"/users/"+uid+"/groups/"+gid, "", http.StatusNoContent)
+			if err != nil {
+				delErrs <- err
+			}
 		}(uids[i])
 	}
 	wg2.Wait()
+	close(delErrs)
+	for err := range delErrs {
+		t.Error(err)
+	}
 
 	var env listResponse[store.User]
 	if err := json.Unmarshal(mustGet(t, base+"/users", http.StatusOK), &env); err != nil {
