@@ -61,14 +61,17 @@ var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 func escapeLikePattern(s string) string { return likeEscaper.Replace(s) }
 
 // sortColumns builds a field→column map from the store's allowed sort fields.
-// By default field name == column name; pass overrides for any that differ.
+// By default field name == column name; pass overrides for any allowed fields
+// whose column names differ. Override keys not present in fields are ignored.
 func sortColumns(fields []string, overrides map[string]string) map[string]string {
 	cols := make(map[string]string, len(fields))
 	for _, f := range fields {
 		cols[f] = f
 	}
 	for f, col := range overrides {
-		cols[f] = col
+		if _, ok := cols[f]; ok {
+			cols[f] = col
+		}
 	}
 	return cols
 }
