@@ -57,11 +57,6 @@ func mustDoRequest(t *testing.T, method, url, body string, wantStatus int) []byt
 	return b
 }
 
-func mustPatchJSON(t *testing.T, url, jsonBody string, wantStatus int) []byte {
-	t.Helper()
-	return mustDoRequest(t, http.MethodPatch, url, jsonBody, wantStatus)
-}
-
 func mustDeleteReq(t *testing.T, url string, wantStatus int) []byte {
 	t.Helper()
 	return mustDoRequest(t, http.MethodDelete, url, "", wantStatus)
