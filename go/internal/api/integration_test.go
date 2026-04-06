@@ -418,6 +418,7 @@ func assertAuthzCheck(t *testing.T, base, userID, resourceID, bit string, wantAl
 }
 
 // ---------------------------------------------------------------------------
-// 6. Pagination + filtering combined — deferred until T35 lands.
-// TODO(T35): Add filter + pagination tests when filtering is implemented.
+// 6. Pagination + filtering combined
+// TODO(T39): Add filter + pagination integration tests (T35 filtering landed
+// in #61; these tests should exercise search + offset/limit together).
 // ---------------------------------------------------------------------------
