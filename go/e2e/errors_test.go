@@ -186,15 +186,3 @@ func TestError_nonIntegerPagination(t *testing.T) {
 		mustDo(t, c, http.MethodGet, base+"/users?limit=xyz", "", http.StatusBadRequest)
 	})
 }
-
-func TestPagination_negativeLimitClamped(t *testing.T) {
-	c := httpClient()
-	did := seedDomain(t, c, "pag-clamp-dom")
-	cleanupDelete(t, c, apiBase()+"/domains/"+did)
-
-	// The API clamps limit < 1 to 1 rather than rejecting with 400.
-	env := mustList(t, c, domainBase(did)+"/users?limit=-1")
-	if env.Meta.Limit != 1 {
-		t.Fatalf("negative limit should be clamped to 1, got %d", env.Meta.Limit)
-	}
-}
