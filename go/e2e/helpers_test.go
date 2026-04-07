@@ -155,8 +155,7 @@ type authzCheckResp struct {
 }
 
 type authzMasksResp struct {
-	Masks         []uint64 `json:"masks"`
-	EffectiveMask uint64   `json:"effective_mask"`
+	Masks []uint64 `json:"masks"`
 }
 
 type listMeta struct {
