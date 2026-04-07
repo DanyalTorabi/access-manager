@@ -307,6 +307,7 @@ func cleanupDelete(t *testing.T, c *http.Client, url string) {
 			t.Logf("cleanup DELETE %s: %v", url, err)
 			return
 		}
+		_, _ = io.Copy(io.Discard, res.Body)
 		_ = res.Body.Close()
 		if res.StatusCode != http.StatusNoContent && res.StatusCode != http.StatusNotFound {
 			t.Logf("cleanup DELETE %s: unexpected status %d", url, res.StatusCode)
@@ -331,6 +332,7 @@ func cleanupUnlinkParent(t *testing.T, c *http.Client, domainID, groupID string)
 			t.Logf("cleanup unlink parent %s: %v", url, err)
 			return
 		}
+		_, _ = io.Copy(io.Discard, res.Body)
 		_ = res.Body.Close()
 	})
 }
