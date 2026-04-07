@@ -188,6 +188,25 @@ type entityTitle struct {
 	Title string `json:"Title"`
 }
 
+type groupResp struct {
+	ID            string  `json:"ID"`
+	Title         string  `json:"Title"`
+	ParentGroupID *string `json:"ParentGroupID"`
+}
+
+type atResp struct {
+	ID    string `json:"ID"`
+	Title string `json:"Title"`
+	Bit   uint64 `json:"Bit"`
+}
+
+type permResp struct {
+	ID         string `json:"ID"`
+	Title      string `json:"Title"`
+	ResourceID string `json:"ResourceID"`
+	AccessMask uint64 `json:"AccessMask"`
+}
+
 // ---------------------------------------------------------------------------
 // Seed helpers — create entities and return their IDs
 // ---------------------------------------------------------------------------
@@ -265,6 +284,73 @@ func revokeGroupPerm(t *testing.T, c *http.Client, domainID, groupID, permID str
 func removeMembership(t *testing.T, c *http.Client, domainID, userID, groupID string) {
 	t.Helper()
 	mustDELETE(t, c, domainBase(domainID)+"/users/"+userID+"/groups/"+groupID, http.StatusNoContent)
+}
+
+// ---------------------------------------------------------------------------
+// Cleanup helpers — best-effort teardown that won't cascade-fail
+// ---------------------------------------------------------------------------
+
+// cleanupDelete registers a t.Cleanup that DELETEs url.
+// It tolerates 404 (already deleted) and logs other unexpected statuses
+// instead of calling t.Fatal, so remaining cleanups still execute.
+func cleanupDelete(t *testing.T, c *http.Client, url string) {
+	t.Helper()
+	t.Cleanup(func() {
+		req, err := http.NewRequest(http.MethodDelete, url, nil)
+		if err != nil {
+			t.Logf("cleanup DELETE %s: %v", url, err)
+			return
+		}
+		authHeader(req)
+		res, err := c.Do(req)
+		if err != nil {
+			t.Logf("cleanup DELETE %s: %v", url, err)
+			return
+		}
+		_ = res.Body.Close()
+		if res.StatusCode != http.StatusNoContent && res.StatusCode != http.StatusNotFound {
+			t.Logf("cleanup DELETE %s: unexpected status %d", url, res.StatusCode)
+		}
+	})
+}
+
+// cleanupUnlinkParent registers a t.Cleanup that sets a group's parent to null.
+func cleanupUnlinkParent(t *testing.T, c *http.Client, domainID, groupID string) {
+	t.Helper()
+	t.Cleanup(func() {
+		url := domainBase(domainID) + "/groups/" + groupID + "/parent"
+		req, err := http.NewRequest(http.MethodPatch, url, strings.NewReader(`{"parent_group_id":null}`))
+		if err != nil {
+			t.Logf("cleanup unlink parent %s: %v", url, err)
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+		authHeader(req)
+		res, err := c.Do(req)
+		if err != nil {
+			t.Logf("cleanup unlink parent %s: %v", url, err)
+			return
+		}
+		_ = res.Body.Close()
+	})
+}
+
+// cleanupRevokeMembership registers a t.Cleanup that removes a user-group membership.
+func cleanupRevokeMembership(t *testing.T, c *http.Client, domainID, userID, groupID string) {
+	t.Helper()
+	cleanupDelete(t, c, domainBase(domainID)+"/users/"+userID+"/groups/"+groupID)
+}
+
+// cleanupRevokeUserPerm registers a t.Cleanup that revokes a user permission grant.
+func cleanupRevokeUserPerm(t *testing.T, c *http.Client, domainID, userID, permID string) {
+	t.Helper()
+	cleanupDelete(t, c, domainBase(domainID)+"/users/"+userID+"/permissions/"+permID)
+}
+
+// cleanupRevokeGroupPerm registers a t.Cleanup that revokes a group permission grant.
+func cleanupRevokeGroupPerm(t *testing.T, c *http.Client, domainID, groupID, permID string) {
+	t.Helper()
+	cleanupDelete(t, c, domainBase(domainID)+"/groups/"+groupID+"/permissions/"+permID)
 }
 
 // assertAuthzCheck verifies /authz/check for the given user, resource, and access bit.

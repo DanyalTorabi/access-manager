@@ -4,7 +4,6 @@ package e2e
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"testing"
 )
@@ -17,11 +16,26 @@ func TestCRUD_domains(t *testing.T) {
 	c := httpClient()
 
 	id := seedDomain(t, c, "crud-domain")
+	cleanupDelete(t, c, apiBase()+"/domains/"+id)
 
 	// List — should contain the new domain.
 	env := mustList(t, c, apiBase()+"/domains")
 	if env.Meta.Total < 1 {
 		t.Fatalf("domain list total < 1: %d", env.Meta.Total)
+	}
+	var domains []entityTitle
+	if err := json.Unmarshal(env.Data, &domains); err != nil {
+		t.Fatalf("decode domain list: %v", err)
+	}
+	found := false
+	for _, d := range domains {
+		if d.ID == id {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("created domain %s not found in list (total=%d)", id, env.Meta.Total)
 	}
 
 	// Get
@@ -61,9 +75,11 @@ func TestCRUD_domains(t *testing.T) {
 func TestCRUD_users(t *testing.T) {
 	c := httpClient()
 	did := seedDomain(t, c, "crud-users-dom")
+	cleanupDelete(t, c, apiBase()+"/domains/"+did)
 	base := domainBase(did)
 
 	uid := seedUser(t, c, did, "crud-user")
+	cleanupDelete(t, c, base+"/users/"+uid)
 
 	// List
 	env := mustList(t, c, base+"/users")
@@ -103,18 +119,19 @@ func TestCRUD_users(t *testing.T) {
 
 	// Verify 404
 	mustGET(t, c, base+"/users/"+uid, http.StatusNotFound)
-
-	// Cleanup domain
-	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }
 
 func TestCRUD_groups(t *testing.T) {
 	c := httpClient()
 	did := seedDomain(t, c, "crud-groups-dom")
+	cleanupDelete(t, c, apiBase()+"/domains/"+did)
 	base := domainBase(did)
 
 	parentID := seedGroup(t, c, did, "parent-group")
+	cleanupDelete(t, c, base+"/groups/"+parentID)
 	childID := seedGroupWithParent(t, c, did, "child-group", parentID)
+	cleanupUnlinkParent(t, c, did, childID)
+	cleanupDelete(t, c, base+"/groups/"+childID)
 
 	// List — both groups present.
 	env := mustList(t, c, base+"/groups")
@@ -123,11 +140,6 @@ func TestCRUD_groups(t *testing.T) {
 	}
 
 	// Get child — verify parent_group_id.
-	type groupResp struct {
-		ID            string  `json:"ID"`
-		Title         string  `json:"Title"`
-		ParentGroupID *string `json:"ParentGroupID"`
-	}
 	var child groupResp
 	if err := json.Unmarshal(mustGET(t, c, base+"/groups/"+childID, http.StatusOK), &child); err != nil {
 		t.Fatal(err)
@@ -164,17 +176,16 @@ func TestCRUD_groups(t *testing.T) {
 	// Verify 404
 	mustGET(t, c, base+"/groups/"+childID, http.StatusNotFound)
 	mustGET(t, c, base+"/groups/"+parentID, http.StatusNotFound)
-
-	// Cleanup
-	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }
 
 func TestCRUD_resources(t *testing.T) {
 	c := httpClient()
 	did := seedDomain(t, c, "crud-resources-dom")
+	cleanupDelete(t, c, apiBase()+"/domains/"+did)
 	base := domainBase(did)
 
 	rid := seedResource(t, c, did, "crud-res")
+	cleanupDelete(t, c, base+"/resources/"+rid)
 
 	env := mustList(t, c, base+"/resources")
 	if env.Meta.Total != 1 {
@@ -199,27 +210,22 @@ func TestCRUD_resources(t *testing.T) {
 
 	mustDELETE(t, c, base+"/resources/"+rid, http.StatusNoContent)
 	mustGET(t, c, base+"/resources/"+rid, http.StatusNotFound)
-
-	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }
 
 func TestCRUD_accessTypes(t *testing.T) {
 	c := httpClient()
 	did := seedDomain(t, c, "crud-at-dom")
+	cleanupDelete(t, c, apiBase()+"/domains/"+did)
 	base := domainBase(did)
 
 	atID := seedAccessType(t, c, did, "read-bit", "0x1")
+	cleanupDelete(t, c, base+"/access-types/"+atID)
 
 	env := mustList(t, c, base+"/access-types")
 	if env.Meta.Total != 1 {
 		t.Fatalf("access-type list total: want 1, got %d", env.Meta.Total)
 	}
 
-	type atResp struct {
-		ID    string `json:"ID"`
-		Title string `json:"Title"`
-		Bit   uint64 `json:"Bit"`
-	}
 	var got atResp
 	if err := json.Unmarshal(mustGET(t, c, base+"/access-types/"+atID, http.StatusOK), &got); err != nil {
 		t.Fatal(err)
@@ -238,29 +244,24 @@ func TestCRUD_accessTypes(t *testing.T) {
 
 	mustDELETE(t, c, base+"/access-types/"+atID, http.StatusNoContent)
 	mustGET(t, c, base+"/access-types/"+atID, http.StatusNotFound)
-
-	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }
 
 func TestCRUD_permissions(t *testing.T) {
 	c := httpClient()
 	did := seedDomain(t, c, "crud-perm-dom")
+	cleanupDelete(t, c, apiBase()+"/domains/"+did)
 	base := domainBase(did)
 	rid := seedResource(t, c, did, "perm-resource")
+	cleanupDelete(t, c, base+"/resources/"+rid)
 
 	pid := seedPermission(t, c, did, "can-read", rid, "0x3")
+	cleanupDelete(t, c, base+"/permissions/"+pid)
 
 	env := mustList(t, c, base+"/permissions")
 	if env.Meta.Total != 1 {
 		t.Fatalf("permission list total: want 1, got %d", env.Meta.Total)
 	}
 
-	type permResp struct {
-		ID         string `json:"ID"`
-		Title      string `json:"Title"`
-		ResourceID string `json:"ResourceID"`
-		AccessMask uint64 `json:"AccessMask"`
-	}
 	var got permResp
 	if err := json.Unmarshal(mustGET(t, c, base+"/permissions/"+pid, http.StatusOK), &got); err != nil {
 		t.Fatal(err)
@@ -273,7 +274,7 @@ func TestCRUD_permissions(t *testing.T) {
 	}
 
 	var patched permResp
-	body := fmt.Sprintf(`{"title":"can-write","access_mask":"0x7"}`)
+	body := `{"title":"can-write","access_mask":"0x7"}`
 	if err := json.Unmarshal(mustPATCH(t, c, base+"/permissions/"+pid, body, http.StatusOK), &patched); err != nil {
 		t.Fatal(err)
 	}
@@ -283,8 +284,4 @@ func TestCRUD_permissions(t *testing.T) {
 
 	mustDELETE(t, c, base+"/permissions/"+pid, http.StatusNoContent)
 	mustGET(t, c, base+"/permissions/"+pid, http.StatusNotFound)
-
-	// Cleanup resource + domain
-	mustDELETE(t, c, base+"/resources/"+rid, http.StatusNoContent)
-	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }

@@ -23,23 +23,21 @@ func TestSmoke_fullJourney(t *testing.T) {
 	}
 
 	did := seedDomain(t, c, "e2e-smoke-domain")
+	cleanupDelete(t, c, apiBase()+"/domains/"+did)
 
 	uid := seedUser(t, c, did, "e2e-user")
+	cleanupDelete(t, c, domainBase(did)+"/users/"+uid)
 	gid := seedGroup(t, c, did, "e2e-group")
+	cleanupDelete(t, c, domainBase(did)+"/groups/"+gid)
 	rid := seedResource(t, c, did, "e2e-resource")
+	cleanupDelete(t, c, domainBase(did)+"/resources/"+rid)
 	pid := seedPermission(t, c, did, "e2e-perm", rid, "0x3")
+	cleanupDelete(t, c, domainBase(did)+"/permissions/"+pid)
 
 	addMembership(t, c, did, uid, gid)
+	cleanupRevokeMembership(t, c, did, uid, gid)
 	grantGroupPerm(t, c, did, gid, pid)
+	cleanupRevokeGroupPerm(t, c, did, gid, pid)
 
 	assertAuthzCheck(t, c, did, uid, rid, "0x1", true)
-
-	// Cleanup in reverse dependency order.
-	revokeGroupPerm(t, c, did, gid, pid)
-	removeMembership(t, c, did, uid, gid)
-	mustDELETE(t, c, domainBase(did)+"/permissions/"+pid, http.StatusNoContent)
-	mustDELETE(t, c, domainBase(did)+"/resources/"+rid, http.StatusNoContent)
-	mustDELETE(t, c, domainBase(did)+"/groups/"+gid, http.StatusNoContent)
-	mustDELETE(t, c, domainBase(did)+"/users/"+uid, http.StatusNoContent)
-	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }

@@ -14,6 +14,7 @@ import (
 func TestError_notFoundForBogusID(t *testing.T) {
 	c := httpClient()
 	did := seedDomain(t, c, "err-notfound-dom")
+	cleanupDelete(t, c, apiBase()+"/domains/"+did)
 	base := domainBase(did)
 
 	bogus := "00000000-0000-0000-0000-000000000000"
@@ -42,8 +43,6 @@ func TestError_notFoundForBogusID(t *testing.T) {
 	t.Run("get_domain", func(t *testing.T) {
 		mustGET(t, c, apiBase()+"/domains/"+bogus, http.StatusNotFound)
 	})
-
-	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }
 
 func TestError_invalidJSON(t *testing.T) {
@@ -60,28 +59,24 @@ func TestError_invalidJSON(t *testing.T) {
 func TestError_permissionMissingAccessMask(t *testing.T) {
 	c := httpClient()
 	did := seedDomain(t, c, "err-perm-mask-dom")
+	cleanupDelete(t, c, apiBase()+"/domains/"+did)
 	rid := seedResource(t, c, did, "r")
+	cleanupDelete(t, c, domainBase(did)+"/resources/"+rid)
 
-	// access_mask is empty string -> parseUint64 fails -> 400
 	body := `{"title":"p","resource_id":"` + rid + `","access_mask":""}`
 	mustDo(t, c, http.MethodPost, domainBase(did)+"/permissions", body, http.StatusBadRequest)
-
-	mustDELETE(t, c, domainBase(did)+"/resources/"+rid, http.StatusNoContent)
-	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }
 
 func TestError_duplicateAccessTypeBit(t *testing.T) {
 	c := httpClient()
 	did := seedDomain(t, c, "err-dup-at-dom")
+	cleanupDelete(t, c, apiBase()+"/domains/"+did)
 
 	atID := seedAccessType(t, c, did, "read", "0x1")
+	cleanupDelete(t, c, domainBase(did)+"/access-types/"+atID)
 
-	// Same bit in same domain -> 409
 	mustDo(t, c, http.MethodPost, domainBase(did)+"/access-types",
 		`{"title":"write","bit":"0x1"}`, http.StatusConflict)
-
-	mustDELETE(t, c, domainBase(did)+"/access-types/"+atID, http.StatusNoContent)
-	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }
 
 func TestError_deleteWithDependents(t *testing.T) {
@@ -89,99 +84,99 @@ func TestError_deleteWithDependents(t *testing.T) {
 
 	t.Run("domain_with_users", func(t *testing.T) {
 		did := seedDomain(t, c, "err-del-dom")
+		cleanupDelete(t, c, apiBase()+"/domains/"+did)
 		uid := seedUser(t, c, did, "u")
-		mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusBadRequest)
+		cleanupDelete(t, c, domainBase(did)+"/users/"+uid)
 
-		mustDELETE(t, c, domainBase(did)+"/users/"+uid, http.StatusNoContent)
-		mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
+		mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusBadRequest)
 	})
 
 	t.Run("resource_with_permissions", func(t *testing.T) {
 		did := seedDomain(t, c, "err-del-res-dom")
+		cleanupDelete(t, c, apiBase()+"/domains/"+did)
 		rid := seedResource(t, c, did, "r")
+		cleanupDelete(t, c, domainBase(did)+"/resources/"+rid)
 		pid := seedPermission(t, c, did, "p", rid, "0x1")
-		mustDELETE(t, c, domainBase(did)+"/resources/"+rid, http.StatusBadRequest)
+		cleanupDelete(t, c, domainBase(did)+"/permissions/"+pid)
 
-		mustDELETE(t, c, domainBase(did)+"/permissions/"+pid, http.StatusNoContent)
-		mustDELETE(t, c, domainBase(did)+"/resources/"+rid, http.StatusNoContent)
-		mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
+		mustDELETE(t, c, domainBase(did)+"/resources/"+rid, http.StatusBadRequest)
 	})
 
 	t.Run("group_with_members", func(t *testing.T) {
 		did := seedDomain(t, c, "err-del-grp-dom")
+		cleanupDelete(t, c, apiBase()+"/domains/"+did)
 		gid := seedGroup(t, c, did, "g")
+		cleanupDelete(t, c, domainBase(did)+"/groups/"+gid)
 		uid := seedUser(t, c, did, "u")
+		cleanupDelete(t, c, domainBase(did)+"/users/"+uid)
 		addMembership(t, c, did, uid, gid)
-		mustDELETE(t, c, domainBase(did)+"/groups/"+gid, http.StatusBadRequest)
+		cleanupRevokeMembership(t, c, did, uid, gid)
 
-		removeMembership(t, c, did, uid, gid)
-		mustDELETE(t, c, domainBase(did)+"/groups/"+gid, http.StatusNoContent)
-		mustDELETE(t, c, domainBase(did)+"/users/"+uid, http.StatusNoContent)
-		mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
+		mustDELETE(t, c, domainBase(did)+"/groups/"+gid, http.StatusBadRequest)
 	})
 
 	t.Run("user_with_membership", func(t *testing.T) {
 		did := seedDomain(t, c, "err-del-usr-dom")
+		cleanupDelete(t, c, apiBase()+"/domains/"+did)
 		gid := seedGroup(t, c, did, "g")
+		cleanupDelete(t, c, domainBase(did)+"/groups/"+gid)
 		uid := seedUser(t, c, did, "u")
+		cleanupDelete(t, c, domainBase(did)+"/users/"+uid)
 		addMembership(t, c, did, uid, gid)
-		mustDELETE(t, c, domainBase(did)+"/users/"+uid, http.StatusBadRequest)
+		cleanupRevokeMembership(t, c, did, uid, gid)
 
-		removeMembership(t, c, did, uid, gid)
-		mustDELETE(t, c, domainBase(did)+"/users/"+uid, http.StatusNoContent)
-		mustDELETE(t, c, domainBase(did)+"/groups/"+gid, http.StatusNoContent)
-		mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
+		mustDELETE(t, c, domainBase(did)+"/users/"+uid, http.StatusBadRequest)
 	})
 
 	t.Run("permission_with_user_grant", func(t *testing.T) {
 		did := seedDomain(t, c, "err-del-perm-ug")
+		cleanupDelete(t, c, apiBase()+"/domains/"+did)
 		rid := seedResource(t, c, did, "r")
+		cleanupDelete(t, c, domainBase(did)+"/resources/"+rid)
 		pid := seedPermission(t, c, did, "p", rid, "0x1")
+		cleanupDelete(t, c, domainBase(did)+"/permissions/"+pid)
 		uid := seedUser(t, c, did, "u")
+		cleanupDelete(t, c, domainBase(did)+"/users/"+uid)
 		grantUserPerm(t, c, did, uid, pid)
-		mustDELETE(t, c, domainBase(did)+"/permissions/"+pid, http.StatusBadRequest)
+		cleanupRevokeUserPerm(t, c, did, uid, pid)
 
-		revokeUserPerm(t, c, did, uid, pid)
-		mustDELETE(t, c, domainBase(did)+"/permissions/"+pid, http.StatusNoContent)
-		mustDELETE(t, c, domainBase(did)+"/resources/"+rid, http.StatusNoContent)
-		mustDELETE(t, c, domainBase(did)+"/users/"+uid, http.StatusNoContent)
-		mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
+		mustDELETE(t, c, domainBase(did)+"/permissions/"+pid, http.StatusBadRequest)
 	})
 
 	t.Run("permission_with_group_grant", func(t *testing.T) {
 		did := seedDomain(t, c, "err-del-perm-gg")
+		cleanupDelete(t, c, apiBase()+"/domains/"+did)
 		rid := seedResource(t, c, did, "r")
+		cleanupDelete(t, c, domainBase(did)+"/resources/"+rid)
 		pid := seedPermission(t, c, did, "p", rid, "0x1")
+		cleanupDelete(t, c, domainBase(did)+"/permissions/"+pid)
 		gid := seedGroup(t, c, did, "g")
+		cleanupDelete(t, c, domainBase(did)+"/groups/"+gid)
 		grantGroupPerm(t, c, did, gid, pid)
-		mustDELETE(t, c, domainBase(did)+"/permissions/"+pid, http.StatusBadRequest)
+		cleanupRevokeGroupPerm(t, c, did, gid, pid)
 
-		revokeGroupPerm(t, c, did, gid, pid)
-		mustDELETE(t, c, domainBase(did)+"/permissions/"+pid, http.StatusNoContent)
-		mustDELETE(t, c, domainBase(did)+"/resources/"+rid, http.StatusNoContent)
-		mustDELETE(t, c, domainBase(did)+"/groups/"+gid, http.StatusNoContent)
-		mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
+		mustDELETE(t, c, domainBase(did)+"/permissions/"+pid, http.StatusBadRequest)
 	})
 }
 
 func TestError_duplicateMembership(t *testing.T) {
 	c := httpClient()
 	did := seedDomain(t, c, "err-dup-mem-dom")
+	cleanupDelete(t, c, apiBase()+"/domains/"+did)
 	uid := seedUser(t, c, did, "u")
+	cleanupDelete(t, c, domainBase(did)+"/users/"+uid)
 	gid := seedGroup(t, c, did, "g")
+	cleanupDelete(t, c, domainBase(did)+"/groups/"+gid)
 	addMembership(t, c, did, uid, gid)
+	cleanupRevokeMembership(t, c, did, uid, gid)
 
 	mustDo(t, c, http.MethodPost, domainBase(did)+"/users/"+uid+"/groups/"+gid, "", http.StatusConflict)
-
-	removeMembership(t, c, did, uid, gid)
-	mustDELETE(t, c, domainBase(did)+"/groups/"+gid, http.StatusNoContent)
-	mustDELETE(t, c, domainBase(did)+"/users/"+uid, http.StatusNoContent)
-	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }
 
 func TestError_invalidPagination(t *testing.T) {
 	c := httpClient()
 	did := seedDomain(t, c, "err-pag-dom")
+	cleanupDelete(t, c, apiBase()+"/domains/"+did)
 	base := domainBase(did)
 
 	t.Run("negative_limit_clamped", func(t *testing.T) {
@@ -197,6 +192,4 @@ func TestError_invalidPagination(t *testing.T) {
 	t.Run("non_integer_limit", func(t *testing.T) {
 		mustDo(t, c, http.MethodGet, base+"/users?limit=xyz", "", http.StatusBadRequest)
 	})
-
-	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }
