@@ -125,7 +125,10 @@ func TestPagination_negativeLimitClamped(t *testing.T) {
 	did := seedDomain(t, c, "pag-clamp-dom")
 	cleanupDelete(t, c, apiBase()+"/domains/"+did)
 
-	// The API clamps limit < 1 to 1 rather than rejecting with 400.
+	// The API clamps limit < 1 to 1 (see parseListOpts) rather than
+	// rejecting with 400. The ticket mentions 400 for negative params,
+	// but that only applies to non-integer values and negative offsets;
+	// negative limits are intentionally clamped.
 	env := mustList(t, c, domainBase(did)+"/users?limit=-1")
 	if env.Meta.Limit != 1 {
 		t.Fatalf("negative limit should be clamped to 1, got %d", env.Meta.Limit)
