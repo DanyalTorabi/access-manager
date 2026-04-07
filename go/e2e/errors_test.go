@@ -55,7 +55,8 @@ func TestError_invalidIDFormat(t *testing.T) {
 
 	// The API does not currently validate UUID format; non-UUID strings
 	// are passed to the store which returns not-found (404, not 400).
-	// TODO: if UUID validation is added to the API layer, change to 400.
+	// If UUID validation is added to the API layer in the future, this
+	// expectation should change to 400.
 	bad := "not-a-uuid"
 
 	t.Run("get_user", func(t *testing.T) {
