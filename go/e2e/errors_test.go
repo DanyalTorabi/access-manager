@@ -65,17 +65,23 @@ func TestError_permissionMissingAccessMask(t *testing.T) {
 	// access_mask is empty string -> parseUint64 fails -> 400
 	body := `{"title":"p","resource_id":"` + rid + `","access_mask":""}`
 	mustDo(t, c, http.MethodPost, domainBase(did)+"/permissions", body, http.StatusBadRequest)
+
+	mustDELETE(t, c, domainBase(did)+"/resources/"+rid, http.StatusNoContent)
+	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }
 
 func TestError_duplicateAccessTypeBit(t *testing.T) {
 	c := httpClient()
 	did := seedDomain(t, c, "err-dup-at-dom")
 
-	seedAccessType(t, c, did, "read", "0x1")
+	atID := seedAccessType(t, c, did, "read", "0x1")
 
 	// Same bit in same domain -> 409
 	mustDo(t, c, http.MethodPost, domainBase(did)+"/access-types",
 		`{"title":"write","bit":"0x1"}`, http.StatusConflict)
+
+	mustDELETE(t, c, domainBase(did)+"/access-types/"+atID, http.StatusNoContent)
+	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }
 
 func TestError_deleteWithDependents(t *testing.T) {
@@ -83,15 +89,22 @@ func TestError_deleteWithDependents(t *testing.T) {
 
 	t.Run("domain_with_users", func(t *testing.T) {
 		did := seedDomain(t, c, "err-del-dom")
-		seedUser(t, c, did, "u")
+		uid := seedUser(t, c, did, "u")
 		mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusBadRequest)
+
+		mustDELETE(t, c, domainBase(did)+"/users/"+uid, http.StatusNoContent)
+		mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 	})
 
 	t.Run("resource_with_permissions", func(t *testing.T) {
 		did := seedDomain(t, c, "err-del-res-dom")
 		rid := seedResource(t, c, did, "r")
-		seedPermission(t, c, did, "p", rid, "0x1")
+		pid := seedPermission(t, c, did, "p", rid, "0x1")
 		mustDELETE(t, c, domainBase(did)+"/resources/"+rid, http.StatusBadRequest)
+
+		mustDELETE(t, c, domainBase(did)+"/permissions/"+pid, http.StatusNoContent)
+		mustDELETE(t, c, domainBase(did)+"/resources/"+rid, http.StatusNoContent)
+		mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 	})
 
 	t.Run("group_with_members", func(t *testing.T) {
@@ -100,6 +113,11 @@ func TestError_deleteWithDependents(t *testing.T) {
 		uid := seedUser(t, c, did, "u")
 		addMembership(t, c, did, uid, gid)
 		mustDELETE(t, c, domainBase(did)+"/groups/"+gid, http.StatusBadRequest)
+
+		removeMembership(t, c, did, uid, gid)
+		mustDELETE(t, c, domainBase(did)+"/groups/"+gid, http.StatusNoContent)
+		mustDELETE(t, c, domainBase(did)+"/users/"+uid, http.StatusNoContent)
+		mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 	})
 
 	t.Run("user_with_membership", func(t *testing.T) {
@@ -108,6 +126,11 @@ func TestError_deleteWithDependents(t *testing.T) {
 		uid := seedUser(t, c, did, "u")
 		addMembership(t, c, did, uid, gid)
 		mustDELETE(t, c, domainBase(did)+"/users/"+uid, http.StatusBadRequest)
+
+		removeMembership(t, c, did, uid, gid)
+		mustDELETE(t, c, domainBase(did)+"/users/"+uid, http.StatusNoContent)
+		mustDELETE(t, c, domainBase(did)+"/groups/"+gid, http.StatusNoContent)
+		mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 	})
 
 	t.Run("permission_with_user_grant", func(t *testing.T) {
@@ -117,6 +140,12 @@ func TestError_deleteWithDependents(t *testing.T) {
 		uid := seedUser(t, c, did, "u")
 		grantUserPerm(t, c, did, uid, pid)
 		mustDELETE(t, c, domainBase(did)+"/permissions/"+pid, http.StatusBadRequest)
+
+		revokeUserPerm(t, c, did, uid, pid)
+		mustDELETE(t, c, domainBase(did)+"/permissions/"+pid, http.StatusNoContent)
+		mustDELETE(t, c, domainBase(did)+"/resources/"+rid, http.StatusNoContent)
+		mustDELETE(t, c, domainBase(did)+"/users/"+uid, http.StatusNoContent)
+		mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 	})
 
 	t.Run("permission_with_group_grant", func(t *testing.T) {
@@ -126,6 +155,12 @@ func TestError_deleteWithDependents(t *testing.T) {
 		gid := seedGroup(t, c, did, "g")
 		grantGroupPerm(t, c, did, gid, pid)
 		mustDELETE(t, c, domainBase(did)+"/permissions/"+pid, http.StatusBadRequest)
+
+		revokeGroupPerm(t, c, did, gid, pid)
+		mustDELETE(t, c, domainBase(did)+"/permissions/"+pid, http.StatusNoContent)
+		mustDELETE(t, c, domainBase(did)+"/resources/"+rid, http.StatusNoContent)
+		mustDELETE(t, c, domainBase(did)+"/groups/"+gid, http.StatusNoContent)
+		mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 	})
 }
 
@@ -137,6 +172,11 @@ func TestError_duplicateMembership(t *testing.T) {
 	addMembership(t, c, did, uid, gid)
 
 	mustDo(t, c, http.MethodPost, domainBase(did)+"/users/"+uid+"/groups/"+gid, "", http.StatusConflict)
+
+	removeMembership(t, c, did, uid, gid)
+	mustDELETE(t, c, domainBase(did)+"/groups/"+gid, http.StatusNoContent)
+	mustDELETE(t, c, domainBase(did)+"/users/"+uid, http.StatusNoContent)
+	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }
 
 func TestError_invalidPagination(t *testing.T) {
@@ -145,10 +185,10 @@ func TestError_invalidPagination(t *testing.T) {
 	base := domainBase(did)
 
 	t.Run("negative_limit_clamped", func(t *testing.T) {
-		// The API clamps negative limit to DefaultLimit rather than rejecting.
+		// The API clamps negative limit to 1 rather than rejecting.
 		env := mustList(t, c, base+"/users?limit=-1")
-		if env.Meta.Limit <= 0 {
-			t.Fatalf("negative limit should be clamped to positive, got %d", env.Meta.Limit)
+		if env.Meta.Limit != 1 {
+			t.Fatalf("negative limit should be clamped to 1, got %d", env.Meta.Limit)
 		}
 	})
 	t.Run("non_integer_offset", func(t *testing.T) {
@@ -157,4 +197,6 @@ func TestError_invalidPagination(t *testing.T) {
 	t.Run("non_integer_limit", func(t *testing.T) {
 		mustDo(t, c, http.MethodGet, base+"/users?limit=xyz", "", http.StatusBadRequest)
 	})
+
+	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }
