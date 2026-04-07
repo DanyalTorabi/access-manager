@@ -173,7 +173,7 @@ func TestError_duplicateMembership(t *testing.T) {
 	mustDo(t, c, http.MethodPost, domainBase(did)+"/users/"+uid+"/groups/"+gid, "", http.StatusConflict)
 }
 
-func TestError_nonIntegerPagination(t *testing.T) {
+func TestError_badPagination(t *testing.T) {
 	c := httpClient()
 	did := seedDomain(t, c, "err-pag-dom")
 	cleanupDelete(t, c, apiBase()+"/domains/"+did)
@@ -184,5 +184,8 @@ func TestError_nonIntegerPagination(t *testing.T) {
 	})
 	t.Run("non_integer_limit", func(t *testing.T) {
 		mustDo(t, c, http.MethodGet, base+"/users?limit=xyz", "", http.StatusBadRequest)
+	})
+	t.Run("negative_offset", func(t *testing.T) {
+		mustDo(t, c, http.MethodGet, base+"/users?offset=-1", "", http.StatusBadRequest)
 	})
 }
