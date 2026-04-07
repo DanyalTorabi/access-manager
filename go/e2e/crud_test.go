@@ -19,7 +19,7 @@ func TestCRUD_domains(t *testing.T) {
 	cleanupDelete(t, c, apiBase()+"/domains/"+id)
 
 	// List — filter by title to avoid pagination hiding the new domain.
-	env := mustList(t, c, apiBase()+"/domains?search=crud-domain")
+	env := mustList(t, c, apiBase()+"/domains?search=crud-domain&limit=100")
 	var domains []entityTitle
 	if err := json.Unmarshal(env.Data, &domains); err != nil {
 		t.Fatalf("decode domain list: %v", err)
