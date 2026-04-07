@@ -127,8 +127,8 @@ func TestCRUD_groups(t *testing.T) {
 	parentID := seedGroup(t, c, did, "parent-group")
 	cleanupDelete(t, c, base+"/groups/"+parentID)
 	childID := seedGroupWithParent(t, c, did, "child-group", parentID)
-	cleanupUnlinkParent(t, c, did, childID)
 	cleanupDelete(t, c, base+"/groups/"+childID)
+	cleanupUnlinkParent(t, c, did, childID)
 
 	// List — both groups present.
 	env := mustList(t, c, base+"/groups")
