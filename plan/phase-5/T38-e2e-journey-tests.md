@@ -18,7 +18,8 @@ Redesign the E2E test suite (`go/e2e/`) from a single smoke test into comprehens
 - [x] Full CRUD lifecycle tests for every entity type (domains, users, groups, resources, access types, permissions).
 - [x] Authz challenge scenarios (direct, group-inherited, no permission, multiple masks, revoke-recheck).
 - [x] Pagination journey (page-through, past-total, default params).
-- [x] Error path journeys (invalid UUIDs, missing fields, duplicates, referential integrity, bad pagination).
+- [x] Error path journeys (invalid IDs, missing fields, duplicates, referential integrity, bad pagination).
+  - **Note:** Non-UUID IDs currently return 404 (no format validation); negative `limit` is clamped to 1 (not 400). Tests document actual API behavior.
 - [x] Auth journey (missing/wrong/valid bearer token; health bypass).
 - [x] Deprecation notice on `test/e2e/bash/run.sh`.
 
