@@ -14,6 +14,19 @@ import (
 
 const paginationN = 12
 
+func mustDecodeIDs(t *testing.T, data json.RawMessage) []string {
+	t.Helper()
+	var items []entityTitle
+	if err := json.Unmarshal(data, &items); err != nil {
+		t.Fatal(err)
+	}
+	ids := make([]string, len(items))
+	for i, it := range items {
+		ids[i] = it.ID
+	}
+	return ids
+}
+
 func TestPagination_users(t *testing.T) {
 	c := httpClient()
 	did := seedDomain(t, c, "pagination-dom")
@@ -26,59 +39,70 @@ func TestPagination_users(t *testing.T) {
 		cleanupDelete(t, c, base+"/users/"+uids[i])
 	}
 
+	// Pin sort order so pages are deterministic.
+	q := base + "/users?sort=title&order=asc"
+
+	var page1IDs, page2IDs, page3IDs []string
+
 	t.Run("page1", func(t *testing.T) {
-		env := mustList(t, c, base+"/users?offset=0&limit=5")
+		env := mustList(t, c, q+"&offset=0&limit=5")
 		if env.Meta.Total != paginationN {
 			t.Fatalf("total: want %d, got %d", paginationN, env.Meta.Total)
 		}
-		var items []entityTitle
-		if err := json.Unmarshal(env.Data, &items); err != nil {
-			t.Fatal(err)
-		}
-		if len(items) != 5 {
-			t.Fatalf("page1 len: want 5, got %d", len(items))
+		page1IDs = mustDecodeIDs(t, env.Data)
+		if len(page1IDs) != 5 {
+			t.Fatalf("page1 len: want 5, got %d", len(page1IDs))
 		}
 	})
 
 	t.Run("page2", func(t *testing.T) {
-		env := mustList(t, c, base+"/users?offset=5&limit=5")
+		env := mustList(t, c, q+"&offset=5&limit=5")
 		if env.Meta.Total != paginationN {
 			t.Fatalf("total: want %d, got %d", paginationN, env.Meta.Total)
 		}
-		var items []entityTitle
-		if err := json.Unmarshal(env.Data, &items); err != nil {
-			t.Fatal(err)
-		}
-		if len(items) != 5 {
-			t.Fatalf("page2 len: want 5, got %d", len(items))
+		page2IDs = mustDecodeIDs(t, env.Data)
+		if len(page2IDs) != 5 {
+			t.Fatalf("page2 len: want 5, got %d", len(page2IDs))
 		}
 	})
 
 	t.Run("page3_partial", func(t *testing.T) {
-		env := mustList(t, c, base+"/users?offset=10&limit=5")
+		env := mustList(t, c, q+"&offset=10&limit=5")
 		if env.Meta.Total != paginationN {
 			t.Fatalf("total: want %d, got %d", paginationN, env.Meta.Total)
 		}
-		var items []entityTitle
-		if err := json.Unmarshal(env.Data, &items); err != nil {
-			t.Fatal(err)
+		page3IDs = mustDecodeIDs(t, env.Data)
+		if len(page3IDs) != 2 {
+			t.Fatalf("page3 len: want 2, got %d", len(page3IDs))
 		}
-		if len(items) != 2 {
-			t.Fatalf("page3 len: want 2, got %d", len(items))
+	})
+
+	t.Run("no_overlap", func(t *testing.T) {
+		seen := make(map[string]int)
+		for _, id := range page1IDs {
+			seen[id] = 1
+		}
+		for _, id := range page2IDs {
+			if seen[id] == 1 {
+				t.Fatalf("page2 ID %s also on page1", id)
+			}
+			seen[id] = 2
+		}
+		for _, id := range page3IDs {
+			if p := seen[id]; p != 0 {
+				t.Fatalf("page3 ID %s also on page%d", id, p)
+			}
 		}
 	})
 
 	t.Run("offset_past_total", func(t *testing.T) {
-		env := mustList(t, c, base+"/users?offset=100&limit=5")
+		env := mustList(t, c, q+"&offset=100&limit=5")
 		if env.Meta.Total != paginationN {
 			t.Fatalf("total: want %d, got %d", paginationN, env.Meta.Total)
 		}
-		var items []entityTitle
-		if err := json.Unmarshal(env.Data, &items); err != nil {
-			t.Fatal(err)
-		}
-		if len(items) != 0 {
-			t.Fatalf("past total len: want 0, got %d", len(items))
+		ids := mustDecodeIDs(t, env.Data)
+		if len(ids) != 0 {
+			t.Fatalf("past total len: want 0, got %d", len(ids))
 		}
 	})
 
