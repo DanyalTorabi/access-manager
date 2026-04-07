@@ -5,6 +5,8 @@ package e2e
 import (
 	"net/http"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 // ---------------------------------------------------------------------------
@@ -17,7 +19,7 @@ func TestError_notFoundForBogusID(t *testing.T) {
 	cleanupDelete(t, c, apiBase()+"/domains/"+did)
 	base := domainBase(did)
 
-	bogus := "00000000-0000-0000-0000-000000000000"
+	bogus := uuid.New().String()
 
 	t.Run("get_user", func(t *testing.T) {
 		mustGET(t, c, base+"/users/"+bogus, http.StatusNotFound)
