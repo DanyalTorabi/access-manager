@@ -33,4 +33,13 @@ func TestSmoke_fullJourney(t *testing.T) {
 	grantGroupPerm(t, c, did, gid, pid)
 
 	assertAuthzCheck(t, c, did, uid, rid, "0x1", true)
+
+	// Cleanup in reverse dependency order.
+	revokeGroupPerm(t, c, did, gid, pid)
+	removeMembership(t, c, did, uid, gid)
+	mustDELETE(t, c, domainBase(did)+"/permissions/"+pid, http.StatusNoContent)
+	mustDELETE(t, c, domainBase(did)+"/resources/"+rid, http.StatusNoContent)
+	mustDELETE(t, c, domainBase(did)+"/groups/"+gid, http.StatusNoContent)
+	mustDELETE(t, c, domainBase(did)+"/users/"+uid, http.StatusNoContent)
+	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }
