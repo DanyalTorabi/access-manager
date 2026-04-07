@@ -47,6 +47,42 @@ func TestError_notFoundForBogusID(t *testing.T) {
 	})
 }
 
+func TestError_invalidIDFormat(t *testing.T) {
+	c := httpClient()
+	did := seedDomain(t, c, "err-badid-dom")
+	cleanupDelete(t, c, apiBase()+"/domains/"+did)
+	base := domainBase(did)
+
+	// The API does not validate UUID format; non-UUID strings are
+	// passed to the store which returns not-found (404, not 400).
+	bad := "not-a-uuid"
+
+	t.Run("get_user", func(t *testing.T) {
+		mustGET(t, c, base+"/users/"+bad, http.StatusNotFound)
+	})
+	t.Run("get_domain", func(t *testing.T) {
+		mustGET(t, c, apiBase()+"/domains/"+bad, http.StatusNotFound)
+	})
+	t.Run("get_group", func(t *testing.T) {
+		mustGET(t, c, base+"/groups/"+bad, http.StatusNotFound)
+	})
+}
+
+func TestError_missingRequiredField(t *testing.T) {
+	c := httpClient()
+	did := seedDomain(t, c, "err-missing-dom")
+	cleanupDelete(t, c, apiBase()+"/domains/"+did)
+	uid := seedUser(t, c, did, "u")
+	cleanupDelete(t, c, domainBase(did)+"/users/"+uid)
+
+	t.Run("patch_domain_no_title", func(t *testing.T) {
+		mustPATCH(t, c, apiBase()+"/domains/"+did, `{}`, http.StatusBadRequest)
+	})
+	t.Run("patch_user_no_title", func(t *testing.T) {
+		mustPATCH(t, c, domainBase(did)+"/users/"+uid, `{}`, http.StatusBadRequest)
+	})
+}
+
 func TestError_invalidJSON(t *testing.T) {
 	c := httpClient()
 
