@@ -1,4 +1,4 @@
-# T13 — curriculum-aligned CI: Go test/vet/lint, Docker + compose smoke, GHCR on main.
+# CI: Go test/vet/lint, Docker + compose smoke, GHCR publish on main.
 name: CI
 
 on:
@@ -89,7 +89,7 @@ jobs:
           go-version-file: go/go.mod
           cache-dependency-path: go/go.sum
 
-      - name: E2E smoke (T16)
+      - name: E2E journeys
         working-directory: go
         env:
           BASE_URL: http://127.0.0.1:8080
