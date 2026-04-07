@@ -24,6 +24,12 @@ func TestAuthz_directPermission(t *testing.T) {
 	grantUserPerm(t, c, did, uid, pid)
 
 	assertAuthzCheck(t, c, did, uid, rid, "0x1", true)
+
+	revokeUserPerm(t, c, did, uid, pid)
+	mustDELETE(t, c, domainBase(did)+"/permissions/"+pid, http.StatusNoContent)
+	mustDELETE(t, c, domainBase(did)+"/resources/"+rid, http.StatusNoContent)
+	mustDELETE(t, c, domainBase(did)+"/users/"+uid, http.StatusNoContent)
+	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }
 
 func TestAuthz_groupInherited(t *testing.T) {
@@ -38,6 +44,14 @@ func TestAuthz_groupInherited(t *testing.T) {
 	grantGroupPerm(t, c, did, gid, pid)
 
 	assertAuthzCheck(t, c, did, uid, rid, "0x2", true)
+
+	revokeGroupPerm(t, c, did, gid, pid)
+	removeMembership(t, c, did, uid, gid)
+	mustDELETE(t, c, domainBase(did)+"/permissions/"+pid, http.StatusNoContent)
+	mustDELETE(t, c, domainBase(did)+"/resources/"+rid, http.StatusNoContent)
+	mustDELETE(t, c, domainBase(did)+"/groups/"+gid, http.StatusNoContent)
+	mustDELETE(t, c, domainBase(did)+"/users/"+uid, http.StatusNoContent)
+	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }
 
 func TestAuthz_noPermission(t *testing.T) {
@@ -45,9 +59,14 @@ func TestAuthz_noPermission(t *testing.T) {
 	did := seedDomain(t, c, "authz-none")
 	uid := seedUser(t, c, did, "u")
 	rid := seedResource(t, c, did, "r")
-	_ = seedPermission(t, c, did, "p", rid, "0x1")
+	pid := seedPermission(t, c, did, "p", rid, "0x1")
 
 	assertAuthzCheck(t, c, did, uid, rid, "0x1", false)
+
+	mustDELETE(t, c, domainBase(did)+"/permissions/"+pid, http.StatusNoContent)
+	mustDELETE(t, c, domainBase(did)+"/resources/"+rid, http.StatusNoContent)
+	mustDELETE(t, c, domainBase(did)+"/users/"+uid, http.StatusNoContent)
+	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }
 
 func TestAuthz_multipleMasks(t *testing.T) {
@@ -85,6 +104,16 @@ func TestAuthz_multipleMasks(t *testing.T) {
 	assertAuthzCheck(t, c, did, uid, rid, "0x2", true)
 	assertAuthzCheck(t, c, did, uid, rid, "0x4", true)
 	assertAuthzCheck(t, c, did, uid, rid, "0x8", true)
+
+	revokeGroupPerm(t, c, did, gid, p2)
+	revokeUserPerm(t, c, did, uid, p1)
+	removeMembership(t, c, did, uid, gid)
+	mustDELETE(t, c, domainBase(did)+"/permissions/"+p2, http.StatusNoContent)
+	mustDELETE(t, c, domainBase(did)+"/permissions/"+p1, http.StatusNoContent)
+	mustDELETE(t, c, domainBase(did)+"/resources/"+rid, http.StatusNoContent)
+	mustDELETE(t, c, domainBase(did)+"/groups/"+gid, http.StatusNoContent)
+	mustDELETE(t, c, domainBase(did)+"/users/"+uid, http.StatusNoContent)
+	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }
 
 func TestAuthz_revokeAndRecheck(t *testing.T) {
@@ -99,6 +128,11 @@ func TestAuthz_revokeAndRecheck(t *testing.T) {
 
 	revokeUserPerm(t, c, did, uid, pid)
 	assertAuthzCheck(t, c, did, uid, rid, "0x1", false)
+
+	mustDELETE(t, c, domainBase(did)+"/permissions/"+pid, http.StatusNoContent)
+	mustDELETE(t, c, domainBase(did)+"/resources/"+rid, http.StatusNoContent)
+	mustDELETE(t, c, domainBase(did)+"/users/"+uid, http.StatusNoContent)
+	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }
 
 // TestAuthz_nestedGroupScaffold is a scaffold for nested-group inheritance (T2).
@@ -118,4 +152,14 @@ func TestAuthz_nestedGroupScaffold(t *testing.T) {
 
 	// TODO(T2): When nested-group inheritance lands, change to true.
 	assertAuthzCheck(t, c, did, uid, rid, "0x1", false)
+
+	revokeGroupPerm(t, c, did, parentGID, pid)
+	removeMembership(t, c, did, uid, childGID)
+	mustDELETE(t, c, domainBase(did)+"/permissions/"+pid, http.StatusNoContent)
+	mustDELETE(t, c, domainBase(did)+"/resources/"+rid, http.StatusNoContent)
+	mustPATCH(t, c, domainBase(did)+"/groups/"+childGID+"/parent", `{"parent_group_id":null}`, http.StatusNoContent)
+	mustDELETE(t, c, domainBase(did)+"/groups/"+childGID, http.StatusNoContent)
+	mustDELETE(t, c, domainBase(did)+"/groups/"+parentGID, http.StatusNoContent)
+	mustDELETE(t, c, domainBase(did)+"/users/"+uid, http.StatusNoContent)
+	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }
