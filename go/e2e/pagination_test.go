@@ -5,6 +5,7 @@ package e2e
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"testing"
 )
 
@@ -19,8 +20,9 @@ func TestPagination_users(t *testing.T) {
 	did := seedDomain(t, c, "pagination-dom")
 	base := domainBase(did)
 
+	uids := make([]string, paginationN)
 	for i := 0; i < paginationN; i++ {
-		seedUser(t, c, did, fmt.Sprintf("page-user-%02d", i))
+		uids[i] = seedUser(t, c, did, fmt.Sprintf("page-user-%02d", i))
 	}
 
 	t.Run("page1", func(t *testing.T) {
@@ -91,4 +93,9 @@ func TestPagination_users(t *testing.T) {
 			t.Fatalf("default limit should be positive, got %d", env.Meta.Limit)
 		}
 	})
+
+	for _, uid := range uids {
+		mustDELETE(t, c, base+"/users/"+uid, http.StatusNoContent)
+	}
+	mustDELETE(t, c, apiBase()+"/domains/"+did, http.StatusNoContent)
 }
