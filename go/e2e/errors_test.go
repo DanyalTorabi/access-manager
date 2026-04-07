@@ -173,23 +173,28 @@ func TestError_duplicateMembership(t *testing.T) {
 	mustDo(t, c, http.MethodPost, domainBase(did)+"/users/"+uid+"/groups/"+gid, "", http.StatusConflict)
 }
 
-func TestError_invalidPagination(t *testing.T) {
+func TestError_nonIntegerPagination(t *testing.T) {
 	c := httpClient()
 	did := seedDomain(t, c, "err-pag-dom")
 	cleanupDelete(t, c, apiBase()+"/domains/"+did)
 	base := domainBase(did)
 
-	t.Run("negative_limit_clamped", func(t *testing.T) {
-		// The API clamps negative limit to 1 rather than rejecting.
-		env := mustList(t, c, base+"/users?limit=-1")
-		if env.Meta.Limit != 1 {
-			t.Fatalf("negative limit should be clamped to 1, got %d", env.Meta.Limit)
-		}
-	})
 	t.Run("non_integer_offset", func(t *testing.T) {
 		mustDo(t, c, http.MethodGet, base+"/users?offset=abc", "", http.StatusBadRequest)
 	})
 	t.Run("non_integer_limit", func(t *testing.T) {
 		mustDo(t, c, http.MethodGet, base+"/users?limit=xyz", "", http.StatusBadRequest)
 	})
+}
+
+func TestPagination_negativeLimitClamped(t *testing.T) {
+	c := httpClient()
+	did := seedDomain(t, c, "pag-clamp-dom")
+	cleanupDelete(t, c, apiBase()+"/domains/"+did)
+
+	// The API clamps limit < 1 to 1 rather than rejecting with 400.
+	env := mustList(t, c, domainBase(did)+"/users?limit=-1")
+	if env.Meta.Limit != 1 {
+		t.Fatalf("negative limit should be clamped to 1, got %d", env.Meta.Limit)
+	}
 }
