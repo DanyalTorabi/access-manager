@@ -43,6 +43,8 @@ Do not add functions, methods, or interfaces that have no callers in the current
 - In code or docs, reference work explicitly, e.g. `Fixes #123` or `// TODO(T36): ...` where **`T36`** points readers to the matching file under [`plan/`](plan/) (filename `T36-...`), not to a repo ticket registry.
 - **Prefer updating an existing open issue** when the follow-up fits that scope; avoid one new issue per tiny item unless it is genuinely separate work.
 
+- Temporary mask limitation: until a v2 migration, access masks are intentionally limited to the lower 63 bits to avoid signed-64 overflow when stored in SQLite. Track and discuss migrations or API validation in issue #67.
+
 ### Pull request / Copilot follow-ups
 
 If a review comment is correct but **out of scope for the current PR**, say on the thread that it will be handled in **#…** / **Txx**, and add a **note** to that umbrella’s [plan/](plan/) file (e.g. under Steps or Deliverables) so the item is scheduled and traceable.

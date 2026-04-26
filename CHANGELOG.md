@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **T36 / #47:** API error responses no longer expose internal SQL/driver details. All error bodies use stable, database-agnostic messages (`resource not found`, `referenced entity does not exist or is still referenced`, `internal server error`, etc.). Full errors are logged server-side for operator diagnostics.
 
+- Temporary limitation: access masks are limited to the lower 63 bits (SQLite `INTEGER` is signed 64-bit and current storage casts to `int64`). This avoids overflow when clients use the most-significant unsigned bit. Enforce first-63-bits until v2 migration; tracked in [#67](https://github.com/DanyalTorabi/access-manager/issues/67).
+
 ### Changed
 
 - **T40 / #55:** `access-types` list default sort changed from `bit` to `title` for consistency with other entities. Clients relying on bit-order should sort client-side.
