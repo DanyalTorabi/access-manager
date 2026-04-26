@@ -18,7 +18,7 @@ const (
 	envHTTPAddr          = "HTTP_ADDR"
 	envMigrationsDir      = "MIGRATIONS_DIR"
 	envShutdownTimeoutSec = "SHUTDOWN_TIMEOUT_SECONDS"
-	envAPIBearerToken     = "API_BEARER_TOKEN"
+	envAPIBearerToken     = "API_BEARER_TOKEN" // #nosec G101: environment variable name, not a hardcoded secret
 )
 
 // fileShape matches config.example.yaml (snake_case keys).
@@ -55,7 +55,11 @@ func Load() (Config, error) {
 
 	path := strings.TrimSpace(os.Getenv(envConfigPath))
 	if path != "" {
-		b, err := os.ReadFile(path)
+		// Reading configuration file at a path supplied by the environment is
+		// expected (operator-provided). Validate presence but do not attempt
+		// to enforce path restrictions here. Suppress gosec G304 as this is
+		// an explicit config file read under operator control.
+		b, err := os.ReadFile(path) // #nosec G304
 		if err != nil {
 			return Config{}, fmt.Errorf("config: read %s: %w", path, err)
 		}
