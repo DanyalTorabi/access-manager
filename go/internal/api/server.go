@@ -785,14 +785,16 @@ type userAuthzResourceResponse struct {
 	EffectiveMask string `json:"effective_mask"`
 }
 
+const userAuthzResourcesSortField = "resource_id"
+
 func (s *Server) userAuthzResources(w http.ResponseWriter, r *http.Request) {
-	opts, err := parseListOpts(r)
+	opts, err := parseOffsetLimitOpts(r)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
 	// This endpoint only exposes pagination and uses a fixed stable ordering.
-	opts.Sort = "resource_id"
+	opts.Sort = userAuthzResourcesSortField
 	opts.Order = store.OrderAsc
 
 	domainID := chi.URLParam(r, "domainID")
@@ -1024,6 +1026,21 @@ func parseListOpts(r *http.Request) (store.ListOpts, error) {
 			}
 		}
 	}
+	return opts, nil
+}
+
+func parseOffsetLimitOpts(r *http.Request) (store.ListOpts, error) {
+	opts, err := parseListOpts(r)
+	if err != nil {
+		return opts, err
+	}
+	q := r.URL.Query()
+	if strings.TrimSpace(q.Get("search")) != "" || strings.TrimSpace(q.Get("search_type")) != "" ||
+		strings.TrimSpace(q.Get("sort")) != "" || strings.TrimSpace(q.Get("order")) != "" {
+		return opts, errors.New("only limit and offset are supported")
+	}
+	opts.Search = ""
+	opts.SearchType = ""
 	return opts, nil
 }
 

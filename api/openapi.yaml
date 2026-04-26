@@ -408,6 +408,7 @@ components:
         effective_mask:
           type: string
           description: Effective mask for this user/resource pair as decimal string.
+          example: "5"
 
 paths:
   /health:

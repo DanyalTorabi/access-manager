@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -558,6 +559,33 @@ func TestAPI_userAuthzResources_integration(t *testing.T) {
 	}
 	if page.Meta.Total != 3 || len(page.Data) != 1 {
 		t.Fatalf("page total=%d len=%d", page.Meta.Total, len(page.Data))
+	}
+	orderedIDs := []string{ridA, ridB, ridC}
+	sort.Strings(orderedIDs)
+	if page.Data[0].ResourceID != orderedIDs[1] {
+		t.Fatalf("page resource: want %s, got %s", orderedIDs[1], page.Data[0].ResourceID)
+	}
+}
+
+func TestAPI_userAuthzResources_unsupportedQueryParams(t *testing.T) {
+	ts, st := newTestAPI(t)
+	ctx := context.Background()
+	domainID := uuid.NewString()
+	uid := uuid.NewString()
+	if err := st.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UserCreate(ctx, &store.User{ID: uid, DomainID: domainID, Title: "u"}); err != nil {
+		t.Fatal(err)
+	}
+	res, err := http.Get(ts.URL + "/api/v1/domains/" + domainID + "/users/" + uid + "/authz/resources?search=foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("unsupported params: want 400, got %d: %s", res.StatusCode, b)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -267,6 +268,11 @@ func TestUserAuthzResourcesList(t *testing.T) {
 	}
 	if pageTotal != 3 || len(page) != 1 {
 		t.Fatalf("pagination: total=%d len=%d", pageTotal, len(page))
+	}
+	orderedIDs := []string{ridA, ridB, ridC}
+	sort.Strings(orderedIDs)
+	if page[0].ResourceID != orderedIDs[1] {
+		t.Fatalf("pagination resource: want %s, got %s", orderedIDs[1], page[0].ResourceID)
 	}
 
 	emptyPage, emptyTotal, err := s.UserAuthzResourcesList(ctx, domainID, uid, store.ListOpts{Offset: 99, Limit: 10})

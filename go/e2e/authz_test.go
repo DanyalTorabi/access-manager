@@ -215,6 +215,11 @@ func TestAuthz_userResourcesList(t *testing.T) {
 	if len(pageItems) != 1 {
 		t.Fatalf("page len: want 1, got %d", len(pageItems))
 	}
+	orderedIDs := []string{ridA, ridB, ridC}
+	sort.Strings(orderedIDs)
+	if pageItems[0].ResourceID != orderedIDs[1] {
+		t.Fatalf("page resource: want %s, got %s", orderedIDs[1], pageItems[0].ResourceID)
+	}
 }
 
 // TestAuthz_nestedGroupScaffold is a scaffold for nested-group inheritance (T2).
