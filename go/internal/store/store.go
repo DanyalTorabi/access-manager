@@ -46,11 +46,17 @@ type AccessType struct {
 }
 
 type Permission struct {
-	ID          string
-	DomainID    string
-	Title       string
-	ResourceID  string
-	AccessMask  uint64
+	ID         string
+	DomainID   string
+	Title      string
+	ResourceID string
+	AccessMask uint64
+}
+
+// UserAuthzResource is one row in the user authz resources listing.
+type UserAuthzResource struct {
+	ResourceID    string
+	EffectiveMask uint64
 }
 
 const (
@@ -162,9 +168,9 @@ type AccessTypePatchParams struct {
 
 // PermissionPatchParams is a partial update for a permission.
 type PermissionPatchParams struct {
-	Title        *string
-	ResourceID   *string
-	AccessMask   *uint64
+	Title      *string
+	ResourceID *string
+	AccessMask *uint64
 }
 
 // AuthzReader resolves effective access masks for the indexed hot path.
@@ -176,6 +182,7 @@ type AuthzReader interface {
 // Store aggregates CRUD and authorization reads for the application.
 type Store interface {
 	AuthzReader
+	UserAuthzResourcesList(ctx context.Context, domainID, userID string, opts ListOpts) ([]UserAuthzResource, int64, error)
 
 	DomainCreate(ctx context.Context, d *Domain) error
 	DomainGet(ctx context.Context, id string) (*Domain, error)

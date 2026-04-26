@@ -96,6 +96,7 @@ func (s *Server) Router(reg prometheus.Registerer, gather prometheus.Gatherer) c
 
 		r.Post("/domains/{domainID}/users/{userID}/permissions/{permissionID}", s.grantUserPermission)
 		r.Delete("/domains/{domainID}/users/{userID}/permissions/{permissionID}", s.revokeUserPermission)
+		r.Get("/domains/{domainID}/users/{userID}/authz/resources", s.userAuthzResources)
 
 		r.Post("/domains/{domainID}/groups/{groupID}/permissions/{permissionID}", s.grantGroupPermission)
 		r.Delete("/domains/{domainID}/groups/{groupID}/permissions/{permissionID}", s.revokeGroupPermission)
@@ -129,15 +130,15 @@ type accessTypePatchBody struct {
 }
 
 type permissionPatchBody struct {
-	Title       *string `json:"title"`
-	ResourceID  *string `json:"resource_id"`
-	AccessMask  *string `json:"access_mask"`
+	Title      *string `json:"title"`
+	ResourceID *string `json:"resource_id"`
+	AccessMask *string `json:"access_mask"`
 }
 
 type permissionBody struct {
-	Title       string `json:"title"`
-	ResourceID  string `json:"resource_id"`
-	AccessMask  string `json:"access_mask"` // decimal or 0x hex
+	Title      string `json:"title"`
+	ResourceID string `json:"resource_id"`
+	AccessMask string `json:"access_mask"` // decimal or 0x hex
 }
 
 type accessTypeBody struct {
@@ -320,8 +321,8 @@ func (s *Server) userDelete(w http.ResponseWriter, r *http.Request) {
 func (s *Server) groupCreate(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
 	var b struct {
-		Title           string  `json:"title"`
-		ParentGroupID   *string `json:"parent_group_id"`
+		Title         string  `json:"title"`
+		ParentGroupID *string `json:"parent_group_id"`
 	}
 	if !readJSON(w, r, &b) {
 		return
@@ -777,6 +778,38 @@ func (s *Server) revokeUserPermission(w http.ResponseWriter, r *http.Request) {
 	}
 	logger.Audit(r.Context(), "revoke_user_permission", slog.String("domain_id", domainID), slog.String("user_id", uid), slog.String("permission_id", pid))
 	w.WriteHeader(http.StatusNoContent)
+}
+
+type userAuthzResourceResponse struct {
+	ResourceID    string `json:"resource_id"`
+	EffectiveMask string `json:"effective_mask"`
+}
+
+func (s *Server) userAuthzResources(w http.ResponseWriter, r *http.Request) {
+	opts, err := parseListOpts(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	// This endpoint only exposes pagination and uses a fixed stable ordering.
+	opts.Sort = "resource_id"
+	opts.Order = store.OrderAsc
+
+	domainID := chi.URLParam(r, "domainID")
+	uid := chi.URLParam(r, "userID")
+	list, total, err := s.Store.UserAuthzResourcesList(r.Context(), domainID, uid, opts)
+	if err != nil {
+		writeStoreErr(w, r, err)
+		return
+	}
+	resp := make([]userAuthzResourceResponse, 0, len(list))
+	for _, it := range list {
+		resp = append(resp, userAuthzResourceResponse{
+			ResourceID:    it.ResourceID,
+			EffectiveMask: strconv.FormatUint(it.EffectiveMask, 10),
+		})
+	}
+	writeList(w, resp, total, opts)
 }
 
 func (s *Server) grantGroupPermission(w http.ResponseWriter, r *http.Request) {
