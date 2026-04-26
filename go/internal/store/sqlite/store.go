@@ -906,7 +906,12 @@ func (s *Store) UserAuthzResourcesList(ctx context.Context, domainID, userID str
 	}
 
 	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(resourceIDs)), ",")
-	maskSQL := `SELECT p.resource_id, p.access_mask FROM permissions p WHERE p.domain_id = ? AND p.resource_id IN (` + placeholders + `)` + userEffectivePermissionPredicateSQL
+	// Safe concatenation: `placeholders` is derived from the controlled
+	// `resourceIDs` slice length (no user input) and
+	// `userEffectivePermissionPredicateSQL` is a constant. Parameters are
+	// passed separately via `maskArgs`, so this is not vulnerable to SQL
+	// injection. Suppress gosec G202 for this deliberate construction.
+	maskSQL := `SELECT p.resource_id, p.access_mask FROM permissions p WHERE p.domain_id = ? AND p.resource_id IN (` + placeholders + `)` + userEffectivePermissionPredicateSQL //nolint:gosec
 	maskArgs := make([]any, 0, 1+len(resourceIDs)+len(predicateArgs))
 	maskArgs = append(maskArgs, domainID)
 	for _, resourceID := range resourceIDs {
