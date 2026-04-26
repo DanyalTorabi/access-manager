@@ -131,7 +131,7 @@ func TestLoad_apiBearerTokenYAMLTrimmed(t *testing.T) {
 	path := filepath.Join(dir, "cfg.yaml")
 	content := `
 database_driver: sqlite
-database_url: "file::memory:?cache=shared"
+database_url: "file::memory"
 http_addr: "127.0.0.1:8080"
 migrations_dir: migrations/sqlite
 api_bearer_token: "  yaml-token  "
