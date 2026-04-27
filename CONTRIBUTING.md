@@ -42,6 +42,13 @@ Provide **proposed** commit message and PR description text only. Do **not** run
 
 ## Pull requests
 
+### Issue / PR title format
+
+- Prefix issue and PR titles with the plan ticket identifier in square brackets when the work maps to a plan, for example: `[T47] API: normalize numeric parse errors and return stable 400`.
+- The `Tnn` identifier must match the corresponding plan file under `plan/phase-*/Tnn-...md` when applicable. Include a link to the plan file in the issue or PR body.
+- If no plan ticket applies, follow a short, imperative title (e.g. `ci: fix linting error`).
+
+
 ### Before you open a PR (self-review)
 
 Do a quick **reviewer pass** on your own diff (humans and AI assistants) before pushing or asking for review:
