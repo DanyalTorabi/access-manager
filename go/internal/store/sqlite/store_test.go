@@ -356,7 +356,59 @@ func TestUserAuthzResourcesList_noPermissions(t *testing.T) {
 	}
 }
 
-func TestUserAuthzResourcesList_negativeMaskTreatedAsZero(t *testing.T) {
+func TestUserAuthzResourcesList_nonPositiveMasksExcluded(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+
+	domainID := uuid.NewString()
+	uid := uuid.NewString()
+	ridNeg := uuid.NewString()
+	pidNeg := uuid.NewString()
+	ridZero := uuid.NewString()
+	pidZero := uuid.NewString()
+
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UserCreate(ctx, &store.User{ID: uid, DomainID: domainID, Title: "u"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: ridNeg, DomainID: domainID, Title: "r-neg"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: ridZero, DomainID: domainID, Title: "r-zero"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.db.ExecContext(ctx,
+		`INSERT INTO permissions (id, domain_id, title, resource_id, access_mask) VALUES (?, ?, ?, ?, ?)`,
+		pidNeg, domainID, "neg-mask", ridNeg, int64(-1),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.ExecContext(ctx,
+		`INSERT INTO user_permissions (domain_id, user_id, permission_id) VALUES (?, ?, ?)`,
+		domainID, uid, pidNeg,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: pidZero, DomainID: domainID, Title: "zero-mask", ResourceID: ridZero, AccessMask: 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GrantUserPermission(ctx, domainID, uid, pidZero); err != nil {
+		t.Fatal(err)
+	}
+
+	list, total, err := s.UserAuthzResourcesList(ctx, domainID, uid, store.ListOpts{Offset: 0, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 0 || len(list) != 0 {
+		t.Fatalf("non-positive masks should be excluded: total=%d len=%d", total, len(list))
+	}
+}
+
+func TestUserAuthzResourcesList_positiveMaskIncluded(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)
 
@@ -374,17 +426,10 @@ func TestUserAuthzResourcesList_negativeMaskTreatedAsZero(t *testing.T) {
 	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
 		t.Fatal(err)
 	}
-
-	if _, err := s.db.ExecContext(ctx,
-		`INSERT INTO permissions (id, domain_id, title, resource_id, access_mask) VALUES (?, ?, ?, ?, ?)`,
-		pid, domainID, "neg-mask", rid, int64(-1),
-	); err != nil {
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: pid, DomainID: domainID, Title: "p", ResourceID: rid, AccessMask: 1}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.db.ExecContext(ctx,
-		`INSERT INTO user_permissions (domain_id, user_id, permission_id) VALUES (?, ?, ?)`,
-		domainID, uid, pid,
-	); err != nil {
+	if err := s.GrantUserPermission(ctx, domainID, uid, pid); err != nil {
 		t.Fatal(err)
 	}
 
@@ -392,14 +437,8 @@ func TestUserAuthzResourcesList_negativeMaskTreatedAsZero(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if total != 1 || len(list) != 1 {
-		t.Fatalf("want one row, got total=%d len=%d", total, len(list))
-	}
-	if list[0].ResourceID != rid {
-		t.Fatalf("resource id: want %s, got %s", rid, list[0].ResourceID)
-	}
-	if list[0].EffectiveMask != 0 {
-		t.Fatalf("effective mask: want 0 for negative DB value, got %d", list[0].EffectiveMask)
+	if total != 1 || len(list) != 1 || list[0].ResourceID != rid || list[0].EffectiveMask != 1 {
+		t.Fatalf("positive mask should be listed: total=%d len=%d list=%+v", total, len(list), list)
 	}
 }
 

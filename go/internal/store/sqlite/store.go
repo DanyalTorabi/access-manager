@@ -880,7 +880,7 @@ WHERE p.domain_id = ? AND p.resource_id = ?
 
 const userAuthzResourcesBaseSQL = `
 FROM permissions p
-WHERE p.domain_id = ?
+WHERE p.domain_id = ? AND p.access_mask > 0
 ` + userEffectivePermissionPredicateSQL
 
 func userEffectivePermissionArgs(domainID, userID string) []any {
@@ -902,7 +902,7 @@ func buildUserAuthzMaskQueryAndArgs(domainID string, resourceIDs []string, predi
 	if err != nil {
 		return "", nil, err
 	}
-	query := `SELECT p.resource_id, p.access_mask FROM permissions p WHERE p.domain_id = ? AND p.resource_id IN (` + placeholders + `)` + userEffectivePermissionPredicateSQL // #nosec G202
+	query := `SELECT p.resource_id, p.access_mask FROM permissions p WHERE p.domain_id = ? AND p.resource_id IN (` + placeholders + `) AND p.access_mask > 0` + userEffectivePermissionPredicateSQL // #nosec G202
 	args := make([]any, 0, 1+len(resourceIDs)+len(predicateArgs))
 	args = append(args, domainID)
 	for _, resourceID := range resourceIDs {
