@@ -23,6 +23,8 @@ func New(db *sql.DB) *Store {
 	return &Store{db: db}
 }
 
+var _ store.Store = (*Store)(nil)
+
 func constraintCode(err error) int {
 	var e *sqlite.Error
 	if errors.As(err, &e) {
