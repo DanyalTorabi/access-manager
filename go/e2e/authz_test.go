@@ -131,6 +131,97 @@ func TestAuthz_revokeAndRecheck(t *testing.T) {
 	assertAuthzCheck(t, c, did, uid, rid, "0x1", false)
 }
 
+func TestAuthz_userResourcesList(t *testing.T) {
+	c := httpClient()
+	did := seedDomain(t, c, "authz-user-resources")
+	cleanupDelete(t, c, apiBase()+"/domains/"+did)
+
+	uid := seedUser(t, c, did, "u")
+	cleanupDelete(t, c, domainBase(did)+"/users/"+uid)
+	gid := seedGroup(t, c, did, "g")
+	cleanupDelete(t, c, domainBase(did)+"/groups/"+gid)
+
+	addMembership(t, c, did, uid, gid)
+	cleanupRevokeMembership(t, c, did, uid, gid)
+
+	ridA := seedResource(t, c, did, "a")
+	ridB := seedResource(t, c, did, "b")
+	ridC := seedResource(t, c, did, "c")
+	cleanupDelete(t, c, domainBase(did)+"/resources/"+ridA)
+	cleanupDelete(t, c, domainBase(did)+"/resources/"+ridB)
+	cleanupDelete(t, c, domainBase(did)+"/resources/"+ridC)
+
+	pUserA := seedPermission(t, c, did, "pUserA", ridA, "0x1")
+	pGroupA := seedPermission(t, c, did, "pGroupA", ridA, "0x4")
+	pGroupB := seedPermission(t, c, did, "pGroupB", ridB, "0x2")
+	pUserC1 := seedPermission(t, c, did, "pUserC1", ridC, "0x8")
+	pUserC2 := seedPermission(t, c, did, "pUserC2", ridC, "0x10")
+	cleanupDelete(t, c, domainBase(did)+"/permissions/"+pUserA)
+	cleanupDelete(t, c, domainBase(did)+"/permissions/"+pGroupA)
+	cleanupDelete(t, c, domainBase(did)+"/permissions/"+pGroupB)
+	cleanupDelete(t, c, domainBase(did)+"/permissions/"+pUserC1)
+	cleanupDelete(t, c, domainBase(did)+"/permissions/"+pUserC2)
+
+	grantUserPerm(t, c, did, uid, pUserA)
+	grantGroupPerm(t, c, did, gid, pGroupA)
+	grantGroupPerm(t, c, did, gid, pGroupB)
+	grantUserPerm(t, c, did, uid, pUserC1)
+	grantUserPerm(t, c, did, uid, pUserC2)
+	cleanupRevokeUserPerm(t, c, did, uid, pUserA)
+	cleanupRevokeGroupPerm(t, c, did, gid, pGroupA)
+	cleanupRevokeGroupPerm(t, c, did, gid, pGroupB)
+	cleanupRevokeUserPerm(t, c, did, uid, pUserC1)
+	cleanupRevokeUserPerm(t, c, did, uid, pUserC2)
+
+	type authzResource struct {
+		ResourceID    string `json:"resource_id"`
+		EffectiveMask string `json:"effective_mask"`
+	}
+
+	base := fmt.Sprintf("%s/users/%s/authz/resources", domainBase(did), uid)
+	env := mustList(t, c, base+"?offset=0&limit=10")
+	if env.Meta.Total != 3 {
+		t.Fatalf("total: want 3, got %d", env.Meta.Total)
+	}
+	var items []authzResource
+	if err := json.Unmarshal(env.Data, &items); err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 3 {
+		t.Fatalf("items len: want 3, got %d", len(items))
+	}
+	got := map[string]string{}
+	for _, it := range items {
+		got[it.ResourceID] = it.EffectiveMask
+	}
+	if got[ridA] != "5" {
+		t.Fatalf("ridA mask: want 5, got %q", got[ridA])
+	}
+	if got[ridB] != "2" {
+		t.Fatalf("ridB mask: want 2, got %q", got[ridB])
+	}
+	if got[ridC] != "24" {
+		t.Fatalf("ridC mask: want 24, got %q", got[ridC])
+	}
+
+	page := mustList(t, c, base+"?offset=1&limit=1")
+	if page.Meta.Total != 3 {
+		t.Fatalf("page total: want 3, got %d", page.Meta.Total)
+	}
+	var pageItems []authzResource
+	if err := json.Unmarshal(page.Data, &pageItems); err != nil {
+		t.Fatal(err)
+	}
+	if len(pageItems) != 1 {
+		t.Fatalf("page len: want 1, got %d", len(pageItems))
+	}
+	orderedIDs := []string{ridA, ridB, ridC}
+	sort.Strings(orderedIDs)
+	if pageItems[0].ResourceID != orderedIDs[1] {
+		t.Fatalf("page resource: want %s, got %s", orderedIDs[1], pageItems[0].ResourceID)
+	}
+}
+
 // TestAuthz_nestedGroupScaffold is a scaffold for nested-group inheritance (T2).
 // Current behaviour: grant to parent, user in child -> NOT inherited (flat
 // group model). When T2 lands, flip wantAllowed to true.

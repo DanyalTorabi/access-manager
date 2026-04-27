@@ -164,6 +164,7 @@
     {"name": "Grant group permission", "request": {"method": "POST", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups/{{groupId}}/permissions/{{permissionId}}"}},
     {"name": "Authz check", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/authz/check?user_id={{userId}}&resource_id={{resourceId}}&access_bit=1"}},
     {"name": "Authz masks", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/authz/masks?user_id={{userId}}&resource_id={{resourceId}}"}},
+    {"name": "List user authz resources", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}/authz/resources?offset=0&limit=20"}},
     {"name": "Revoke group permission", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups/{{groupId}}/permissions/{{permissionId}}"}},
     {"name": "Revoke user permission", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}/permissions/{{permissionId}}"}},
     {"name": "Remove user from group", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}/groups/{{groupId}}"}},

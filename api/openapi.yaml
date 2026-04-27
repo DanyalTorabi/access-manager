@@ -398,6 +398,18 @@ components:
             maximum: 9223372036854775807
           description: Individual permission masks (uint64); JSON numbers in SQLite-safe non-negative range.
 
+    UserAuthzResource:
+      type: object
+      required: [resource_id, effective_mask]
+      properties:
+        resource_id:
+          type: string
+          format: uuid
+        effective_mask:
+          type: string
+          description: Effective mask for this user/resource pair as decimal string.
+          example: "5"
+
 paths:
   /health:
     get:
@@ -1385,6 +1397,63 @@ paths:
           description: No content
         "404":
           description: Not found
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v1/domains/{domainID}/users/{userID}/authz/resources:
+    parameters:
+      - $ref: "#/components/parameters/domainID"
+      - $ref: "#/components/parameters/userID"
+    get:
+      tags: [Authz]
+      summary: List resources where the user has effective access
+      description: |
+        Returns resources for which the user has any effective access via direct user grants and direct group membership grants.
+        Effective masks are returned as decimal strings.
+      parameters:
+        - $ref: "#/components/parameters/offsetParam"
+        - $ref: "#/components/parameters/limitParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserAuthzResource"
+                  meta:
+                    $ref: "#/components/schemas/ListMeta"
+              example:
+                data:
+                  - resource_id: "11111111-1111-1111-1111-111111111111"
+                    effective_mask: "5"
+                meta:
+                  total: 1
+                  offset: 0
+                  limit: 20
+                  sort: "resource_id"
+                  order: "asc"
+        "400":
+          description: Bad request (invalid pagination params)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: Domain or user not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
         "401":
           description: Unauthorized
           content:

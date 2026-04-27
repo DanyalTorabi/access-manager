@@ -23,6 +23,8 @@ func New(db *sql.DB) *Store {
 	return &Store{db: db}
 }
 
+var _ store.Store = (*Store)(nil)
+
 func constraintCode(err error) int {
 	var e *sqlite.Error
 	if errors.As(err, &e) {
@@ -52,9 +54,29 @@ func wrapConstraintError(err error) error {
 	return err
 }
 
-func maskToSQL(m uint64) int64 { return int64(m) }
+const maxInt64 = 1<<63 - 1
 
-func maskFromSQL(v int64) uint64 { return uint64(v) }
+// maskToSQL converts a uint64 mask into a signed int64 suitable for SQLite
+// storage. Returns an error if the value cannot be represented in signed
+// 64-bit (i.e. uses bit 63). Callers should validate input and return a
+// client-facing validation error when necessary.
+func maskToSQL(m uint64) (int64, error) {
+	if m > uint64(maxInt64) {
+		return 0, fmt.Errorf("%w: mask value exceeds signed 64-bit range", store.ErrInvalidInput)
+	}
+	return int64(m), nil
+}
+
+// maskFromSQL converts an int64 value read from SQLite into uint64. If a
+// negative value is encountered, log a warning and treat it as zero to avoid
+// propagating unexpected large unsigned values.
+func maskFromSQL(v int64) uint64 {
+	if v < 0 {
+		slog.Warn("negative mask value read from DB; treating as 0", "value", v)
+		return 0
+	}
+	return uint64(v)
+}
 
 var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 
@@ -160,7 +182,7 @@ func (s *Store) DomainList(ctx context.Context, opts store.ListOpts) ([]store.Do
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, title FROM domains`+where+orderByClause(opts.Sort, opts.Order, domainSortColumns, "title")+` LIMIT ? OFFSET ?`, //nolint:gosec // G202: ORDER BY column from allow-list, not user input
+		`SELECT id, title FROM domains`+where+orderByClause(opts.Sort, opts.Order, domainSortColumns, "title")+` LIMIT ? OFFSET ?`, // #nosec G202: ORDER BY column from allow-list, not user input
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
@@ -238,7 +260,7 @@ func (s *Store) UserList(ctx context.Context, domainID string, opts store.ListOp
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title FROM users `+where+orderByClause(opts.Sort, opts.Order, userSortColumns, "title")+` LIMIT ? OFFSET ?`, //nolint:gosec // G202: ORDER BY column from allow-list, not user input
+		`SELECT id, domain_id, title FROM users `+where+orderByClause(opts.Sort, opts.Order, userSortColumns, "title")+` LIMIT ? OFFSET ?`, // #nosec G202: ORDER BY column from allow-list, not user input
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
@@ -330,7 +352,7 @@ func (s *Store) GroupList(ctx context.Context, domainID string, opts store.Group
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title, parent_group_id FROM groups `+where+orderByClause(opts.Sort, opts.Order, groupSortColumns, "title")+` LIMIT ? OFFSET ?`, //nolint:gosec // G202: ORDER BY column from allow-list, not user input
+		`SELECT id, domain_id, title, parent_group_id FROM groups `+where+orderByClause(opts.Sort, opts.Order, groupSortColumns, "title")+` LIMIT ? OFFSET ?`, // #nosec G202: ORDER BY column from allow-list, not user input
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
@@ -494,7 +516,7 @@ func (s *Store) ResourceList(ctx context.Context, domainID string, opts store.Li
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title FROM resources `+where+orderByClause(opts.Sort, opts.Order, resourceSortColumns, "title")+` LIMIT ? OFFSET ?`, //nolint:gosec // G202: ORDER BY column from allow-list, not user input
+		`SELECT id, domain_id, title FROM resources `+where+orderByClause(opts.Sort, opts.Order, resourceSortColumns, "title")+` LIMIT ? OFFSET ?`, // #nosec G202: ORDER BY column from allow-list, not user input
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
@@ -540,8 +562,12 @@ func (s *Store) ResourcePatch(ctx context.Context, domainID, id string, title *s
 }
 
 func (s *Store) AccessTypeCreate(ctx context.Context, a *store.AccessType) error {
-	_, err := s.db.ExecContext(ctx, `INSERT INTO access_types (id, domain_id, title, bit) VALUES (?, ?, ?, ?)`,
-		a.ID, a.DomainID, a.Title, maskToSQL(a.Bit))
+	bitVal, err := maskToSQL(a.Bit)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `INSERT INTO access_types (id, domain_id, title, bit) VALUES (?, ?, ?, ?)`,
+		a.ID, a.DomainID, a.Title, bitVal)
 	return wrapConstraintError(err)
 }
 
@@ -560,7 +586,7 @@ func (s *Store) AccessTypeList(ctx context.Context, domainID string, opts store.
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title, bit FROM access_types `+where+orderByClause(opts.Sort, opts.Order, accessTypeSortColumns, "title")+` LIMIT ? OFFSET ?`, //nolint:gosec // G202: ORDER BY column from allow-list, not user input
+		`SELECT id, domain_id, title, bit FROM access_types `+where+orderByClause(opts.Sort, opts.Order, accessTypeSortColumns, "title")+` LIMIT ? OFFSET ?`, // #nosec G202: ORDER BY column from allow-list, not user input
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
@@ -634,8 +660,12 @@ func (s *Store) AccessTypePatch(ctx context.Context, domainID, id string, p stor
 	if p.Bit != nil {
 		bit = *p.Bit
 	}
+	bitVal, err := maskToSQL(bit)
+	if err != nil {
+		return nil, err
+	}
 	if _, err := tx.ExecContext(ctx, `UPDATE access_types SET title = ?, bit = ? WHERE id = ? AND domain_id = ?`,
-		title, maskToSQL(bit), id, domainID); err != nil {
+		title, bitVal, id, domainID); err != nil {
 		return nil, wrapConstraintError(err)
 	}
 	if err := tx.Commit(); err != nil {
@@ -645,8 +675,12 @@ func (s *Store) AccessTypePatch(ctx context.Context, domainID, id string, p stor
 }
 
 func (s *Store) PermissionCreate(ctx context.Context, p *store.Permission) error {
-	_, err := s.db.ExecContext(ctx, `INSERT INTO permissions (id, domain_id, title, resource_id, access_mask) VALUES (?, ?, ?, ?, ?)`,
-		p.ID, p.DomainID, p.Title, p.ResourceID, maskToSQL(p.AccessMask))
+	maskVal, err := maskToSQL(p.AccessMask)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `INSERT INTO permissions (id, domain_id, title, resource_id, access_mask) VALUES (?, ?, ?, ?, ?)`,
+		p.ID, p.DomainID, p.Title, p.ResourceID, maskVal)
 	return wrapConstraintError(err)
 }
 
@@ -683,7 +717,7 @@ func (s *Store) PermissionList(ctx context.Context, domainID string, opts store.
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, domain_id, title, resource_id, access_mask FROM permissions `+where+orderByClause(opts.Sort, opts.Order, permissionSortColumns, "title")+` LIMIT ? OFFSET ?`, //nolint:gosec // G202: ORDER BY column from allow-list, not user input
+		`SELECT id, domain_id, title, resource_id, access_mask FROM permissions `+where+orderByClause(opts.Sort, opts.Order, permissionSortColumns, "title")+` LIMIT ? OFFSET ?`, // #nosec G202: ORDER BY column from allow-list, not user input
 		append(args, opts.Limit, opts.Offset)...)
 	if err != nil {
 		return nil, 0, err
@@ -754,8 +788,12 @@ func (s *Store) PermissionPatch(ctx context.Context, domainID, id string, p stor
 	if p.AccessMask != nil {
 		mask = *p.AccessMask
 	}
+	maskVal, err := maskToSQL(mask)
+	if err != nil {
+		return nil, err
+	}
 	if _, err := tx.ExecContext(ctx, `UPDATE permissions SET title = ?, resource_id = ?, access_mask = ? WHERE id = ? AND domain_id = ?`,
-		title, resourceID, maskToSQL(mask), id, domainID); err != nil {
+		title, resourceID, maskVal, id, domainID); err != nil {
 		return nil, wrapConstraintError(err)
 	}
 	if err := tx.Commit(); err != nil {
@@ -821,9 +859,7 @@ func (s *Store) RevokeGroupPermission(ctx context.Context, domainID, groupID, pe
 	return nil
 }
 
-const effectiveMaskSQL = `
-SELECT p.access_mask FROM permissions p
-WHERE p.domain_id = ? AND p.resource_id = ?
+const userEffectivePermissionPredicateSQL = `
 AND (
 	EXISTS (
 		SELECT 1 FROM user_permissions up
@@ -837,12 +873,136 @@ AND (
 )
 `
 
-func (s *Store) PermissionMasksForUserResource(ctx context.Context, domainID, userID, resourceID string) ([]uint64, error) {
-	rows, err := s.db.QueryContext(ctx, effectiveMaskSQL,
-		domainID, resourceID,
-		domainID, userID,
-		userID, domainID, domainID,
+const effectiveMaskSQL = `
+SELECT p.access_mask FROM permissions p
+WHERE p.domain_id = ? AND p.resource_id = ?
+` + userEffectivePermissionPredicateSQL
+
+const userAuthzResourcesBaseSQL = `
+FROM permissions p
+WHERE p.domain_id = ? AND p.access_mask > 0
+` + userEffectivePermissionPredicateSQL
+
+func userEffectivePermissionArgs(domainID, userID string) []any {
+	return []any{domainID, userID, userID, domainID, domainID}
+}
+
+func inPlaceholders(n int) (string, error) {
+	if n <= 0 {
+		return "", fmt.Errorf("in placeholders: n must be > 0")
+	}
+	return strings.TrimSuffix(strings.Repeat("?,", n), ","), nil
+}
+
+// buildUserAuthzMaskQueryAndArgs builds the batched mask query used by
+// UserAuthzResourcesList and returns the SQL and args in the exact placeholder
+// order to avoid call-site mistakes.
+func buildUserAuthzMaskQueryAndArgs(domainID string, resourceIDs []string, predicateArgs []any) (string, []any, error) {
+	placeholders, err := inPlaceholders(len(resourceIDs))
+	if err != nil {
+		return "", nil, err
+	}
+	query := `SELECT p.resource_id, p.access_mask FROM permissions p WHERE p.domain_id = ? AND p.resource_id IN (` + placeholders + `) AND p.access_mask > 0` + userEffectivePermissionPredicateSQL // #nosec G202
+	args := make([]any, 0, 1+len(resourceIDs)+len(predicateArgs))
+	args = append(args, domainID)
+	for _, resourceID := range resourceIDs {
+		args = append(args, resourceID)
+	}
+	args = append(args, predicateArgs...)
+	return query, args, nil
+}
+
+func (s *Store) UserAuthzResourcesList(ctx context.Context, domainID, userID string, opts store.ListOpts) ([]store.UserAuthzResource, int64, error) {
+	opts = store.SanitizeListOpts(opts)
+
+	var exists int
+	if err := s.db.QueryRowContext(ctx, `SELECT 1 FROM domains WHERE id = ?`, domainID).Scan(&exists); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, 0, store.ErrNotFound
+		}
+		return nil, 0, err
+	}
+	if err := s.db.QueryRowContext(ctx, `SELECT 1 FROM users WHERE id = ? AND domain_id = ?`, userID, domainID).Scan(&exists); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, 0, store.ErrNotFound
+		}
+		return nil, 0, err
+	}
+
+	predicateArgs := userEffectivePermissionArgs(domainID, userID)
+	countArgs := append([]any{domainID}, predicateArgs...)
+	var total int64
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(DISTINCT p.resource_id) `+userAuthzResourcesBaseSQL, countArgs...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	listArgs := append([]any{domainID}, predicateArgs...)
+	listArgs = append(listArgs, opts.Limit, opts.Offset)
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT DISTINCT p.resource_id `+userAuthzResourcesBaseSQL+` ORDER BY p.resource_id ASC LIMIT ? OFFSET ?`,
+		listArgs...,
 	)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var resourceIDs []string
+	for rows.Next() {
+		var resourceID string
+		if err := rows.Scan(&resourceID); err != nil {
+			_ = rows.Close()
+			return nil, 0, err
+		}
+		resourceIDs = append(resourceIDs, resourceID)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, 0, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, 0, err
+	}
+	if len(resourceIDs) == 0 {
+		return []store.UserAuthzResource{}, total, nil
+	}
+
+	maskSQL, maskArgs, err := buildUserAuthzMaskQueryAndArgs(domainID, resourceIDs, predicateArgs)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	maskRows, err := s.db.QueryContext(ctx, maskSQL, maskArgs...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer func() { _ = maskRows.Close() }()
+
+	masksByResource := make(map[string]uint64, len(resourceIDs))
+	for maskRows.Next() {
+		var resourceID string
+		var m int64
+		if err := maskRows.Scan(&resourceID, &m); err != nil {
+			return nil, 0, err
+		}
+		masksByResource[resourceID] |= maskFromSQL(m)
+	}
+	if err := maskRows.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	list := make([]store.UserAuthzResource, 0, len(resourceIDs))
+	for _, resourceID := range resourceIDs {
+		mask := masksByResource[resourceID]
+		list = append(list, store.UserAuthzResource{ResourceID: resourceID, EffectiveMask: mask})
+	}
+	return list, total, nil
+}
+
+func (s *Store) PermissionMasksForUserResource(ctx context.Context, domainID, userID, resourceID string) ([]uint64, error) {
+	args := make([]any, 0, 2+5)
+	args = append(args, domainID, resourceID)
+	args = append(args, userEffectivePermissionArgs(domainID, userID)...)
+	rows, err := s.db.QueryContext(ctx, effectiveMaskSQL, args...)
 	if err != nil {
 		return nil, err
 	}

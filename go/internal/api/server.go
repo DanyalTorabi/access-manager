@@ -96,6 +96,7 @@ func (s *Server) Router(reg prometheus.Registerer, gather prometheus.Gatherer) c
 
 		r.Post("/domains/{domainID}/users/{userID}/permissions/{permissionID}", s.grantUserPermission)
 		r.Delete("/domains/{domainID}/users/{userID}/permissions/{permissionID}", s.revokeUserPermission)
+		r.Get("/domains/{domainID}/users/{userID}/authz/resources", s.userAuthzResources)
 
 		r.Post("/domains/{domainID}/groups/{groupID}/permissions/{permissionID}", s.grantGroupPermission)
 		r.Delete("/domains/{domainID}/groups/{groupID}/permissions/{permissionID}", s.revokeGroupPermission)
@@ -129,15 +130,15 @@ type accessTypePatchBody struct {
 }
 
 type permissionPatchBody struct {
-	Title       *string `json:"title"`
-	ResourceID  *string `json:"resource_id"`
-	AccessMask  *string `json:"access_mask"`
+	Title      *string `json:"title"`
+	ResourceID *string `json:"resource_id"`
+	AccessMask *string `json:"access_mask"`
 }
 
 type permissionBody struct {
-	Title       string `json:"title"`
-	ResourceID  string `json:"resource_id"`
-	AccessMask  string `json:"access_mask"` // decimal or 0x hex
+	Title      string `json:"title"`
+	ResourceID string `json:"resource_id"`
+	AccessMask string `json:"access_mask"` // decimal or 0x hex
 }
 
 type accessTypeBody struct {
@@ -320,8 +321,8 @@ func (s *Server) userDelete(w http.ResponseWriter, r *http.Request) {
 func (s *Server) groupCreate(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
 	var b struct {
-		Title           string  `json:"title"`
-		ParentGroupID   *string `json:"parent_group_id"`
+		Title         string  `json:"title"`
+		ParentGroupID *string `json:"parent_group_id"`
 	}
 	if !readJSON(w, r, &b) {
 		return
@@ -779,6 +780,40 @@ func (s *Server) revokeUserPermission(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+type userAuthzResourceResponse struct {
+	ResourceID    string `json:"resource_id"`
+	EffectiveMask string `json:"effective_mask"`
+}
+
+const userAuthzResourcesSortField = "resource_id"
+
+func (s *Server) userAuthzResources(w http.ResponseWriter, r *http.Request) {
+	opts, err := parseOffsetLimitOpts(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	// This endpoint only exposes pagination and uses a fixed stable ordering.
+	opts.Sort = userAuthzResourcesSortField
+	opts.Order = store.OrderAsc
+
+	domainID := chi.URLParam(r, "domainID")
+	uid := chi.URLParam(r, "userID")
+	list, total, err := s.Store.UserAuthzResourcesList(r.Context(), domainID, uid, opts)
+	if err != nil {
+		writeStoreErr(w, r, err)
+		return
+	}
+	resp := make([]userAuthzResourceResponse, 0, len(list))
+	for _, it := range list {
+		resp = append(resp, userAuthzResourceResponse{
+			ResourceID:    it.ResourceID,
+			EffectiveMask: strconv.FormatUint(it.EffectiveMask, 10),
+		})
+	}
+	writeList(w, resp, total, opts)
+}
+
 func (s *Server) grantGroupPermission(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
 	gid := chi.URLParam(r, "groupID")
@@ -929,6 +964,9 @@ func publicInvalidInputMsg(err error) string {
 	full := err.Error()
 	const prefix = "store: invalid input: "
 	if after, ok := strings.CutPrefix(full, prefix); ok && after != "" {
+		if strings.Contains(after, "mask value exceeds signed 64-bit range") {
+			return "mask value must be within signed 64-bit range"
+		}
 		return after
 	}
 	return "invalid request"
@@ -990,6 +1028,47 @@ func parseListOpts(r *http.Request) (store.ListOpts, error) {
 				return opts, errors.New("search_type must be contains, starts_with, or ends_with")
 			}
 		}
+	}
+	return opts, nil
+}
+
+func parseOffsetLimitOpts(r *http.Request) (store.ListOpts, error) {
+	opts := store.ListOpts{Offset: 0, Limit: store.DefaultLimit}
+	q := r.URL.Query()
+	if _, ok := q["search"]; ok {
+		return opts, errors.New("only limit and offset are supported")
+	}
+	if _, ok := q["search_type"]; ok {
+		return opts, errors.New("only limit and offset are supported")
+	}
+	if _, ok := q["sort"]; ok {
+		return opts, errors.New("only limit and offset are supported")
+	}
+	if _, ok := q["order"]; ok {
+		return opts, errors.New("only limit and offset are supported")
+	}
+	if v := q.Get("offset"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return opts, errors.New("offset must be an integer")
+		}
+		if n < 0 {
+			return opts, errors.New("offset must not be negative")
+		}
+		opts.Offset = n
+	}
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return opts, errors.New("limit must be an integer")
+		}
+		if n < 1 {
+			n = 1
+		}
+		if n > store.MaxLimit {
+			n = store.MaxLimit
+		}
+		opts.Limit = n
 	}
 	return opts, nil
 }
