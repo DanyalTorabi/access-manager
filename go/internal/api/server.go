@@ -1030,17 +1030,43 @@ func parseListOpts(r *http.Request) (store.ListOpts, error) {
 }
 
 func parseOffsetLimitOpts(r *http.Request) (store.ListOpts, error) {
-	opts, err := parseListOpts(r)
-	if err != nil {
-		return opts, err
-	}
+	opts := store.ListOpts{Offset: 0, Limit: store.DefaultLimit}
 	q := r.URL.Query()
-	if strings.TrimSpace(q.Get("search")) != "" || strings.TrimSpace(q.Get("search_type")) != "" ||
-		strings.TrimSpace(q.Get("sort")) != "" || strings.TrimSpace(q.Get("order")) != "" {
+	if _, ok := q["search"]; ok {
 		return opts, errors.New("only limit and offset are supported")
 	}
-	opts.Search = ""
-	opts.SearchType = ""
+	if _, ok := q["search_type"]; ok {
+		return opts, errors.New("only limit and offset are supported")
+	}
+	if _, ok := q["sort"]; ok {
+		return opts, errors.New("only limit and offset are supported")
+	}
+	if _, ok := q["order"]; ok {
+		return opts, errors.New("only limit and offset are supported")
+	}
+	if v := q.Get("offset"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return opts, errors.New("offset must be an integer")
+		}
+		if n < 0 {
+			return opts, errors.New("offset must not be negative")
+		}
+		opts.Offset = n
+	}
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return opts, errors.New("limit must be an integer")
+		}
+		if n < 1 {
+			n = 1
+		}
+		if n > store.MaxLimit {
+			n = store.MaxLimit
+		}
+		opts.Limit = n
+	}
 	return opts, nil
 }
 

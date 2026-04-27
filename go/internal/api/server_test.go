@@ -587,6 +587,31 @@ func TestAPI_userAuthzResources_unsupportedQueryParams(t *testing.T) {
 		b, _ := io.ReadAll(res.Body)
 		t.Fatalf("unsupported params: want 400, got %d: %s", res.StatusCode, b)
 	}
+	var out map[string]string
+	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out["error"] != "only limit and offset are supported" {
+		t.Fatalf("unexpected error message: %q", out["error"])
+	}
+
+	longSearch := strings.Repeat("x", 300)
+	resLong, err := http.Get(ts.URL + "/api/v1/domains/" + domainID + "/users/" + uid + "/authz/resources?search=" + longSearch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resLong.Body.Close() }()
+	if resLong.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(resLong.Body)
+		t.Fatalf("unsupported long search: want 400, got %d: %s", resLong.StatusCode, b)
+	}
+	var outLong map[string]string
+	if err := json.NewDecoder(resLong.Body).Decode(&outLong); err != nil {
+		t.Fatal(err)
+	}
+	if outLong["error"] != "only limit and offset are supported" {
+		t.Fatalf("unexpected long-search error message: %q", outLong["error"])
+	}
 }
 
 func TestAPI_userAuthzResources_notFound(t *testing.T) {
