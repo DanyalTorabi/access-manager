@@ -1432,6 +1432,16 @@ paths:
                       $ref: "#/components/schemas/UserAuthzResource"
                   meta:
                     $ref: "#/components/schemas/ListMeta"
+              example:
+                data:
+                  - resource_id: "11111111-1111-1111-1111-111111111111"
+                    effective_mask: "5"
+                meta:
+                  total: 1
+                  offset: 0
+                  limit: 20
+                  sort: "resource_id"
+                  order: "asc"
         "400":
           description: Bad request (invalid pagination params)
           content:
