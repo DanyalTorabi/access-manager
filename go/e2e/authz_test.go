@@ -249,3 +249,77 @@ func TestAuthz_nestedGroupScaffold(t *testing.T) {
 	// TODO(T2): When nested-group inheritance lands, change to true.
 	assertAuthzCheck(t, c, did, uid, rid, "0x1", false)
 }
+
+func TestAuthz_groupResourcesList(t *testing.T) {
+	c := httpClient()
+	did := seedDomain(t, c, "authz-group-resources")
+	cleanupDelete(t, c, apiBase()+"/domains/"+did)
+
+	gid := seedGroup(t, c, did, "g")
+	cleanupDelete(t, c, domainBase(did)+"/groups/"+gid)
+
+	ridA := seedResource(t, c, did, "a")
+	ridB := seedResource(t, c, did, "b")
+	cleanupDelete(t, c, domainBase(did)+"/resources/"+ridA)
+	cleanupDelete(t, c, domainBase(did)+"/resources/"+ridB)
+
+	// Two permissions on ridA (OR = 0x1|0x4 = 5), one on ridB (0x2).
+	pA1 := seedPermission(t, c, did, "pA1", ridA, "0x1")
+	pA2 := seedPermission(t, c, did, "pA2", ridA, "0x4")
+	pB := seedPermission(t, c, did, "pB", ridB, "0x2")
+	cleanupDelete(t, c, domainBase(did)+"/permissions/"+pA1)
+	cleanupDelete(t, c, domainBase(did)+"/permissions/"+pA2)
+	cleanupDelete(t, c, domainBase(did)+"/permissions/"+pB)
+
+	grantGroupPerm(t, c, did, gid, pA1)
+	grantGroupPerm(t, c, did, gid, pA2)
+	grantGroupPerm(t, c, did, gid, pB)
+	cleanupRevokeGroupPerm(t, c, did, gid, pA1)
+	cleanupRevokeGroupPerm(t, c, did, gid, pA2)
+	cleanupRevokeGroupPerm(t, c, did, gid, pB)
+
+	type groupAuthzResource struct {
+		ResourceID string `json:"resource_id"`
+		Mask       string `json:"mask"`
+	}
+
+	base := fmt.Sprintf("%s/groups/%s/authz/resources", domainBase(did), gid)
+	env := mustList(t, c, base+"?offset=0&limit=10")
+	if env.Meta.Total != 2 {
+		t.Fatalf("total: want 2, got %d", env.Meta.Total)
+	}
+	var items []groupAuthzResource
+	if err := json.Unmarshal(env.Data, &items); err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("items len: want 2, got %d", len(items))
+	}
+	got := map[string]string{}
+	for _, it := range items {
+		got[it.ResourceID] = it.Mask
+	}
+	if got[ridA] != "5" {
+		t.Fatalf("ridA mask: want 5, got %q", got[ridA])
+	}
+	if got[ridB] != "2" {
+		t.Fatalf("ridB mask: want 2, got %q", got[ridB])
+	}
+
+	page := mustList(t, c, base+"?offset=1&limit=1")
+	if page.Meta.Total != 2 {
+		t.Fatalf("page total: want 2, got %d", page.Meta.Total)
+	}
+	var pageItems []groupAuthzResource
+	if err := json.Unmarshal(page.Data, &pageItems); err != nil {
+		t.Fatal(err)
+	}
+	if len(pageItems) != 1 {
+		t.Fatalf("page len: want 1, got %d", len(pageItems))
+	}
+	orderedIDs := []string{ridA, ridB}
+	sort.Strings(orderedIDs)
+	if pageItems[0].ResourceID != orderedIDs[1] {
+		t.Fatalf("page resource: want %s, got %s", orderedIDs[1], pageItems[0].ResourceID)
+	}
+}

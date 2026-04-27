@@ -59,7 +59,7 @@ func Load() (Config, error) {
 		// expected (operator-provided). Validate presence but do not attempt
 		// to enforce path restrictions here. Suppress gosec G304 as this is
 		// an explicit config file read under operator control.
-		b, err := os.ReadFile(path) // #nosec G304
+		b, err := os.ReadFile(path) // #nosec G304 G703
 		if err != nil {
 			return Config{}, fmt.Errorf("config: read %s: %w", path, err)
 		}

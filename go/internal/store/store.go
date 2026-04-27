@@ -59,6 +59,12 @@ type UserAuthzResource struct {
 	EffectiveMask uint64
 }
 
+// GroupAuthzResource is one row in the group authz resources listing.
+type GroupAuthzResource struct {
+	ResourceID string
+	Mask       uint64
+}
+
 const (
 	DefaultLimit = 20
 	MaxLimit     = 100
@@ -183,6 +189,7 @@ type AuthzReader interface {
 type Store interface {
 	AuthzReader
 	UserAuthzResourcesList(ctx context.Context, domainID, userID string, opts ListOpts) ([]UserAuthzResource, int64, error)
+	GroupAuthzResourcesList(ctx context.Context, domainID, groupID string, opts ListOpts) ([]GroupAuthzResource, int64, error)
 
 	DomainCreate(ctx context.Context, d *Domain) error
 	DomainGet(ctx context.Context, id string) (*Domain, error)
