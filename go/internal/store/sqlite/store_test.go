@@ -305,6 +305,32 @@ func TestUserAuthzResourcesList_notFound(t *testing.T) {
 	}
 }
 
+func TestBuildUserAuthzMaskQueryAndArgs(t *testing.T) {
+	predicateArgs := []any{"d", "u", "u", "d", "d"}
+	q, args, err := buildUserAuthzMaskQueryAndArgs("dom", []string{"r1", "r2"}, predicateArgs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(q, "IN (?,?)") {
+		t.Fatalf("query placeholders: got %q", q)
+	}
+	want := []any{"dom", "r1", "r2", "d", "u", "u", "d", "d"}
+	if len(args) != len(want) {
+		t.Fatalf("args len: want %d, got %d", len(want), len(args))
+	}
+	for i := range want {
+		if args[i] != want[i] {
+			t.Fatalf("args[%d]: want %v, got %v", i, want[i], args[i])
+		}
+	}
+}
+
+func TestBuildUserAuthzMaskQueryAndArgs_emptyResourceIDs(t *testing.T) {
+	if _, _, err := buildUserAuthzMaskQueryAndArgs("dom", nil, []any{"d", "u", "u", "d", "d"}); err == nil {
+		t.Fatal("want error for empty resource IDs")
+	}
+}
+
 func TestDomainGet_foundAndNotFound(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)

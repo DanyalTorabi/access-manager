@@ -885,6 +885,31 @@ func userEffectivePermissionArgs(domainID, userID string) []any {
 	return []any{domainID, userID, userID, domainID, domainID}
 }
 
+func inPlaceholders(n int) (string, error) {
+	if n <= 0 {
+		return "", fmt.Errorf("in placeholders: n must be > 0")
+	}
+	return strings.TrimSuffix(strings.Repeat("?,", n), ","), nil
+}
+
+// buildUserAuthzMaskQueryAndArgs builds the batched mask query used by
+// UserAuthzResourcesList and returns the SQL and args in the exact placeholder
+// order to avoid call-site mistakes.
+func buildUserAuthzMaskQueryAndArgs(domainID string, resourceIDs []string, predicateArgs []any) (string, []any, error) {
+	placeholders, err := inPlaceholders(len(resourceIDs))
+	if err != nil {
+		return "", nil, err
+	}
+	query := `SELECT p.resource_id, p.access_mask FROM permissions p WHERE p.domain_id = ? AND p.resource_id IN (` + placeholders + `)` + userEffectivePermissionPredicateSQL // #nosec G202
+	args := make([]any, 0, 1+len(resourceIDs)+len(predicateArgs))
+	args = append(args, domainID)
+	for _, resourceID := range resourceIDs {
+		args = append(args, resourceID)
+	}
+	args = append(args, predicateArgs...)
+	return query, args, nil
+}
+
 func (s *Store) UserAuthzResourcesList(ctx context.Context, domainID, userID string, opts store.ListOpts) ([]store.UserAuthzResource, int64, error) {
 	opts = store.SanitizeListOpts(opts)
 
@@ -939,24 +964,10 @@ func (s *Store) UserAuthzResourcesList(ctx context.Context, domainID, userID str
 		return []store.UserAuthzResource{}, total, nil
 	}
 
-	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(resourceIDs)), ",")
-	// Safe concatenation: `placeholders` is derived from the controlled
-	// `resourceIDs` slice length (no user input) and
-	// `userEffectivePermissionPredicateSQL` is a constant. Parameters are
-	// passed separately via `maskArgs`, so this is not vulnerable to SQL
-	// injection. Suppress gosec G202 for this deliberate construction.
-	// Safe concatenation: `placeholders` is derived from the controlled
-	// `resourceIDs` slice length (no user input) and
-	// `userEffectivePermissionPredicateSQL` is a constant. Parameters are
-	// passed separately via `maskArgs`, so this is not vulnerable to SQL
-	// injection. Suppress gosec G202 for this deliberate construction.
-	maskSQL := `SELECT p.resource_id, p.access_mask FROM permissions p WHERE p.domain_id = ? AND p.resource_id IN (` + placeholders + `)` + userEffectivePermissionPredicateSQL // #nosec G202
-	maskArgs := make([]any, 0, 1+len(resourceIDs)+len(predicateArgs))
-	maskArgs = append(maskArgs, domainID)
-	for _, resourceID := range resourceIDs {
-		maskArgs = append(maskArgs, resourceID)
+	maskSQL, maskArgs, err := buildUserAuthzMaskQueryAndArgs(domainID, resourceIDs, predicateArgs)
+	if err != nil {
+		return nil, 0, err
 	}
-	maskArgs = append(maskArgs, predicateArgs...)
 
 	maskRows, err := s.db.QueryContext(ctx, maskSQL, maskArgs...)
 	if err != nil {
