@@ -964,6 +964,9 @@ func publicInvalidInputMsg(err error) string {
 	full := err.Error()
 	const prefix = "store: invalid input: "
 	if after, ok := strings.CutPrefix(full, prefix); ok && after != "" {
+		if strings.Contains(after, "mask value exceeds signed 64-bit range") {
+			return "mask value must be within signed 64-bit range"
+		}
 		return after
 	}
 	return "invalid request"

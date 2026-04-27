@@ -1970,6 +1970,7 @@ func TestWriteStoreErr_allCases(t *testing.T) {
 		{"fk violation", store.ErrFKViolation, http.StatusBadRequest, "referenced entity does not exist or is still referenced"},
 		{"invalid input", store.ErrInvalidInput, http.StatusBadRequest, "invalid request"},
 		{"invalid input detail", fmt.Errorf("%w: cycle detected in group parent chain", store.ErrInvalidInput), http.StatusBadRequest, "cycle detected in group parent chain"},
+		{"invalid input mask range", fmt.Errorf("%w: mask value exceeds signed 64-bit range", store.ErrInvalidInput), http.StatusBadRequest, "mask value must be within signed 64-bit range"},
 		{"conflict", store.ErrConflict, http.StatusConflict, "resource already exists"},
 		{"generic", fmt.Errorf("boom"), http.StatusInternalServerError, "internal server error"},
 	}
