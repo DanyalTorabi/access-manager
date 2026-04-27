@@ -331,6 +331,129 @@ func TestBuildUserAuthzMaskQueryAndArgs_emptyResourceIDs(t *testing.T) {
 	}
 }
 
+func TestUserAuthzResourcesList_noPermissions(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+
+	domainID := uuid.NewString()
+	uid := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UserCreate(ctx, &store.User{ID: uid, DomainID: domainID, Title: "u"}); err != nil {
+		t.Fatal(err)
+	}
+
+	list, total, err := s.UserAuthzResourcesList(ctx, domainID, uid, store.ListOpts{Offset: 0, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 0 {
+		t.Fatalf("total: want 0, got %d", total)
+	}
+	if len(list) != 0 {
+		t.Fatalf("list len: want 0, got %d", len(list))
+	}
+}
+
+func TestUserAuthzResourcesList_negativeMaskTreatedAsZero(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+
+	domainID := uuid.NewString()
+	uid := uuid.NewString()
+	rid := uuid.NewString()
+	pid := uuid.NewString()
+
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UserCreate(ctx, &store.User{ID: uid, DomainID: domainID, Title: "u"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.db.ExecContext(ctx,
+		`INSERT INTO permissions (id, domain_id, title, resource_id, access_mask) VALUES (?, ?, ?, ?, ?)`,
+		pid, domainID, "neg-mask", rid, int64(-1),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.ExecContext(ctx,
+		`INSERT INTO user_permissions (domain_id, user_id, permission_id) VALUES (?, ?, ?)`,
+		domainID, uid, pid,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	list, total, err := s.UserAuthzResourcesList(ctx, domainID, uid, store.ListOpts{Offset: 0, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 1 || len(list) != 1 {
+		t.Fatalf("want one row, got total=%d len=%d", total, len(list))
+	}
+	if list[0].ResourceID != rid {
+		t.Fatalf("resource id: want %s, got %s", rid, list[0].ResourceID)
+	}
+	if list[0].EffectiveMask != 0 {
+		t.Fatalf("effective mask: want 0 for negative DB value, got %d", list[0].EffectiveMask)
+	}
+}
+
+func TestUserAuthzResourcesList_limitClampedAtMaxLimit(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+
+	domainID := uuid.NewString()
+	uid := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UserCreate(ctx, &store.User{ID: uid, DomainID: domainID, Title: "u"}); err != nil {
+		t.Fatal(err)
+	}
+
+	wantTotal := store.MaxLimit + 5
+	for i := 0; i < wantTotal; i++ {
+		rid := uuid.NewString()
+		pid := uuid.NewString()
+		if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: fmt.Sprintf("r-%03d", i)}); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.PermissionCreate(ctx, &store.Permission{ID: pid, DomainID: domainID, Title: fmt.Sprintf("p-%03d", i), ResourceID: rid, AccessMask: 1}); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.GrantUserPermission(ctx, domainID, uid, pid); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	page1, total1, err := s.UserAuthzResourcesList(ctx, domainID, uid, store.ListOpts{Offset: 0, Limit: store.MaxLimit + 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total1 != int64(wantTotal) {
+		t.Fatalf("total1: want %d, got %d", wantTotal, total1)
+	}
+	if len(page1) != store.MaxLimit {
+		t.Fatalf("page1 len: want %d, got %d", store.MaxLimit, len(page1))
+	}
+
+	page2, total2, err := s.UserAuthzResourcesList(ctx, domainID, uid, store.ListOpts{Offset: store.MaxLimit, Limit: store.MaxLimit + 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total2 != int64(wantTotal) {
+		t.Fatalf("total2: want %d, got %d", wantTotal, total2)
+	}
+	if len(page2) != wantTotal-store.MaxLimit {
+		t.Fatalf("page2 len: want %d, got %d", wantTotal-store.MaxLimit, len(page2))
+	}
+}
+
 func TestDomainGet_foundAndNotFound(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)
