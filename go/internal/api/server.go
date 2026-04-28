@@ -855,6 +855,13 @@ type resourceAuthzUserResponse struct {
 	EffectiveMask string `json:"effective_mask"`
 }
 
+// resourceAuthzUsersSortField is the meta.sort label returned to clients.
+// It is the public/JSON name ("user_id") for what the store internally
+// orders by (users.id). Both refer to the same column — the store
+// ALWAYS uses a fixed ORDER BY users.id ASC for deterministic pagination
+// regardless of the opts.Sort/Order values set here; those fields exist
+// only so meta.sort/meta.order are populated consistently with other list
+// endpoints.
 const resourceAuthzUsersSortField = "user_id"
 
 func (s *Server) resourceAuthzUsers(w http.ResponseWriter, r *http.Request) {
@@ -863,6 +870,7 @@ func (s *Server) resourceAuthzUsers(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
+	// Populated for meta only; the store enforces fixed ORDER BY users.id ASC.
 	opts.Sort = resourceAuthzUsersSortField
 	opts.Order = store.OrderAsc
 

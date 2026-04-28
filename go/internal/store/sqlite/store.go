@@ -1171,7 +1171,9 @@ func (s *Store) ResourceAuthzUsersList(ctx context.Context, domainID, resourceID
 
 	// opts.Sort / opts.Order are populated by the handler and reflected in the
 	// meta response via writeList. The store always uses a fixed ORDER BY
-	// u.id ASC for stable, deterministic pagination.
+	// u.id ASC for stable, deterministic pagination — opts.Sort/Order are
+	// intentionally NOT honoured here. The handler exposes the meta label
+	// "user_id" which is the public name for the same users.id column.
 	listArgs := append(append([]any{}, baseArgs...), opts.Limit, opts.Offset)
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT u.id `+resourceAuthzUsersBaseSQL+` ORDER BY u.id ASC LIMIT ? OFFSET ?`,
