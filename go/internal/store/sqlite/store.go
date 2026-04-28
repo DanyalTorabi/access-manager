@@ -1203,6 +1203,11 @@ func (s *Store) ResourceAuthzUsersList(ctx context.Context, domainID, resourceID
 		return []store.ResourceAuthzUser{}, total, nil
 	}
 
+	// Invariant: len(userIDs) <= opts.Limit which is clamped to store.MaxLimit
+	// (100) by SanitizeListOpts. SQLite's default SQLITE_MAX_VARIABLE_NUMBER
+	// is well above this (>=999), so the IN (?,…) expansions below are safe.
+	// If MaxLimit is ever raised above the SQLite parameter cap, batch the
+	// IN clauses or chunk userIDs.
 	placeholders, err := inPlaceholders(len(userIDs))
 	if err != nil {
 		return nil, 0, err
