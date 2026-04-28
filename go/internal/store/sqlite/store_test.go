@@ -3482,9 +3482,9 @@ func TestResourceAuthzUsersList(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create three users:
-	// uA: direct grant 0x1 + group grant 0x4 -> 0x5
-	// uB: group grant only 0x2 -> 0x2
+	// Create four users:
+	// uA: direct grant 0x1 + group grants 0x2|0x4 -> 0x7
+	// uB: group grants 0x2|0x4 only -> 0x6
 	// uC: direct grant 0x8 plus another direct 0x10 -> 0x18
 	// uX: no access (must NOT appear)
 	uA := uuid.NewString()
@@ -3785,7 +3785,8 @@ func TestResourceAuthzUsersBaseArgs_orderMatchesPlaceholders(t *testing.T) {
 		}
 	}
 	// Sanity: the SQL must contain exactly one '?' per arg position.
-	if got, want := strings.Count(resourceAuthzUsersBaseSQL, "?"), len(want); got != want {
-		t.Fatalf("placeholder count: want %d, got %d", want, got)
+	wantCount := len(want)
+	if got := strings.Count(resourceAuthzUsersBaseSQL, "?"); got != wantCount {
+		t.Fatalf("placeholder count: want %d, got %d", wantCount, got)
 	}
 }
