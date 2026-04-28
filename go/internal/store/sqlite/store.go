@@ -1106,8 +1106,19 @@ func (s *Store) GroupAuthzResourcesList(ctx context.Context, domainID, groupID s
 
 // resourceAuthzUsersBaseSQL selects users in the resource's domain who have a
 // non-zero effective mask on (domainID, resourceID) via direct grants OR via
-// any group they belong to. The placeholder order is:
-//   u.domain_id, p.domain_id, p.resource_id, up.domain_id, gp.domain_id, gm.domain_id
+// any group they belong to.
+//
+// Placeholder map (six ?'s, all built from {domainID, resourceID}; keep this
+// table in sync with resourceAuthzUsersBaseArgs):
+//
+//	1: u.domain_id   = domainID
+//	2: p.domain_id   = domainID
+//	3: p.resource_id = resourceID
+//	4: up.domain_id  = domainID   (direct user grant branch)
+//	5: gp.domain_id  = domainID   (group-inherited grant branch)
+//	6: gm.domain_id  = domainID   (group-membership domain pin)
+//
+// Example with domainID="D" / resourceID="R": all six args are ["D","D","R","D","D","D"].
 const resourceAuthzUsersBaseSQL = `
 FROM users u
 WHERE u.domain_id = ? AND EXISTS (
@@ -1127,6 +1138,9 @@ WHERE u.domain_id = ? AND EXISTS (
 )
 `
 
+// resourceAuthzUsersBaseArgs returns the six positional args for
+// resourceAuthzUsersBaseSQL in placeholder order. Centralised so callers
+// (count + page-select) cannot drift out of sync with the SQL.
 func resourceAuthzUsersBaseArgs(domainID, resourceID string) []any {
 	return []any{domainID, domainID, resourceID, domainID, domainID, domainID}
 }
