@@ -42,3 +42,7 @@ Replace fragile string-prefix extraction used by `publicInvalidInputMsg` with a 
 ## Dependencies
 
 - Related to **T31** (handler error classification); coordinate with that plan if overlapping work is scheduled.
+
+## Deferred from other PRs
+
+- **From T44 (#59 / PR #71) review:** the brittle `err.Error()` prefix parsing in `publicInvalidInputMsg` was flagged again. T48 already owns the typed-error refactor — no T44-specific change needed beyond noting the additional motivation.

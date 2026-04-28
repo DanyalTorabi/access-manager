@@ -102,6 +102,8 @@ func (s *Server) Router(reg prometheus.Registerer, gather prometheus.Gatherer) c
 		r.Delete("/domains/{domainID}/groups/{groupID}/permissions/{permissionID}", s.revokeGroupPermission)
 		r.Get("/domains/{domainID}/groups/{groupID}/authz/resources", s.groupAuthzResources)
 
+		r.Get("/domains/{domainID}/resources/{resourceID}/authz/users", s.resourceAuthzUsers)
+
 		r.Get("/domains/{domainID}/authz/check", s.authzCheck)
 		r.Get("/domains/{domainID}/authz/masks", s.authzMasks)
 	})
@@ -843,6 +845,47 @@ func (s *Server) groupAuthzResources(w http.ResponseWriter, r *http.Request) {
 		resp = append(resp, groupAuthzResourceResponse{
 			ResourceID: it.ResourceID,
 			Mask:       strconv.FormatUint(it.Mask, 10),
+		})
+	}
+	writeList(w, resp, total, opts)
+}
+
+type resourceAuthzUserResponse struct {
+	UserID        string `json:"user_id"`
+	EffectiveMask string `json:"effective_mask"`
+}
+
+// resourceAuthzUsersSortField is the meta.sort label returned to clients.
+// It is the public/JSON name ("user_id") for what the store internally
+// orders by (users.id). Both refer to the same column — the store
+// ALWAYS uses a fixed ORDER BY users.id ASC for deterministic pagination
+// regardless of the opts.Sort/Order values set here; those fields exist
+// only so meta.sort/meta.order are populated consistently with other list
+// endpoints.
+const resourceAuthzUsersSortField = "user_id"
+
+func (s *Server) resourceAuthzUsers(w http.ResponseWriter, r *http.Request) {
+	opts, err := parseOffsetLimitOpts(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	// Populated for meta only; the store enforces fixed ORDER BY users.id ASC.
+	opts.Sort = resourceAuthzUsersSortField
+	opts.Order = store.OrderAsc
+
+	domainID := chi.URLParam(r, "domainID")
+	rid := chi.URLParam(r, "resourceID")
+	list, total, err := s.Store.ResourceAuthzUsersList(r.Context(), domainID, rid, opts)
+	if err != nil {
+		writeStoreErr(w, r, err)
+		return
+	}
+	resp := make([]resourceAuthzUserResponse, 0, len(list))
+	for _, it := range list {
+		resp = append(resp, resourceAuthzUserResponse{
+			UserID:        it.UserID,
+			EffectiveMask: strconv.FormatUint(it.EffectiveMask, 10),
 		})
 	}
 	writeList(w, resp, total, opts)

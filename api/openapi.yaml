@@ -422,6 +422,18 @@ components:
           description: OR of all direct group grants for this group/resource pair as decimal string.
           example: "5"
 
+    ResourceAuthzUser:
+      type: object
+      required: [user_id, effective_mask]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        effective_mask:
+          type: string
+          description: Effective mask (OR of direct user grants and group-membership grants) for this user/resource pair as decimal string.
+          example: "7"
+
 paths:
   /health:
     get:
@@ -1519,6 +1531,66 @@ paths:
                 $ref: "#/components/schemas/ErrorBody"
         "404":
           description: Domain or group not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v1/domains/{domainID}/resources/{resourceID}/authz/users:
+    parameters:
+      - $ref: "#/components/parameters/domainID"
+      - $ref: "#/components/parameters/resourceID"
+    get:
+      tags: [Authz]
+      summary: List users with effective access on a resource
+      description: |
+        Returns users in the resource's domain whose effective mask on this resource is non-zero.
+        Effective masks are computed as the OR of direct user grants and grants inherited via group membership.
+        Effective masks are returned as decimal strings.
+
+        Pagination: only `offset` and `limit` are supported. Results are always ordered by `user_id` ascending — `sort` and `order` are not honoured for this endpoint, and any of `search`, `search_type`, `sort`, or `order` in the query string will produce a `400`.
+      parameters:
+        - $ref: "#/components/parameters/offsetParam"
+        - $ref: "#/components/parameters/limitParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ResourceAuthzUser"
+                  meta:
+                    $ref: "#/components/schemas/ListMeta"
+              example:
+                data:
+                  - user_id: "11111111-1111-1111-1111-111111111111"
+                    effective_mask: "7"
+                meta:
+                  total: 1
+                  offset: 0
+                  limit: 20
+                  sort: "user_id"
+                  order: "asc"
+        "400":
+          description: Bad request (invalid pagination params)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: Domain or resource not found
           content:
             application/json:
               schema:

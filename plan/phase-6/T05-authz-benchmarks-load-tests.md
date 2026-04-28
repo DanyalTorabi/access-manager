@@ -36,6 +36,10 @@ Measure **authz check** latency and throughput under realistic data sizes: **Go 
 
 - Production load testing customer data.
 
+## Deferred from other PRs
+
+- **From T44 (#59 / PR #71) review:** add a perf/regression benchmark for `Store.ResourceAuthzUsersList` (sqlite) that simulates large user/membership counts (1000+ users with mixed direct + group-inherited grants on a single resource). Today the implementation uses a per-user `EXISTS` predicate plus two batched `IN` aggregation queries, bounded by `store.MaxLimit` (100). The benchmark should both establish a baseline and let us evaluate a single-query GROUP BY / aggregated bit-OR alternative if numbers warrant it.
+
 ## Dependencies
 
 - **T4** optional comparison target.

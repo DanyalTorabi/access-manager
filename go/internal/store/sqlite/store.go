@@ -1104,6 +1104,176 @@ func (s *Store) GroupAuthzResourcesList(ctx context.Context, domainID, groupID s
 	return result, total, nil
 }
 
+// resourceAuthzUsersBaseSQL selects users in the resource's domain who have a
+// non-zero effective mask on (domainID, resourceID) via direct grants OR via
+// any group they belong to.
+//
+// `p.access_mask > 0` excludes both zero masks (no-op grants) AND any legacy
+// rows with negative int64 mask values — see maskFromSQL, which similarly
+// coerces negative DB values to 0 with a warning. Such rows can only exist
+// from out-of-band/legacy writes (PermissionCreate validates the range), so
+// silently ignoring them in the listing is intentional and matches T42/T43.
+//
+// Placeholder map (six ?'s, all built from {domainID, resourceID}; keep this
+// table in sync with resourceAuthzUsersBaseArgs):
+//
+//	1: u.domain_id   = domainID
+//	2: p.domain_id   = domainID
+//	3: p.resource_id = resourceID
+//	4: up.domain_id  = domainID   (direct user grant branch)
+//	5: gp.domain_id  = domainID   (group-inherited grant branch)
+//	6: gm.domain_id  = domainID   (group-membership domain pin)
+//
+// Example with domainID="D" / resourceID="R": all six args are ["D","D","R","D","D","D"].
+const resourceAuthzUsersBaseSQL = `
+FROM users u
+WHERE u.domain_id = ? AND EXISTS (
+	SELECT 1 FROM permissions p
+	WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0
+	AND (
+		EXISTS (
+			SELECT 1 FROM user_permissions up
+			WHERE up.permission_id = p.id AND up.domain_id = ? AND up.user_id = u.id
+		)
+		OR EXISTS (
+			SELECT 1 FROM group_permissions gp
+			INNER JOIN group_members gm ON gm.group_id = gp.group_id AND gm.user_id = u.id
+			WHERE gp.permission_id = p.id AND gp.domain_id = ? AND gm.domain_id = ?
+		)
+	)
+)
+`
+
+// resourceAuthzUsersBaseArgs returns the six positional args for
+// resourceAuthzUsersBaseSQL in placeholder order. Centralised so callers
+// (count + page-select) cannot drift out of sync with the SQL.
+func resourceAuthzUsersBaseArgs(domainID, resourceID string) []any {
+	return []any{domainID, domainID, resourceID, domainID, domainID, domainID}
+}
+
+func (s *Store) ResourceAuthzUsersList(ctx context.Context, domainID, resourceID string, opts store.ListOpts) ([]store.ResourceAuthzUser, int64, error) {
+	opts = store.SanitizeListOpts(opts)
+
+	var exists int
+	if err := s.db.QueryRowContext(ctx, `SELECT 1 FROM domains WHERE id = ?`, domainID).Scan(&exists); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, 0, store.ErrNotFound
+		}
+		return nil, 0, err
+	}
+	if err := s.db.QueryRowContext(ctx, `SELECT 1 FROM resources WHERE id = ? AND domain_id = ?`, resourceID, domainID).Scan(&exists); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, 0, store.ErrNotFound
+		}
+		return nil, 0, err
+	}
+
+	baseArgs := resourceAuthzUsersBaseArgs(domainID, resourceID)
+
+	var total int64
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) `+resourceAuthzUsersBaseSQL, baseArgs...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	// opts.Sort / opts.Order are populated by the handler and reflected in the
+	// meta response via writeList. The store always uses a fixed ORDER BY
+	// u.id ASC for stable, deterministic pagination — opts.Sort/Order are
+	// intentionally NOT honoured here. The handler exposes the meta label
+	// "user_id" which is the public name for the same users.id column.
+	listArgs := append(append([]any{}, baseArgs...), opts.Limit, opts.Offset)
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT u.id `+resourceAuthzUsersBaseSQL+` ORDER BY u.id ASC LIMIT ? OFFSET ?`,
+		listArgs...,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var userIDs []string
+	for rows.Next() {
+		var uid string
+		if err := rows.Scan(&uid); err != nil {
+			_ = rows.Close()
+			return nil, 0, err
+		}
+		userIDs = append(userIDs, uid)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, 0, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, 0, err
+	}
+	if len(userIDs) == 0 {
+		return []store.ResourceAuthzUser{}, total, nil
+	}
+
+	// Invariant: len(userIDs) <= opts.Limit which is clamped to store.MaxLimit
+	// (100) by SanitizeListOpts. SQLite's default SQLITE_MAX_VARIABLE_NUMBER
+	// is well above this (>=999), so the IN (?,…) expansions below are safe.
+	// If MaxLimit is ever raised above the SQLite parameter cap, batch the
+	// IN clauses or chunk userIDs.
+	placeholders, err := inPlaceholders(len(userIDs))
+	if err != nil {
+		return nil, 0, err
+	}
+
+	masksByUser := make(map[string]uint64, len(userIDs))
+
+	// Direct user grants on this resource.
+	directSQL := `SELECT up.user_id, p.access_mask FROM user_permissions up ` + // #nosec G202
+		`INNER JOIN permissions p ON p.id = up.permission_id ` +
+		`WHERE up.domain_id = ? AND p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0 ` +
+		`AND up.user_id IN (` + placeholders + `)`
+	directArgs := make([]any, 0, 3+len(userIDs))
+	directArgs = append(directArgs, domainID, domainID, resourceID)
+	for _, uid := range userIDs {
+		directArgs = append(directArgs, uid)
+	}
+	if err := scanUserMasks(ctx, s.db, directSQL, directArgs, masksByUser); err != nil {
+		return nil, 0, err
+	}
+
+	// Indirect grants via group membership.
+	indirectSQL := `SELECT gm.user_id, p.access_mask FROM group_members gm ` + // #nosec G202
+		`INNER JOIN group_permissions gp ON gp.group_id = gm.group_id ` +
+		`INNER JOIN permissions p ON p.id = gp.permission_id ` +
+		`WHERE gm.domain_id = ? AND gp.domain_id = ? AND p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0 ` +
+		`AND gm.user_id IN (` + placeholders + `)`
+	indirectArgs := make([]any, 0, 4+len(userIDs))
+	indirectArgs = append(indirectArgs, domainID, domainID, domainID, resourceID)
+	for _, uid := range userIDs {
+		indirectArgs = append(indirectArgs, uid)
+	}
+	if err := scanUserMasks(ctx, s.db, indirectSQL, indirectArgs, masksByUser); err != nil {
+		return nil, 0, err
+	}
+
+	result := make([]store.ResourceAuthzUser, 0, len(userIDs))
+	for _, uid := range userIDs {
+		result = append(result, store.ResourceAuthzUser{UserID: uid, EffectiveMask: masksByUser[uid]})
+	}
+	return result, total, nil
+}
+
+func scanUserMasks(ctx context.Context, db *sql.DB, query string, args []any, into map[string]uint64) error {
+	rows, err := db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var uid string
+		var m int64
+		if err := rows.Scan(&uid, &m); err != nil {
+			return err
+		}
+		into[uid] |= maskFromSQL(m)
+	}
+	return rows.Err()
+}
+
 func (s *Store) PermissionMasksForUserResource(ctx context.Context, domainID, userID, resourceID string) ([]uint64, error) {
 	args := make([]any, 0, 2+5)
 	args = append(args, domainID, resourceID)
