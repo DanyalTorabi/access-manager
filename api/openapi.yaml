@@ -1553,6 +1553,8 @@ paths:
         Returns users in the resource's domain whose effective mask on this resource is non-zero.
         Effective masks are computed as the OR of direct user grants and grants inherited via group membership.
         Effective masks are returned as decimal strings.
+
+        Pagination: only `offset` and `limit` are supported. Results are always ordered by `user_id` ascending — `sort` and `order` are not honoured for this endpoint, and any of `search`, `search_type`, `sort`, or `order` in the query string will produce a `400`.
       parameters:
         - $ref: "#/components/parameters/offsetParam"
         - $ref: "#/components/parameters/limitParam"

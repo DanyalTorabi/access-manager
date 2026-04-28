@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **T44 / #59:** `GET /api/v1/domains/{domainID}/resources/{resourceID}/authz/users` — paginated list of users in the resource's domain with non-zero effective access on the resource. Each item carries `effective_mask` (OR of direct user grants and grants inherited via group membership).
+- **T44 / #59:** `GET /api/v1/domains/{domainID}/resources/{resourceID}/authz/users` — paginated list of users in the resource's domain with non-zero effective access on the resource. Each item carries `effective_mask` (OR of direct user grants and grants inherited via group membership). Only `offset` and `limit` are supported; results are always ordered by `user_id` ascending (any `search`/`search_type`/`sort`/`order` query param returns `400`).
 - **T43 / #58:** `GET /api/v1/domains/{domainID}/groups/{groupID}/authz/resources` — paginated list of resources where the group has direct `group_permissions`, with `mask` = bitwise OR of all grants for that `(domain, group, resource)`.
 - **`make gosec`** target in `go/Makefile` and root `Makefile` for running `gosec` security scanner.
 - **T35 / #46:** Title search (`?search=`) on all six list endpoints (`LIKE` with escaped wildcards). Optional `?search_type=` parameter: `contains` (default), `starts_with`, `ends_with`. Entity-specific filters: `?parent_group_id=` on groups, `?resource_id=` on permissions. Filters apply to both paged results and `meta.total`.
