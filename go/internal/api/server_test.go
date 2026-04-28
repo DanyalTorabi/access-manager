@@ -645,6 +645,173 @@ func TestAPI_userAuthzResources_notFound(t *testing.T) {
 	}
 }
 
+func TestAPI_groupAuthzResources_integration(t *testing.T) {
+	ts, st := newTestAPI(t)
+	ctx := context.Background()
+
+	domainID := uuid.NewString()
+	gid := uuid.NewString()
+	ridA := uuid.NewString()
+	ridB := uuid.NewString()
+
+	if err := st.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.GroupCreate(ctx, &store.Group{ID: gid, DomainID: domainID, Title: "g"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, rid := range []string{ridA, ridB} {
+		if err := st.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r" + rid}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Two permissions on ridA (OR of 0x1 | 0x4 = 0x5), one on ridB (0x2).
+	pA1 := uuid.NewString()
+	pA2 := uuid.NewString()
+	pB := uuid.NewString()
+
+	if err := st.PermissionCreate(ctx, &store.Permission{ID: pA1, DomainID: domainID, Title: "pA1", ResourceID: ridA, AccessMask: 0x1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.PermissionCreate(ctx, &store.Permission{ID: pA2, DomainID: domainID, Title: "pA2", ResourceID: ridA, AccessMask: 0x4}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.PermissionCreate(ctx, &store.Permission{ID: pB, DomainID: domainID, Title: "pB", ResourceID: ridB, AccessMask: 0x2}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.GrantGroupPermission(ctx, domainID, gid, pA1); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.GrantGroupPermission(ctx, domainID, gid, pA2); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.GrantGroupPermission(ctx, domainID, gid, pB); err != nil {
+		t.Fatal(err)
+	}
+
+	base := ts.URL + "/api/v1/domains/" + domainID + "/groups/" + gid + "/authz/resources"
+
+	res, err := http.Get(base + "?offset=0&limit=10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("status %d: %s", res.StatusCode, b)
+	}
+	var env listResponse[struct {
+		ResourceID string `json:"resource_id"`
+		Mask       string `json:"mask"`
+	}]
+	if err := json.NewDecoder(res.Body).Decode(&env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Meta.Total != 2 {
+		t.Fatalf("total: want 2, got %d", env.Meta.Total)
+	}
+	if len(env.Data) != 2 {
+		t.Fatalf("len: want 2, got %d", len(env.Data))
+	}
+	gotMasks := map[string]string{}
+	for _, it := range env.Data {
+		gotMasks[it.ResourceID] = it.Mask
+	}
+	if gotMasks[ridA] != "5" {
+		t.Fatalf("ridA mask: want 5, got %q", gotMasks[ridA])
+	}
+	if gotMasks[ridB] != "2" {
+		t.Fatalf("ridB mask: want 2, got %q", gotMasks[ridB])
+	}
+
+	// Pagination.
+	resPage, err := http.Get(base + "?offset=1&limit=1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resPage.Body.Close() }()
+	if resPage.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resPage.Body)
+		t.Fatalf("page status %d: %s", resPage.StatusCode, b)
+	}
+	var page listResponse[struct {
+		ResourceID string `json:"resource_id"`
+		Mask       string `json:"mask"`
+	}]
+	if err := json.NewDecoder(resPage.Body).Decode(&page); err != nil {
+		t.Fatal(err)
+	}
+	if page.Meta.Total != 2 || len(page.Data) != 1 {
+		t.Fatalf("page total=%d len=%d", page.Meta.Total, len(page.Data))
+	}
+	orderedIDs := []string{ridA, ridB}
+	sort.Strings(orderedIDs)
+	if page.Data[0].ResourceID != orderedIDs[1] {
+		t.Fatalf("page resource: want %s, got %s", orderedIDs[1], page.Data[0].ResourceID)
+	}
+}
+
+func TestAPI_groupAuthzResources_unsupportedQueryParams(t *testing.T) {
+	ts, st := newTestAPI(t)
+	ctx := context.Background()
+	domainID := uuid.NewString()
+	gid := uuid.NewString()
+	if err := st.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.GroupCreate(ctx, &store.Group{ID: gid, DomainID: domainID, Title: "g"}); err != nil {
+		t.Fatal(err)
+	}
+	res, err := http.Get(ts.URL + "/api/v1/domains/" + domainID + "/groups/" + gid + "/authz/resources?search=foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("unsupported params: want 400, got %d: %s", res.StatusCode, b)
+	}
+	var out map[string]string
+	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out["error"] != "only limit and offset are supported" {
+		t.Fatalf("unexpected error message: %q", out["error"])
+	}
+}
+
+func TestAPI_groupAuthzResources_notFound(t *testing.T) {
+	ts, st := newTestAPI(t)
+	ctx := context.Background()
+	domainID := uuid.NewString()
+	if err := st.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	gid := uuid.NewString()
+	if err := st.GroupCreate(ctx, &store.Group{ID: gid, DomainID: domainID, Title: "g"}); err != nil {
+		t.Fatal(err)
+	}
+
+	resUnknownDomain, err := http.Get(ts.URL + "/api/v1/domains/" + uuid.NewString() + "/groups/" + gid + "/authz/resources")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resUnknownDomain.Body.Close() }()
+	if resUnknownDomain.StatusCode != http.StatusNotFound {
+		t.Fatalf("unknown domain: want 404, got %d", resUnknownDomain.StatusCode)
+	}
+
+	resUnknownGroup, err := http.Get(ts.URL + "/api/v1/domains/" + domainID + "/groups/" + uuid.NewString() + "/authz/resources")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resUnknownGroup.Body.Close() }()
+	if resUnknownGroup.StatusCode != http.StatusNotFound {
+		t.Fatalf("unknown group: want 404, got %d", resUnknownGroup.StatusCode)
+	}
+}
+
 func TestAPI_userList_empty(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	var dom store.Domain
@@ -2104,6 +2271,7 @@ func TestAPI_storeErrors(t *testing.T) {
 		{"removeUserFromGroup", http.MethodDelete, "/api/v1/domains/" + domID + "/users/" + userID + "/groups/" + groupID, "", 500},
 		{"revokeUserPerm", http.MethodDelete, "/api/v1/domains/" + domID + "/users/" + userID + "/permissions/" + permID, "", 500},
 		{"userAuthzResources", http.MethodGet, "/api/v1/domains/" + domID + "/users/" + userID + "/authz/resources", "", 500},
+		{"groupAuthzResources", http.MethodGet, "/api/v1/domains/" + domID + "/groups/" + groupID + "/authz/resources", "", 500},
 		{"revokeGroupPerm", http.MethodDelete, "/api/v1/domains/" + domID + "/groups/" + groupID + "/permissions/" + permID, "", 500},
 		{"authzCheck", http.MethodGet, "/api/v1/domains/" + domID + "/authz/check?user_id=" + userID + "&resource_id=" + resourceID + "&access_bit=0x1", "", 500},
 		{"authzMasks", http.MethodGet, "/api/v1/domains/" + domID + "/authz/masks?user_id=" + userID + "&resource_id=" + resourceID, "", 500},

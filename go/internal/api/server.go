@@ -100,6 +100,7 @@ func (s *Server) Router(reg prometheus.Registerer, gather prometheus.Gatherer) c
 
 		r.Post("/domains/{domainID}/groups/{groupID}/permissions/{permissionID}", s.grantGroupPermission)
 		r.Delete("/domains/{domainID}/groups/{groupID}/permissions/{permissionID}", s.revokeGroupPermission)
+		r.Get("/domains/{domainID}/groups/{groupID}/authz/resources", s.groupAuthzResources)
 
 		r.Get("/domains/{domainID}/authz/check", s.authzCheck)
 		r.Get("/domains/{domainID}/authz/masks", s.authzMasks)
@@ -809,6 +810,39 @@ func (s *Server) userAuthzResources(w http.ResponseWriter, r *http.Request) {
 		resp = append(resp, userAuthzResourceResponse{
 			ResourceID:    it.ResourceID,
 			EffectiveMask: strconv.FormatUint(it.EffectiveMask, 10),
+		})
+	}
+	writeList(w, resp, total, opts)
+}
+
+type groupAuthzResourceResponse struct {
+	ResourceID string `json:"resource_id"`
+	Mask       string `json:"mask"`
+}
+
+const groupAuthzResourcesSortField = "resource_id"
+
+func (s *Server) groupAuthzResources(w http.ResponseWriter, r *http.Request) {
+	opts, err := parseOffsetLimitOpts(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	opts.Sort = groupAuthzResourcesSortField
+	opts.Order = store.OrderAsc
+
+	domainID := chi.URLParam(r, "domainID")
+	gid := chi.URLParam(r, "groupID")
+	list, total, err := s.Store.GroupAuthzResourcesList(r.Context(), domainID, gid, opts)
+	if err != nil {
+		writeStoreErr(w, r, err)
+		return
+	}
+	resp := make([]groupAuthzResourceResponse, 0, len(list))
+	for _, it := range list {
+		resp = append(resp, groupAuthzResourceResponse{
+			ResourceID: it.ResourceID,
+			Mask:       strconv.FormatUint(it.Mask, 10),
 		})
 	}
 	writeList(w, resp, total, opts)

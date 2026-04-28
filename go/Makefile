@@ -1,4 +1,4 @@
-.PHONY: build test integration cover cover-func run tidy lint vuln e2e
+.PHONY: build test integration cover cover-func run tidy lint vuln gosec e2e
 
 # golang/go#75031: GOTOOLCHAIN=auto can make `go test -cover` fail with "no such tool covdata".
 # Pin the minimum toolchain to the `go` version in go.mod (override: `make test GOTOOLCHAIN=local`).
@@ -37,6 +37,9 @@ lint:
 
 vuln:
 	go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+
+gosec:
+	go run github.com/securego/gosec/v2/cmd/gosec@v2.25.0 ./...
 
 integration:
 	go test -race -count=1 -run '^TestIntegration' ./internal/api/...
