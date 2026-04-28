@@ -65,6 +65,13 @@ type GroupAuthzResource struct {
 	Mask       uint64
 }
 
+// ResourceAuthzUser is one row in the resource authz users listing: a user
+// in the resource's domain whose effective mask on that resource is non-zero.
+type ResourceAuthzUser struct {
+	UserID        string
+	EffectiveMask uint64
+}
+
 const (
 	DefaultLimit = 20
 	MaxLimit     = 100
@@ -190,6 +197,7 @@ type Store interface {
 	AuthzReader
 	UserAuthzResourcesList(ctx context.Context, domainID, userID string, opts ListOpts) ([]UserAuthzResource, int64, error)
 	GroupAuthzResourcesList(ctx context.Context, domainID, groupID string, opts ListOpts) ([]GroupAuthzResource, int64, error)
+	ResourceAuthzUsersList(ctx context.Context, domainID, resourceID string, opts ListOpts) ([]ResourceAuthzUser, int64, error)
 
 	DomainCreate(ctx context.Context, d *Domain) error
 	DomainGet(ctx context.Context, id string) (*Domain, error)
