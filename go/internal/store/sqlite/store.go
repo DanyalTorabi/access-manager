@@ -1108,6 +1108,12 @@ func (s *Store) GroupAuthzResourcesList(ctx context.Context, domainID, groupID s
 // non-zero effective mask on (domainID, resourceID) via direct grants OR via
 // any group they belong to.
 //
+// `p.access_mask > 0` excludes both zero masks (no-op grants) AND any legacy
+// rows with negative int64 mask values — see maskFromSQL, which similarly
+// coerces negative DB values to 0 with a warning. Such rows can only exist
+// from out-of-band/legacy writes (PermissionCreate validates the range), so
+// silently ignoring them in the listing is intentional and matches T42/T43.
+//
 // Placeholder map (six ?'s, all built from {domainID, resourceID}; keep this
 // table in sync with resourceAuthzUsersBaseArgs):
 //
