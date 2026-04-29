@@ -1117,6 +1117,11 @@ func (s *Store) GroupAuthzResourcesList(ctx context.Context, domainID, groupID s
 // listing. domain_id therefore appears three times: once for p
 // (permissions), once for gp (group_permissions), once for g (groups).
 //
+// TODO(T51): tighten the schema with a composite FK
+// (domain_id, group_id) -> groups(domain_id, id) so the redundant
+// g.domain_id filter can be dropped from this and the other authz
+// listings. See plan/phase-6/T51-composite-fk-cross-domain.md.
+//
 // p.access_mask > 0 mirrors GroupAuthzResourcesList and
 // ResourceAuthzUsersList: zero masks are no-ops, and any negative legacy
 // values (which PermissionCreate disallows) are excluded for parity with
