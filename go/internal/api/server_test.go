@@ -2509,7 +2509,7 @@ func TestWriteStoreErr_allCases(t *testing.T) {
 		{"invalid input", store.ErrInvalidInput, http.StatusBadRequest, "invalid request"},
 		{"invalid input detail", store.NewInvalidInput("cycle detected in group parent chain"), http.StatusBadRequest, "cycle detected in group parent chain"},
 		{"invalid input wrapped detail", fmt.Errorf("ctx: %w", store.NewInvalidInput("empty patch")), http.StatusBadRequest, "empty patch"},
-		{"invalid input mask range", store.NewInvalidInput("mask value exceeds signed 64-bit range"), http.StatusBadRequest, "mask value must be within signed 64-bit range"},
+		{"invalid input mask range", store.NewInvalidInput(store.InvalidInputDetailMaskOverflow), http.StatusBadRequest, "mask value must be within signed 64-bit range"},
 		{"conflict", store.ErrConflict, http.StatusConflict, "resource already exists"},
 		{"generic", fmt.Errorf("boom"), http.StatusInternalServerError, "internal server error"},
 	}
@@ -4481,7 +4481,7 @@ func TestPublicInvalidInputMsg_typedExtraction(t *testing.T) {
 		{"plain_typed", store.NewInvalidInput("empty patch"), "empty patch"},
 		{"wrapped_once", fmt.Errorf("ctx: %w", store.NewInvalidInput("empty patch")), "empty patch"},
 		{"wrapped_twice", fmt.Errorf("a: %w", fmt.Errorf("b: %w", store.NewInvalidInput("cycle detected in group parent chain"))), "cycle detected in group parent chain"},
-		{"mask_overflow_translated", store.NewInvalidInput("mask value exceeds signed 64-bit range"), "mask value must be within signed 64-bit range"},
+		{"mask_overflow_translated", store.NewInvalidInput(store.InvalidInputDetailMaskOverflow), "mask value must be within signed 64-bit range"},
 		{"plain_sentinel_falls_back", store.ErrInvalidInput, "invalid request"},
 	}
 	for _, c := range cases {

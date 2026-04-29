@@ -62,7 +62,7 @@ const maxInt64 = 1<<63 - 1
 // client-facing validation error when necessary.
 func maskToSQL(m uint64) (int64, error) {
 	if m > uint64(maxInt64) {
-		return 0, store.NewInvalidInput("mask value exceeds signed 64-bit range")
+		return 0, store.NewInvalidInput(store.InvalidInputDetailMaskOverflow)
 	}
 	return int64(m), nil
 }

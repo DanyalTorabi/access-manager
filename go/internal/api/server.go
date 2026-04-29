@@ -1092,7 +1092,7 @@ func logRequestErr(r *http.Request, status int, err error) {
 func publicInvalidInputMsg(err error) string {
 	var iie *store.InvalidInputError
 	if errors.As(err, &iie) && iie != nil && iie.Detail != "" {
-		if iie.Detail == "mask value exceeds signed 64-bit range" {
+		if iie.Detail == store.InvalidInputDetailMaskOverflow {
 			return "mask value must be within signed 64-bit range"
 		}
 		return iie.Detail

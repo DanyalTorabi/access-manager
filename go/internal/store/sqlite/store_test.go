@@ -4221,7 +4221,7 @@ func TestT48_TypedInvalidInputError_RoundTrip(t *testing.T) {
 					ResourceID: rid, AccessMask: 1 << 63,
 				})
 			},
-			wantDetail: "mask value exceeds signed 64-bit range",
+			wantDetail: store.InvalidInputDetailMaskOverflow,
 		},
 	}
 	for _, c := range cases {

@@ -36,6 +36,13 @@ func (e *InvalidInputError) Unwrap() error { return ErrInvalidInput }
 // safe to surface to API clients verbatim.
 func NewInvalidInput(detail string) error { return &InvalidInputError{Detail: detail} }
 
+// InvalidInputDetailMaskOverflow is the canonical Detail string set by the
+// store when an access mask / bit value exceeds the signed 64-bit range
+// permitted by the current SQLite schema (see issue #67 / T46). Exported so
+// the API layer can map it to its public wording without coupling on a
+// string literal.
+const InvalidInputDetailMaskOverflow = "mask value exceeds signed 64-bit range"
+
 type Domain struct {
 	ID    string
 	Title string
