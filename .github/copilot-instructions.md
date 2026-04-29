@@ -58,7 +58,7 @@ When reviewing a PR, always review **all changed files** — not a partial subse
 - **Git (AI default):** Do not run `git commit`, `git push`, or `gh pr create` on behalf of a user unless they explicitly ask you to. When proposing changes, provide a proposed commit message (subject + optional body) and a PR description that follows `.github/pull_request_template.md` (Summary, Ticket, Checklist) so the human can run the git/gh commands locally.
 - **Use `gh` for automation:** If the user asks you to automate GitHub operations, prefer the `gh` CLI over raw HTTP calls; when automation is not permitted, supply copy-paste snippets for maintainers.
 - **After substantive changes:** Update `go/README.md` (and root `README.md` if layout/entrypoints changed). If the change is user-visible and `CHANGELOG.md` exists, add an Unreleased entry. Run `make test` from the repository root (or `go test -race ./...` from `go/`) and `make lint` / `make cover` when configured.
-- **PR / review deferrals:** If a valid review comment (human or AI) will not be fixed in the current PR, reply on the thread that it will be addressed in `#… / Txx` and add a tracked note under the umbrella plan file (`plan/...`) so the follow-up is not lost.
+- **PR / review deferrals:** If a valid review comment (human or AI) will not be fixed in the current PR, reply on the thread that it will be addressed in `#… / Txx` and add a tracked note under the umbrella plan file (`plan/...`) so the follow-up is not lost. Never defer to a closed GitHub issue; if the intended ticket is already closed, re-home the item to another open issue or create a new issue and matching plan file first.
 
 ## Code Review Mode (Cursor → Copilot guidance)
 

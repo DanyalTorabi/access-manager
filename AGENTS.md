@@ -47,7 +47,7 @@ Do not add functions, methods, or interfaces that have no callers in the current
 
 ### Pull request / Copilot follow-ups
 
-If a review comment is correct but **out of scope for the current PR**, say on the thread that it will be handled in **#…** / **Txx**, and add a **note** to that umbrella’s [plan/](plan/) file (e.g. under Steps or Deliverables) so the item is scheduled and traceable.
+If a review comment is correct but **out of scope for the current PR**, say on the thread that it will be handled in **#…** / **Txx**, and add a **note** to that umbrella’s [plan/](plan/) file (e.g. under Steps or Deliverables) so the item is scheduled and traceable. Never defer to a closed GitHub issue; if the target is already closed, re-home it to another open issue or create a new issue and matching plan file before deferring.
 
 ## Before you open a PR (self-review)
 
