@@ -4010,6 +4010,19 @@ func TestResourceAuthzGroupsList_otherDomainsExcluded(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Insert a cross-domain group_permissions row directly: the row's
+	// domain_id matches the queried domain (so gp.domain_id passes), but
+	// otherGID belongs to otherDomainID. group_permissions(group_id) FKs to
+	// groups(id) only — not the composite (domain_id, id) — so this insert
+	// succeeds even with PRAGMA foreign_keys=ON. The store must still
+	// exclude otherGID from the listing.
+	if _, err := s.db.ExecContext(ctx,
+		`INSERT INTO group_permissions (domain_id, group_id, permission_id) VALUES (?, ?, ?)`,
+		domainID, otherGID, pid,
+	); err != nil {
+		t.Fatal(err)
+	}
+
 	list, total, err := s.ResourceAuthzGroupsList(ctx, domainID, rid, store.ListOpts{Offset: 0, Limit: 10})
 	if err != nil {
 		t.Fatal(err)
