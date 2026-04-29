@@ -4488,6 +4488,9 @@ func TestParseUint64Validated(t *testing.T) {
 		{"hex_upper", "0X10", max, 16, nil},
 		{"max_signed64_ok", "0x7FFFFFFFFFFFFFFF", max, 1<<63 - 1, nil},
 		{"max_disabled_accepts_full_uint64", "0xFFFFFFFFFFFFFFFF", 0, ^uint64(0), nil},
+		// Leading-zero decimals are not interpreted as octal (which strconv
+		// base 0 would do — "010" -> 8). Helper uses base 10 so "010" -> 10.
+		{"leading_zero_decimal", "010", max, 10, nil},
 
 		{"empty_string", "", max, 0, errInvalidNumericValue},
 		{"non_numeric", "notanumber", max, 0, errInvalidNumericValue},
@@ -4496,6 +4499,15 @@ func TestParseUint64Validated(t *testing.T) {
 		{"plus_sign", "+1", max, 0, errInvalidNumericValue},
 		{"malformed_hex", "0xZZ", max, 0, errInvalidNumericValue},
 		{"overflow_uint64", "0x10000000000000000", max, 0, errInvalidNumericValue},
+		// strconv.ParseUint(base=0) would accept these; the helper must
+		// reject them so the wire format stays "decimal or 0x hex" as
+		// documented in api/openapi.yaml.
+		{"binary_rejected", "0b10", max, 0, errInvalidNumericValue},
+		{"hex_prefix_only", "0x", max, 0, errInvalidNumericValue},
+		{"leading_whitespace", " 1", max, 0, errInvalidNumericValue},
+		{"trailing_whitespace", "1 ", max, 0, errInvalidNumericValue},
+		// Defensive length cap (maxNumericInputLen).
+		{"too_long", strings.Repeat("9", 33), max, 0, errInvalidNumericValue},
 
 		{"out_of_range_bit63", "0x8000000000000000", max, 0, errAccessMaskOutOfRange},
 		{"out_of_range_max_uint64", "0xFFFFFFFFFFFFFFFF", max, 0, errAccessMaskOutOfRange},
@@ -4549,19 +4561,21 @@ func TestAPI_numericParseErrors_stableMessages(t *testing.T) {
 	const badInput = "notanumber"
 	assertBad := func(t *testing.T, res *http.Response) {
 		t.Helper()
+		defer func() { _ = res.Body.Close() }()
 		if res.StatusCode != http.StatusBadRequest {
 			b, _ := io.ReadAll(res.Body)
-			_ = res.Body.Close()
 			t.Fatalf("want 400, got %d: %s", res.StatusCode, b)
 		}
-		b, _ := io.ReadAll(res.Body)
-		_ = res.Body.Close()
-		body := string(b)
-		if !strings.Contains(body, wantMsg) {
-			t.Fatalf("want stable message %q, got %s", wantMsg, body)
+		var body map[string]string
+		if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body: %v", err)
 		}
-		if strings.Contains(body, "strconv") || strings.Contains(body, badInput) {
-			t.Fatalf("body leaks strconv text or echoes input: %s", body)
+		got := body["error"]
+		if got != wantMsg {
+			t.Fatalf(`body["error"] = %q, want %q`, got, wantMsg)
+		}
+		if strings.Contains(got, badInput) {
+			t.Fatalf(`body["error"] echoes input: %q`, got)
 		}
 	}
 	doPatch := func(t *testing.T, url, body string) *http.Response {
@@ -4617,14 +4631,16 @@ func TestAPI_authzCheck_accessBitOutOfRange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode != http.StatusBadRequest {
 		b, _ := io.ReadAll(res.Body)
-		_ = res.Body.Close()
 		t.Fatalf("want 400, got %d: %s", res.StatusCode, b)
 	}
-	b, _ := io.ReadAll(res.Body)
-	_ = res.Body.Close()
-	if !strings.Contains(string(b), "mask value must be within signed 64-bit range") {
-		t.Fatalf("want stable range error, got %s", b)
+	var body map[string]string
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if got, want := body["error"], "mask value must be within signed 64-bit range"; got != want {
+		t.Fatalf(`body["error"] = %q, want %q`, got, want)
 	}
 }
