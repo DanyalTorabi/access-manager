@@ -814,7 +814,10 @@ func (s *Store) RemoveUserFromGroup(ctx context.Context, domainID, userID, group
 	if err != nil {
 		return wrapConstraintError(err)
 	}
-	n, _ := res.RowsAffected()
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
 	if n == 0 {
 		return store.ErrNotFound
 	}
@@ -833,7 +836,10 @@ func (s *Store) RevokeUserPermission(ctx context.Context, domainID, userID, perm
 	if err != nil {
 		return wrapConstraintError(err)
 	}
-	n, _ := res.RowsAffected()
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
 	if n == 0 {
 		return store.ErrNotFound
 	}
@@ -852,7 +858,10 @@ func (s *Store) RevokeGroupPermission(ctx context.Context, domainID, groupID, pe
 	if err != nil {
 		return wrapConstraintError(err)
 	}
-	n, _ := res.RowsAffected()
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
 	if n == 0 {
 		return store.ErrNotFound
 	}
