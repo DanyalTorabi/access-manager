@@ -4186,3 +4186,66 @@ func TestStore_accessMask_rejectsBit63(t *testing.T) {
 		}
 	})
 }
+
+// TestT48_TypedInvalidInputError_RoundTrip verifies that store-level
+// validation errors are extractable via errors.As as a typed
+// store.InvalidInputError, including through fmt.Errorf("%w", err) wrapping,
+// and that errors.Is(err, store.ErrInvalidInput) still works.
+func TestT48_TypedInvalidInputError_RoundTrip(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		name       string
+		call       func(t *testing.T) error
+		wantDetail string
+	}{
+		{
+			name:       "DomainPatch_emptyPatch",
+			call:       func(t *testing.T) error { _, err := s.DomainPatch(ctx, domainID, nil); return err },
+			wantDetail: "empty patch",
+		},
+		{
+			name: "PermissionCreate_maskOverflow",
+			call: func(t *testing.T) error {
+				rid := uuid.NewString()
+				if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
+					t.Fatal(err)
+				}
+				return s.PermissionCreate(ctx, &store.Permission{
+					ID: uuid.NewString(), DomainID: domainID, Title: "p",
+					ResourceID: rid, AccessMask: 1 << 63,
+				})
+			},
+			wantDetail: store.InvalidInputDetailMaskOverflow,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			err := c.call(t)
+			if err == nil {
+				t.Fatal("want error, got nil")
+			}
+			if !errors.Is(err, store.ErrInvalidInput) {
+				t.Fatalf("errors.Is(err, store.ErrInvalidInput) = false; err=%v", err)
+			}
+			var iie *store.InvalidInputError
+			if !errors.As(err, &iie) {
+				t.Fatalf("errors.As did not extract *store.InvalidInputError; err=%v", err)
+			}
+			if iie.Detail != c.wantDetail {
+				t.Fatalf("Detail = %q, want %q", iie.Detail, c.wantDetail)
+			}
+			// Robust through extra context wrapping (the bug T48 fixes).
+			wrapped := fmt.Errorf("ctx: %w", err)
+			var iie2 *store.InvalidInputError
+			if !errors.As(wrapped, &iie2) || iie2.Detail != c.wantDetail {
+				t.Fatalf("errors.As failed through wrapping; got %v", iie2)
+			}
+		})
+	}
+}

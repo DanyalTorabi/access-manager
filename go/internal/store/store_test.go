@@ -1,6 +1,8 @@
 package store
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -96,6 +98,40 @@ func TestSanitizeListOpts(t *testing.T) {
 		opts := SanitizeListOpts(ListOpts{Limit: 50, Offset: 10, Order: OrderDesc})
 		if opts.Limit != 50 || opts.Offset != 10 || opts.Order != OrderDesc {
 			t.Fatalf("got Limit=%d Offset=%d Order=%q", opts.Limit, opts.Offset, opts.Order)
+		}
+	})
+}
+
+func TestInvalidInputError(t *testing.T) {
+	t.Run("Error_includesDetail", func(t *testing.T) {
+		err := NewInvalidInput("empty patch")
+		if got, want := err.Error(), "store: invalid input: empty patch"; got != want {
+			t.Fatalf("Error() = %q, want %q", got, want)
+		}
+	})
+	t.Run("Error_emptyDetail", func(t *testing.T) {
+		err := NewInvalidInput("")
+		if got, want := err.Error(), "store: invalid input"; got != want {
+			t.Fatalf("Error() = %q, want %q", got, want)
+		}
+	})
+	t.Run("ErrorsIs_invalidInput", func(t *testing.T) {
+		err := NewInvalidInput("anything")
+		if !errors.Is(err, ErrInvalidInput) {
+			t.Fatal("errors.Is(err, ErrInvalidInput) = false, want true")
+		}
+	})
+	t.Run("ErrorsIs_throughWrap", func(t *testing.T) {
+		err := fmt.Errorf("ctx: %w", NewInvalidInput("cycle detected"))
+		if !errors.Is(err, ErrInvalidInput) {
+			t.Fatal("errors.Is failed through fmt.Errorf wrap")
+		}
+		var iie *InvalidInputError
+		if !errors.As(err, &iie) {
+			t.Fatal("errors.As failed through fmt.Errorf wrap")
+		}
+		if iie.Detail != "cycle detected" {
+			t.Fatalf("Detail = %q", iie.Detail)
 		}
 	})
 }

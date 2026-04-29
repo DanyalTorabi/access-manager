@@ -1067,19 +1067,19 @@ func logRequestErr(r *http.Request, status int, err error) {
 	}
 }
 
-// publicInvalidInputMsg extracts the user-friendly detail from a store.ErrInvalidInput
-// wrapped error (e.g. "store: invalid input: cycle detected …" → "cycle detected …").
-// TODO(T36): fragile string-prefix coupling — if intermediate context wrapping is added
-// around ErrInvalidInput the prefix won't match. Replace with a typed InvalidInputError
-// carrying a Detail() method and use errors.As. Tracked on #47.
+// publicInvalidInputMsg returns a stable, client-safe message for an
+// ErrInvalidInput-classed error. It uses errors.As to extract a
+// store.InvalidInputError carrying the Detail set at the validation site,
+// so intermediate fmt.Errorf("%w", err) wrapping is safe. The mask-overflow
+// case is translated to the API's existing wording for backward
+// compatibility with clients that key on the message text.
 func publicInvalidInputMsg(err error) string {
-	full := err.Error()
-	const prefix = "store: invalid input: "
-	if after, ok := strings.CutPrefix(full, prefix); ok && after != "" {
-		if strings.Contains(after, "mask value exceeds signed 64-bit range") {
+	var iie *store.InvalidInputError
+	if errors.As(err, &iie) && iie != nil && iie.Detail != "" {
+		if iie.Detail == store.InvalidInputDetailMaskOverflow {
 			return "mask value must be within signed 64-bit range"
 		}
-		return after
+		return iie.Detail
 	}
 	return "invalid request"
 }
