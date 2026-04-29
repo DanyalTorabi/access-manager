@@ -56,8 +56,3 @@ Handlers that mutate relationships (`addUserToGroup`, `grantUserPermission`, `gr
 
 - **T10** (unit test patterns), **T30** (coverage thresholds).
 
-## Deferred from other PRs
-
-- **From T45 (#60 / PR #73) review:** external-agent comments **CML4** and **CML6**.
-  - **CML4:** `wrapConstraintError` in `go/internal/store/sqlite/store.go` falls back to substring matching of error strings (e.g. `"foreign key constraint failed"`). This is fragile across driver/message changes. Once typed sentinels exist (this ticket + T48), centralise the mapping and remove the substring fallback where the driver exposes a numeric code.
-  - **CML6:** delete/exec helpers are inconsistent — some use `wrapConstraintError`, others (e.g. `RemoveUserFromGroup`, `RevokeUserPermission`, `RevokeGroupPermission`) return the raw `err`. Sweep these as part of the typed-error work so all mutating helpers classify errors uniformly.

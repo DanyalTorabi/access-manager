@@ -46,4 +46,7 @@ Replace fragile string-prefix extraction used by `publicInvalidInputMsg` with a 
 ## Deferred from other PRs
 
 - **From T44 (#59 / PR #71) review:** the brittle `err.Error()` prefix parsing in `publicInvalidInputMsg` was flagged again. T48 already owns the typed-error refactor — no T44-specific change needed beyond noting the additional motivation.
-- **From T45 (#60 / PR #73) review:** external-agent comment **CML5** flagged the same `publicInvalidInputMsg` string-prefix coupling (`"store: invalid input: "`). Same disposition: T48 owns the fix; no separate T45 change needed.
+- **From T45 (#60 / PR #73) review:**
+  - **CML5:** same `publicInvalidInputMsg` string-prefix coupling (`"store: invalid input: "`). Disposition: T48 owns the fix; no separate change needed.
+  - **CML4:** `wrapConstraintError` in `go/internal/store/sqlite/store.go` falls back to substring matching of error strings (e.g. `"foreign key constraint failed"`). Fragile across driver/message changes. T31 (#42) introduced typed FK sentinels but the substring fallback remains. While typing more invalid-input branches in T48, also centralise the constraint-error mapping and remove the substring fallback where the driver exposes a numeric code.
+  - **CML6:** delete/exec helpers are inconsistent — some use `wrapConstraintError`, others (e.g. `RemoveUserFromGroup`, `RevokeUserPermission`, `RevokeGroupPermission`) return the raw `err`. Sweep these as part of the typed-error work so all mutating helpers classify errors uniformly.

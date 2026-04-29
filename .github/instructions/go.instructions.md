@@ -6,10 +6,11 @@ applyTo: "go/**/*.go"
 
 ## Error Handling
 
-- HTTP handlers: return 400 for validation/client errors, 500 for unexpected/internal errors.
-- `store.ErrNotFound` → 404 (used in get, list, delete, and `groupSetParent` handlers).
-- `groupSetParent`: returns 404 when the group or parent is not found, 400 for self-parent/cycle/domain-mismatch validation errors. Other store errors currently also fall through to 400 — see TODO(T31).
-- `addUserToGroup`, `grantUserPermission`, `grantGroupPermission`: currently map **all** store errors to 400 (FK violations are client errors, but closed-DB or unexpected errors should be 500). Tracked in TODO(T31) — requires typed errors in the store layer.
+- HTTP handlers: return 400 for validation/client errors, 404 for not-found, 500 for unexpected/internal errors.
+- `store.ErrNotFound` → 404; `store.ErrFKViolation` (invalid reference / FK violation) → 400; `store.ErrConflict` → 409; `store.ErrInvalidInput` → 400; everything else → 500. Use the shared `writeStoreErr` helper in handlers — do not roll a new mapping.
+- `groupSetParent`: 404 when the group/parent is not found, 400 for self-parent / cycle / domain-mismatch validation errors, otherwise routed through `writeStoreErr`.
+- `addUserToGroup`, `grantUserPermission`, `grantGroupPermission`: also use `writeStoreErr`, so FK violations → 400, duplicates → 409, broken-DB / unexpected → 500.
+- When deferring an issue, reference the matching plan file (`// TODO(T<NN>): ...`) where `T<NN>` is the actual plan you mean — do **not** copy `T31` as a placeholder. T31 is closed (#42) and refers specifically to handler error classification.
 
 ## Concurrency
 
