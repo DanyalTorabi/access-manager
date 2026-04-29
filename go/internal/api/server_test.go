@@ -3199,6 +3199,108 @@ func TestAPI_accessTypePatch_bitOnly(t *testing.T) {
 	}
 }
 
+// TestAPI_accessMask_rejectsBit63 documents the temporary 63-bit limit on
+// access masks (issue #67 / T46). Bit 63 (1<<63) would overflow signed-64
+// storage in SQLite, so the API rejects it with 400 on access-type and
+// permission create/patch. Values <= MaxInt64 are accepted.
+func TestAPI_accessMask_rejectsBit63(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	dom := mustCreateDomain(t, ts)
+	base := ts.URL + "/api/v1/domains/" + dom
+	rBody := mustPostJSON201(t, base+"/resources", `{"title":"r"}`)
+	var resrc store.Resource
+	if err := json.Unmarshal(rBody, &resrc); err != nil {
+		t.Fatal(err)
+	}
+
+	// 1<<63 is the first value that overflows signed-64 and must be rejected.
+	const tooBig = `"0x8000000000000000"`
+	// MaxInt64 == 1<<63 - 1 must still be accepted at the API boundary.
+	const maxOK = `"0x7FFFFFFFFFFFFFFF"`
+
+	postBad := func(t *testing.T, url, body string) {
+		t.Helper()
+		res, err := http.Post(url, "application/json", strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, _ := io.ReadAll(res.Body)
+		_ = res.Body.Close()
+		if res.StatusCode != http.StatusBadRequest {
+			t.Fatalf("want 400, got %d: %s", res.StatusCode, b)
+		}
+		if !strings.Contains(string(b), "mask value must be within signed 64-bit range") {
+			t.Fatalf("want stable error message, got %s", b)
+		}
+	}
+	patchBad := func(t *testing.T, url, body string) {
+		t.Helper()
+		req, _ := http.NewRequest(http.MethodPatch, url, strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, _ := io.ReadAll(res.Body)
+		_ = res.Body.Close()
+		if res.StatusCode != http.StatusBadRequest {
+			t.Fatalf("want 400, got %d: %s", res.StatusCode, b)
+		}
+		if !strings.Contains(string(b), "mask value must be within signed 64-bit range") {
+			t.Fatalf("want stable error message, got %s", b)
+		}
+	}
+
+	t.Run("accessTypeCreate_bit63", func(t *testing.T) {
+		postBad(t, base+"/access-types", `{"title":"x","bit":`+tooBig+`}`)
+	})
+	t.Run("permissionCreate_bit63", func(t *testing.T) {
+		postBad(t, base+"/permissions", `{"title":"p","resource_id":"`+resrc.ID+`","access_mask":`+tooBig+`}`)
+	})
+
+	// Create a valid access type and permission to use for patch tests.
+	atBody := mustPostJSON201(t, base+"/access-types", `{"title":"read","bit":"0x1"}`)
+	var at store.AccessType
+	if err := json.Unmarshal(atBody, &at); err != nil {
+		t.Fatal(err)
+	}
+	pBody := mustPostJSON201(t, base+"/permissions", `{"title":"p","resource_id":"`+resrc.ID+`","access_mask":"0x1"}`)
+	var perm store.Permission
+	if err := json.Unmarshal(pBody, &perm); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("accessTypePatch_bit63", func(t *testing.T) {
+		patchBad(t, base+"/access-types/"+at.ID, `{"bit":`+tooBig+`}`)
+	})
+	t.Run("permissionPatch_bit63", func(t *testing.T) {
+		patchBad(t, base+"/permissions/"+perm.ID, `{"access_mask":`+tooBig+`}`)
+	})
+
+	// MaxInt64 (bit 62 fully set) is accepted on create and round-trips.
+	t.Run("accessTypeCreate_maxInt64_ok", func(t *testing.T) {
+		body := mustPostJSON201(t, base+"/access-types", `{"title":"max","bit":`+maxOK+`}`)
+		var got store.AccessType
+		if err := json.Unmarshal(body, &got); err != nil {
+			t.Fatal(err)
+		}
+		if got.Bit != 1<<63-1 {
+			t.Fatalf("bit: want %d, got %d", uint64(1<<63-1), got.Bit)
+		}
+	})
+	t.Run("permissionCreate_maxInt64_ok", func(t *testing.T) {
+		body := mustPostJSON201(t, base+"/permissions",
+			`{"title":"pmax","resource_id":"`+resrc.ID+`","access_mask":`+maxOK+`}`)
+		var got store.Permission
+		if err := json.Unmarshal(body, &got); err != nil {
+			t.Fatal(err)
+		}
+		if got.AccessMask != 1<<63-1 {
+			t.Fatalf("mask: want %d, got %d", uint64(1<<63-1), got.AccessMask)
+		}
+	})
+}
+
 func TestAPI_permissionPatch_invalidMask(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	dom := mustCreateDomain(t, ts)
