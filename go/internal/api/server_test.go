@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -4464,4 +4465,166 @@ func TestAPI_accessTypeList_invalidOrder(t *testing.T) {
 	if res.StatusCode != http.StatusBadRequest {
 		t.Fatalf("want 400, got %d", res.StatusCode)
 	}
+}
+
+// --- T47: parseUint64Validated and stable numeric parse errors ---
+
+// TestParseUint64Validated covers the validated parse helper directly: every
+// rejection path returns a stable sentinel error and never embeds the raw
+// strconv message or the user input.
+func TestParseUint64Validated(t *testing.T) {
+const max = maxAccessMask // 1<<63 - 1
+type tc struct {
+name    string
+in      string
+max     uint64
+want    uint64
+wantErr error
+}
+cases := []tc{
+{"decimal_zero", "0", max, 0, nil},
+{"decimal_small", "42", max, 42, nil},
+{"hex_lower", "0x1f", max, 31, nil},
+{"hex_upper", "0X10", max, 16, nil},
+{"max_signed64_ok", "0x7FFFFFFFFFFFFFFF", max, 1<<63 - 1, nil},
+{"max_disabled_accepts_full_uint64", "0xFFFFFFFFFFFFFFFF", 0, ^uint64(0), nil},
+
+{"empty_string", "", max, 0, errInvalidNumericValue},
+{"non_numeric", "notanumber", max, 0, errInvalidNumericValue},
+{"trailing_garbage", "12abc", max, 0, errInvalidNumericValue},
+{"negative", "-1", max, 0, errInvalidNumericValue},
+{"plus_sign", "+1", max, 0, errInvalidNumericValue},
+{"malformed_hex", "0xZZ", max, 0, errInvalidNumericValue},
+{"overflow_uint64", "0x10000000000000000", max, 0, errInvalidNumericValue},
+
+{"out_of_range_bit63", "0x8000000000000000", max, 0, errAccessMaskOutOfRange},
+{"out_of_range_max_uint64", "0xFFFFFFFFFFFFFFFF", max, 0, errAccessMaskOutOfRange},
+}
+for _, c := range cases {
+t.Run(c.name, func(t *testing.T) {
+got, err := parseUint64Validated(c.in, c.max)
+if !errors.Is(err, c.wantErr) {
+t.Fatalf("err = %v, want %v", err, c.wantErr)
+}
+if err == nil && got != c.want {
+t.Fatalf("got = %d, want %d", got, c.want)
+}
+if err != nil {
+if strings.Contains(err.Error(), c.in) && c.in != "" {
+t.Fatalf("error message %q must not echo input %q", err.Error(), c.in)
+}
+if strings.Contains(err.Error(), "strconv") {
+t.Fatalf("error message %q leaks strconv internals", err.Error())
+}
+}
+})
+}
+}
+
+// TestAPI_numericParseErrors_stableMessages asserts that the API surfaces the
+// stable "invalid numeric value" message (not strconv text) for malformed
+// numeric input on every handler that parses bit / access_mask. Status code
+// is asserted before the body is read.
+func TestAPI_numericParseErrors_stableMessages(t *testing.T) {
+ts, _ := newTestAPI(t)
+dom := mustCreateDomain(t, ts)
+base := ts.URL + "/api/v1/domains/" + dom
+rBody := mustPostJSON201(t, base+"/resources", `{"title":"r"}`)
+var resrc store.Resource
+if err := json.Unmarshal(rBody, &resrc); err != nil {
+t.Fatal(err)
+}
+atBody := mustPostJSON201(t, base+"/access-types", `{"title":"a","bit":"0x1"}`)
+var at store.AccessType
+if err := json.Unmarshal(atBody, &at); err != nil {
+t.Fatal(err)
+}
+pBody := mustPostJSON201(t, base+"/permissions", fmt.Sprintf(`{"title":"p","resource_id":%q,"access_mask":"0x1"}`, resrc.ID))
+var perm store.Permission
+if err := json.Unmarshal(pBody, &perm); err != nil {
+t.Fatal(err)
+}
+
+const wantMsg = "invalid numeric value"
+const badInput = "notanumber"
+assertBad := func(t *testing.T, res *http.Response) {
+t.Helper()
+if res.StatusCode != http.StatusBadRequest {
+b, _ := io.ReadAll(res.Body)
+_ = res.Body.Close()
+t.Fatalf("want 400, got %d: %s", res.StatusCode, b)
+}
+b, _ := io.ReadAll(res.Body)
+_ = res.Body.Close()
+body := string(b)
+if !strings.Contains(body, wantMsg) {
+t.Fatalf("want stable message %q, got %s", wantMsg, body)
+}
+if strings.Contains(body, "strconv") || strings.Contains(body, badInput) {
+t.Fatalf("body leaks strconv text or echoes input: %s", body)
+}
+}
+doPatch := func(t *testing.T, url, body string) *http.Response {
+t.Helper()
+req, _ := http.NewRequest(http.MethodPatch, url, strings.NewReader(body))
+req.Header.Set("Content-Type", "application/json")
+res, err := http.DefaultClient.Do(req)
+if err != nil {
+t.Fatal(err)
+}
+return res
+}
+
+t.Run("accessTypeCreate", func(t *testing.T) {
+res, err := http.Post(base+"/access-types", "application/json",
+strings.NewReader(`{"title":"x","bit":"`+badInput+`"}`))
+if err != nil {
+t.Fatal(err)
+}
+assertBad(t, res)
+})
+t.Run("accessTypePatch", func(t *testing.T) {
+assertBad(t, doPatch(t, base+"/access-types/"+at.ID, `{"bit":"`+badInput+`"}`))
+})
+t.Run("permissionCreate", func(t *testing.T) {
+res, err := http.Post(base+"/permissions", "application/json",
+strings.NewReader(fmt.Sprintf(`{"title":"p2","resource_id":%q,"access_mask":"`+badInput+`"}`, resrc.ID)))
+if err != nil {
+t.Fatal(err)
+}
+assertBad(t, res)
+})
+t.Run("permissionPatch", func(t *testing.T) {
+assertBad(t, doPatch(t, base+"/permissions/"+perm.ID, `{"access_mask":"`+badInput+`"}`))
+})
+t.Run("authzCheck_accessBit", func(t *testing.T) {
+url := fmt.Sprintf("%s/authz/check?user_id=u&resource_id=r&access_bit=%s", base, badInput)
+res, err := http.Get(url)
+if err != nil {
+t.Fatal(err)
+}
+assertBad(t, res)
+})
+}
+
+// TestAPI_authzCheck_accessBitOutOfRange asserts authzCheck rejects a bit
+// value above the signed-63 limit before reaching the store.
+func TestAPI_authzCheck_accessBitOutOfRange(t *testing.T) {
+ts, _ := newTestAPI(t)
+dom := mustCreateDomain(t, ts)
+url := fmt.Sprintf("%s/api/v1/domains/%s/authz/check?user_id=u&resource_id=r&access_bit=0x8000000000000000", ts.URL, dom)
+res, err := http.Get(url)
+if err != nil {
+t.Fatal(err)
+}
+if res.StatusCode != http.StatusBadRequest {
+b, _ := io.ReadAll(res.Body)
+_ = res.Body.Close()
+t.Fatalf("want 400, got %d: %s", res.StatusCode, b)
+}
+b, _ := io.ReadAll(res.Body)
+_ = res.Body.Close()
+if !strings.Contains(string(b), "mask value must be within signed 64-bit range") {
+t.Fatalf("want stable range error, got %s", b)
+}
 }

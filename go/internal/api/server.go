@@ -533,12 +533,8 @@ func (s *Server) accessTypeCreate(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &b) {
 		return
 	}
-	bit, err := parseUint64(b.Bit)
+	bit, err := parseUint64Validated(b.Bit, maxAccessMask)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err)
-		return
-	}
-	if err := validateAccessMask(bit); err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
@@ -602,12 +598,8 @@ func (s *Server) accessTypePatch(w http.ResponseWriter, r *http.Request) {
 	}
 	params := store.AccessTypePatchParams{Title: b.Title}
 	if b.Bit != nil {
-		bit, err := parseUint64(*b.Bit)
+		bit, err := parseUint64Validated(*b.Bit, maxAccessMask)
 		if err != nil {
-			writeErr(w, http.StatusBadRequest, err)
-			return
-		}
-		if err := validateAccessMask(bit); err != nil {
 			writeErr(w, http.StatusBadRequest, err)
 			return
 		}
@@ -643,12 +635,8 @@ func (s *Server) permissionCreate(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &b) {
 		return
 	}
-	mask, err := parseUint64(b.AccessMask)
+	mask, err := parseUint64Validated(b.AccessMask, maxAccessMask)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err)
-		return
-	}
-	if err := validateAccessMask(mask); err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
@@ -716,12 +704,8 @@ func (s *Server) permissionPatch(w http.ResponseWriter, r *http.Request) {
 	}
 	params := store.PermissionPatchParams{Title: b.Title, ResourceID: b.ResourceID}
 	if b.AccessMask != nil {
-		mask, err := parseUint64(*b.AccessMask)
+		mask, err := parseUint64Validated(*b.AccessMask, maxAccessMask)
 		if err != nil {
-			writeErr(w, http.StatusBadRequest, err)
-			return
-		}
-		if err := validateAccessMask(mask); err != nil {
 			writeErr(w, http.StatusBadRequest, err)
 			return
 		}
@@ -976,7 +960,7 @@ func (s *Server) authzCheck(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "user_id, resource_id, and access_bit are required", http.StatusBadRequest)
 		return
 	}
-	bit, err := parseUint64(bitStr)
+	bit, err := parseUint64Validated(bitStr, maxAccessMask)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
@@ -1274,24 +1258,32 @@ func readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	return true
 }
 
-// TODO(T36): parseUint64 errors are passed to writeErr, which exposes
-// strconv.ParseUint messages containing user input. Not a SQL leak but not
-// a stable message either. Tracked on #47.
-func parseUint64(s string) (uint64, error) {
-	return strconv.ParseUint(s, 0, 64)
-}
+// errInvalidNumericValue is the stable, client-safe error returned when a
+// query/body field cannot be parsed as a uint64. It intentionally does not
+// echo back the raw input or the underlying strconv message.
+var errInvalidNumericValue = errors.New("invalid numeric value")
+
+// errAccessMaskOutOfRange is the stable, client-safe error returned when a
+// mask/bit value is parseable but exceeds the API's signed-63 limit (see
+// issue #67 / T46). Wording must stay backward-compatible with existing
+// clients and tests.
+var errAccessMaskOutOfRange = errors.New("mask value must be within signed 64-bit range")
 
 // maxAccessMask is the largest mask value permitted by the API until a v2
 // migration stores full uint64 values. Bit 63 (1<<63) is reserved to avoid
 // signed-64 overflow when masks are persisted in SQLite. See issue #67 / T46.
 const maxAccessMask uint64 = 1<<63 - 1
 
-// validateAccessMask rejects mask/bit values that would set bit 63. Returns
-// nil for values in [0, 1<<63 - 1]. The error message is stable and safe to
-// return to clients; it intentionally does not echo back the user input.
-func validateAccessMask(m uint64) error {
-	if m > maxAccessMask {
-		return errors.New("mask value must be within signed 64-bit range")
+// parseUint64Validated parses s as a uint64 (decimal or `0x` hex). When
+// max > 0 it also rejects values greater than max. The returned errors are
+// stable, client-safe sentinels and never embed the user input.
+func parseUint64Validated(s string, max uint64) (uint64, error) {
+	n, err := strconv.ParseUint(s, 0, 64)
+	if err != nil {
+		return 0, errInvalidNumericValue
 	}
-	return nil
+	if max > 0 && n > max {
+		return 0, errAccessMaskOutOfRange
+	}
+	return n, nil
 }
