@@ -46,3 +46,4 @@ Replace fragile string-prefix extraction used by `publicInvalidInputMsg` with a 
 ## Deferred from other PRs
 
 - **From T44 (#59 / PR #71) review:** the brittle `err.Error()` prefix parsing in `publicInvalidInputMsg` was flagged again. T48 already owns the typed-error refactor — no T44-specific change needed beyond noting the additional motivation.
+- **From T45 (#60 / PR #73) review:** external-agent comment **CML5** flagged the same `publicInvalidInputMsg` string-prefix coupling (`"store: invalid input: "`). Same disposition: T48 owns the fix; no separate T45 change needed.
