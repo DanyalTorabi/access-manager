@@ -241,6 +241,11 @@ func seedResource(t *testing.T, c *http.Client, domainID, title string) string {
 		mustPostJSON(t, c, domainBase(domainID)+"/resources", fmt.Sprintf(`{"title":%q}`, title), http.StatusCreated))
 }
 
+// seedAccessType posts a create-access-type request. The bit string is
+// passed verbatim to the API, which accepts both decimal ("4") and 0x-hex
+// ("0x4") forms via parseUint64. Callers should not normalize either form
+// here so the helpers stay in sync with the API contract documented in
+// api/openapi.yaml.
 func seedAccessType(t *testing.T, c *http.Client, domainID, title, bit string) string {
 	t.Helper()
 	body := fmt.Sprintf(`{"title":%q,"bit":%q}`, title, bit)
@@ -248,6 +253,8 @@ func seedAccessType(t *testing.T, c *http.Client, domainID, title, bit string) s
 		mustPostJSON(t, c, domainBase(domainID)+"/access-types", body, http.StatusCreated))
 }
 
+// seedPermission posts a create-permission request. The mask string is
+// passed verbatim to the API; see seedAccessType for the accepted formats.
 func seedPermission(t *testing.T, c *http.Client, domainID, title, resourceID, mask string) string {
 	t.Helper()
 	body := fmt.Sprintf(`{"title":%q,"resource_id":%q,"access_mask":%q}`, title, resourceID, mask)

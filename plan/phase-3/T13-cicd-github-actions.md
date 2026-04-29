@@ -39,6 +39,13 @@ On **pull requests** to **main**: run **unit tests**, **integration tests** (com
 
 - Deploy to Kubernetes (T21); staging/prod promotion (T22).
 
+## Followups
+
+- **From PR #75 review:** add an OpenAPI lint/validation step (e.g.
+  `redocly lint api/openapi.yaml` or `swagger-cli validate`) to CI so
+  large YAML diffs that break spec generation fail the PR rather than
+  reaching `main`. Today nothing on the pipeline parses the spec.
+
 ## Dependencies
 
 - **T29** `go/` module root; **T6** GitHub remote; **T28** lint config; **T19** compose for integration; **T9** parity with local commands.

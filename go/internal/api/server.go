@@ -538,6 +538,10 @@ func (s *Server) accessTypeCreate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
+	if err := validateAccessMask(bit); err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
 	a := &store.AccessType{ID: uuid.NewString(), DomainID: domainID, Title: b.Title, Bit: bit}
 	if err := s.Store.AccessTypeCreate(r.Context(), a); err != nil {
 		writeStoreErr(w, r, err)
@@ -603,6 +607,10 @@ func (s *Server) accessTypePatch(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusBadRequest, err)
 			return
 		}
+		if err := validateAccessMask(bit); err != nil {
+			writeErr(w, http.StatusBadRequest, err)
+			return
+		}
 		params.Bit = &bit
 	}
 	a, err := s.Store.AccessTypePatch(r.Context(), domainID, id, params)
@@ -637,6 +645,10 @@ func (s *Server) permissionCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	mask, err := parseUint64(b.AccessMask)
 	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := validateAccessMask(mask); err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
@@ -706,6 +718,10 @@ func (s *Server) permissionPatch(w http.ResponseWriter, r *http.Request) {
 	if b.AccessMask != nil {
 		mask, err := parseUint64(*b.AccessMask)
 		if err != nil {
+			writeErr(w, http.StatusBadRequest, err)
+			return
+		}
+		if err := validateAccessMask(mask); err != nil {
 			writeErr(w, http.StatusBadRequest, err)
 			return
 		}
@@ -1263,4 +1279,19 @@ func readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 // a stable message either. Tracked on #47.
 func parseUint64(s string) (uint64, error) {
 	return strconv.ParseUint(s, 0, 64)
+}
+
+// maxAccessMask is the largest mask value permitted by the API until a v2
+// migration stores full uint64 values. Bit 63 (1<<63) is reserved to avoid
+// signed-64 overflow when masks are persisted in SQLite. See issue #67 / T46.
+const maxAccessMask uint64 = 1<<63 - 1
+
+// validateAccessMask rejects mask/bit values that would set bit 63. Returns
+// nil for values in [0, 1<<63 - 1]. The error message is stable and safe to
+// return to clients; it intentionally does not echo back the user input.
+func validateAccessMask(m uint64) error {
+	if m > maxAccessMask {
+		return errors.New("mask value must be within signed 64-bit range")
+	}
+	return nil
 }

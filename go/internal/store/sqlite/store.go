@@ -1117,6 +1117,11 @@ func (s *Store) GroupAuthzResourcesList(ctx context.Context, domainID, groupID s
 // listing. domain_id therefore appears three times: once for p
 // (permissions), once for gp (group_permissions), once for g (groups).
 //
+// TODO(T51): tighten the schema with a composite FK
+// (domain_id, group_id) -> groups(domain_id, id) so the redundant
+// g.domain_id filter can be dropped from this and the other authz
+// listings. See plan/phase-6/T51-composite-fk-cross-domain.md.
+//
 // p.access_mask > 0 mirrors GroupAuthzResourcesList and
 // ResourceAuthzUsersList: zero masks are no-ops, and any negative legacy
 // values (which PermissionCreate disallows) are excluded for parity with
@@ -1147,6 +1152,12 @@ func (s *Store) ResourceAuthzGroupsList(ctx context.Context, domainID, resourceI
 
 	baseArgs := []any{domainID, domainID, domainID, resourceID}
 
+	// COUNT and the page SELECT below are issued as separate statements,
+	// not wrapped in a read transaction. Under concurrent writes the page
+	// and total may briefly disagree (a row counted here may be deleted
+	// before the page query, or vice versa). This is acceptable for a
+	// listing endpoint; if strict consistency is ever required, both
+	// queries should run inside a single read transaction.
 	var total int64
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(DISTINCT gp.group_id) `+resourceAuthzGroupsBaseSQL, baseArgs...).Scan(&total); err != nil {
 		return nil, 0, err
