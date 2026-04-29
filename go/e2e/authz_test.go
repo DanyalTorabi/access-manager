@@ -405,3 +405,83 @@ func TestAuthz_resourceUsersList(t *testing.T) {
 		t.Fatalf("page user: want %s, got %s", orderedIDs[1], pageItems[0].UserID)
 	}
 }
+
+func TestAuthz_resourceGroupsList(t *testing.T) {
+	c := httpClient()
+	did := seedDomain(t, c, "authz-resource-groups")
+	cleanupDelete(t, c, apiBase()+"/domains/"+did)
+
+	rid := seedResource(t, c, did, "r")
+	cleanupDelete(t, c, domainBase(did)+"/resources/"+rid)
+
+	gA := seedGroup(t, c, did, "gA")
+	gB := seedGroup(t, c, did, "gB")
+	gX := seedGroup(t, c, did, "gX")
+	cleanupDelete(t, c, domainBase(did)+"/groups/"+gA)
+	cleanupDelete(t, c, domainBase(did)+"/groups/"+gB)
+	cleanupDelete(t, c, domainBase(did)+"/groups/"+gX)
+
+	// Two grants for gA on rid (OR = 0x1|0x4 = 5), one grant for gB (0x2).
+	pA1 := seedPermission(t, c, did, "pA1", rid, "0x1")
+	pA2 := seedPermission(t, c, did, "pA2", rid, "0x4")
+	pB := seedPermission(t, c, did, "pB", rid, "0x2")
+	cleanupDelete(t, c, domainBase(did)+"/permissions/"+pA1)
+	cleanupDelete(t, c, domainBase(did)+"/permissions/"+pA2)
+	cleanupDelete(t, c, domainBase(did)+"/permissions/"+pB)
+
+	grantGroupPerm(t, c, did, gA, pA1)
+	grantGroupPerm(t, c, did, gA, pA2)
+	grantGroupPerm(t, c, did, gB, pB)
+	cleanupRevokeGroupPerm(t, c, did, gA, pA1)
+	cleanupRevokeGroupPerm(t, c, did, gA, pA2)
+	cleanupRevokeGroupPerm(t, c, did, gB, pB)
+
+	type authzGroup struct {
+		GroupID string `json:"group_id"`
+		Mask    string `json:"mask"`
+	}
+
+	base := fmt.Sprintf("%s/resources/%s/authz/groups", domainBase(did), rid)
+	env := mustList(t, c, base+"?offset=0&limit=10")
+	if env.Meta.Total != 2 {
+		t.Fatalf("total: want 2 (gA + gB; gX has no grants), got %d", env.Meta.Total)
+	}
+	var items []authzGroup
+	if err := json.Unmarshal(env.Data, &items); err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("items len: want 2, got %d", len(items))
+	}
+	got := map[string]string{}
+	for _, it := range items {
+		got[it.GroupID] = it.Mask
+	}
+	if got[gA] != "5" {
+		t.Fatalf("gA mask: want 5 (0x1|0x4), got %q", got[gA])
+	}
+	if got[gB] != "2" {
+		t.Fatalf("gB mask: want 2, got %q", got[gB])
+	}
+	if _, ok := got[gX]; ok {
+		t.Fatalf("gX must not appear (no grants)")
+	}
+
+	// Pagination: ordered by group_id ASC.
+	page := mustList(t, c, base+"?offset=1&limit=1")
+	if page.Meta.Total != 2 {
+		t.Fatalf("page total: want 2, got %d", page.Meta.Total)
+	}
+	var pageItems []authzGroup
+	if err := json.Unmarshal(page.Data, &pageItems); err != nil {
+		t.Fatal(err)
+	}
+	if len(pageItems) != 1 {
+		t.Fatalf("page len: want 1, got %d", len(pageItems))
+	}
+	orderedIDs := []string{gA, gB}
+	sort.Strings(orderedIDs)
+	if pageItems[0].GroupID != orderedIDs[1] {
+		t.Fatalf("page group: want %s, got %s", orderedIDs[1], pageItems[0].GroupID)
+	}
+}
