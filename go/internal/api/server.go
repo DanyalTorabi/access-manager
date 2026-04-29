@@ -1274,11 +1274,30 @@ var errAccessMaskOutOfRange = errors.New("mask value must be within signed 64-bi
 // signed-64 overflow when masks are persisted in SQLite. See issue #67 / T46.
 const maxAccessMask uint64 = 1<<63 - 1
 
-// parseUint64Validated parses s as a uint64 (decimal or `0x` hex). When
-// max > 0 it also rejects values greater than max. The returned errors are
-// stable, client-safe sentinels and never embed the user input.
+// maxNumericInputLen caps the length of strings accepted by
+// parseUint64Validated. The longest legal input is 18 chars (`0x` + 16 hex
+// digits) for full uint64; 32 leaves comfortable headroom while bounding
+// CPU on pathological inputs without depending on outer body-size limits.
+const maxNumericInputLen = 32
+
+// parseUint64Validated parses s as a uint64 in either base 10 (decimal)
+// or base 16 (with a `0x`/`0X` prefix), matching the format documented in
+// api/openapi.yaml. Other strconv.ParseUint(base=0) modes (octal `0nnn`,
+// binary `0b…`) are intentionally rejected so the wire format stays
+// unambiguous. When max > 0 the helper also rejects values greater than
+// max. The returned errors are stable, client-safe sentinels and never
+// embed the user input.
 func parseUint64Validated(s string, max uint64) (uint64, error) {
-	n, err := strconv.ParseUint(s, 0, 64)
+	if len(s) == 0 || len(s) > maxNumericInputLen {
+		return 0, errInvalidNumericValue
+	}
+	base := 10
+	digits := s
+	if len(s) > 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X') {
+		base = 16
+		digits = s[2:]
+	}
+	n, err := strconv.ParseUint(digits, base, 64)
 	if err != nil {
 		return 0, errInvalidNumericValue
 	}
