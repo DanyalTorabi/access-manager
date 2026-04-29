@@ -3790,3 +3790,295 @@ func TestResourceAuthzUsersBaseArgs_orderMatchesPlaceholders(t *testing.T) {
 		t.Fatalf("placeholder count: want %d, got %d", wantCount, got)
 	}
 }
+
+func TestResourceAuthzGroupsList(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	rid := uuid.NewString()
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Three groups:
+	// gA: two grants on rid (0x1 + 0x4 -> mask 0x5)
+	// gB: one grant on rid (0x2 -> mask 0x2)
+	// gX: no grants on rid (must NOT appear)
+	gA := uuid.NewString()
+	gB := uuid.NewString()
+	gX := uuid.NewString()
+	for _, g := range []string{gA, gB, gX} {
+		if err := s.GroupCreate(ctx, &store.Group{ID: g, DomainID: domainID, Title: "g-" + g}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	pA1 := uuid.NewString()
+	pA2 := uuid.NewString()
+	pB := uuid.NewString()
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: pA1, DomainID: domainID, Title: "pA1", ResourceID: rid, AccessMask: 0x1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: pA2, DomainID: domainID, Title: "pA2", ResourceID: rid, AccessMask: 0x4}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: pB, DomainID: domainID, Title: "pB", ResourceID: rid, AccessMask: 0x2}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GrantGroupPermission(ctx, domainID, gA, pA1); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GrantGroupPermission(ctx, domainID, gA, pA2); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GrantGroupPermission(ctx, domainID, gB, pB); err != nil {
+		t.Fatal(err)
+	}
+
+	wantMasks := map[string]uint64{gA: 0x5, gB: 0x2}
+
+	list, total, err := s.ResourceAuthzGroupsList(ctx, domainID, rid, store.ListOpts{Offset: 0, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 2 {
+		t.Fatalf("total: want 2, got %d", total)
+	}
+	if len(list) != 2 {
+		t.Fatalf("len: want 2, got %d", len(list))
+	}
+	gotMasks := map[string]uint64{}
+	for _, it := range list {
+		gotMasks[it.GroupID] = it.Mask
+	}
+	for g, m := range wantMasks {
+		if gotMasks[g] != m {
+			t.Fatalf("group %s mask: want %#x, got %#x", g, m, gotMasks[g])
+		}
+	}
+	if _, ok := gotMasks[gX]; ok {
+		t.Fatalf("gX with no grants must not appear")
+	}
+
+	page, pageTotal, err := s.ResourceAuthzGroupsList(ctx, domainID, rid, store.ListOpts{Offset: 1, Limit: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pageTotal != 2 || len(page) != 1 {
+		t.Fatalf("pagination: total=%d len=%d", pageTotal, len(page))
+	}
+	orderedIDs := []string{gA, gB}
+	sort.Strings(orderedIDs)
+	if page[0].GroupID != orderedIDs[1] {
+		t.Fatalf("pagination group: want %s, got %s", orderedIDs[1], page[0].GroupID)
+	}
+
+	emptyPage, emptyTotal, err := s.ResourceAuthzGroupsList(ctx, domainID, rid, store.ListOpts{Offset: 99, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if emptyTotal != 2 || len(emptyPage) != 0 {
+		t.Fatalf("past end: total=%d len=%d", emptyTotal, len(emptyPage))
+	}
+}
+
+func TestResourceAuthzGroupsList_notFound(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+
+	domainID := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	rid := uuid.NewString()
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, err := s.ResourceAuthzGroupsList(ctx, uuid.NewString(), rid, store.ListOpts{Offset: 0, Limit: 10}); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("unknown domain: want ErrNotFound, got %v", err)
+	}
+	if _, _, err := s.ResourceAuthzGroupsList(ctx, domainID, uuid.NewString(), store.ListOpts{Offset: 0, Limit: 10}); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("unknown resource: want ErrNotFound, got %v", err)
+	}
+}
+
+func TestResourceAuthzGroupsList_noGroups(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+
+	domainID := uuid.NewString()
+	rid := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+
+	list, total, err := s.ResourceAuthzGroupsList(ctx, domainID, rid, store.ListOpts{Offset: 0, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 0 || len(list) != 0 {
+		t.Fatalf("no groups: total=%d len=%d", total, len(list))
+	}
+}
+
+func TestResourceAuthzGroupsList_nonPositiveMasksExcluded(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+
+	domainID := uuid.NewString()
+	rid := uuid.NewString()
+	gid := uuid.NewString()
+	pidNeg := uuid.NewString()
+	pidZero := uuid.NewString()
+
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GroupCreate(ctx, &store.Group{ID: gid, DomainID: domainID, Title: "g"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.db.ExecContext(ctx,
+		`INSERT INTO permissions (id, domain_id, title, resource_id, access_mask) VALUES (?, ?, ?, ?, ?)`,
+		pidNeg, domainID, "neg-mask", rid, int64(-1),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.ExecContext(ctx,
+		`INSERT INTO group_permissions (domain_id, group_id, permission_id) VALUES (?, ?, ?)`,
+		domainID, gid, pidNeg,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: pidZero, DomainID: domainID, Title: "zero-mask", ResourceID: rid, AccessMask: 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GrantGroupPermission(ctx, domainID, gid, pidZero); err != nil {
+		t.Fatal(err)
+	}
+
+	list, total, err := s.ResourceAuthzGroupsList(ctx, domainID, rid, store.ListOpts{Offset: 0, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 0 || len(list) != 0 {
+		t.Fatalf("non-positive masks should be excluded: total=%d len=%d", total, len(list))
+	}
+}
+
+func TestResourceAuthzGroupsList_otherDomainsExcluded(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+
+	domainID := uuid.NewString()
+	otherDomainID := uuid.NewString()
+	rid := uuid.NewString()
+	gid := uuid.NewString()
+	otherGID := uuid.NewString()
+	pid := uuid.NewString()
+
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DomainCreate(ctx, &store.Domain{ID: otherDomainID, Title: "other"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GroupCreate(ctx, &store.Group{ID: gid, DomainID: domainID, Title: "g"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GroupCreate(ctx, &store.Group{ID: otherGID, DomainID: otherDomainID, Title: "o"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: pid, DomainID: domainID, Title: "p", ResourceID: rid, AccessMask: 0x1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GrantGroupPermission(ctx, domainID, gid, pid); err != nil {
+		t.Fatal(err)
+	}
+
+	// Insert a cross-domain group_permissions row directly: the row's
+	// domain_id matches the queried domain (so gp.domain_id passes), but
+	// otherGID belongs to otherDomainID. group_permissions(group_id) FKs to
+	// groups(id) only — not the composite (domain_id, id) — so this insert
+	// succeeds even with PRAGMA foreign_keys=ON. The store must still
+	// exclude otherGID from the listing.
+	if _, err := s.db.ExecContext(ctx,
+		`INSERT INTO group_permissions (domain_id, group_id, permission_id) VALUES (?, ?, ?)`,
+		domainID, otherGID, pid,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	list, total, err := s.ResourceAuthzGroupsList(ctx, domainID, rid, store.ListOpts{Offset: 0, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 1 || len(list) != 1 || list[0].GroupID != gid {
+		t.Fatalf("other-domain groups must not appear: total=%d list=%+v", total, list)
+	}
+}
+
+func TestResourceAuthzGroupsList_limitClampedAtMaxLimit(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+
+	domainID := uuid.NewString()
+	rid := uuid.NewString()
+	pid := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: pid, DomainID: domainID, Title: "p", ResourceID: rid, AccessMask: 1}); err != nil {
+		t.Fatal(err)
+	}
+
+	wantTotal := store.MaxLimit + 5
+	for i := 0; i < wantTotal; i++ {
+		gid := uuid.NewString()
+		if err := s.GroupCreate(ctx, &store.Group{ID: gid, DomainID: domainID, Title: fmt.Sprintf("g-%03d", i)}); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.GrantGroupPermission(ctx, domainID, gid, pid); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	page1, total1, err := s.ResourceAuthzGroupsList(ctx, domainID, rid, store.ListOpts{Offset: 0, Limit: store.MaxLimit + 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total1 != int64(wantTotal) {
+		t.Fatalf("total1: want %d, got %d", wantTotal, total1)
+	}
+	if len(page1) != store.MaxLimit {
+		t.Fatalf("page1 len: want %d, got %d", store.MaxLimit, len(page1))
+	}
+
+	page2, total2, err := s.ResourceAuthzGroupsList(ctx, domainID, rid, store.ListOpts{Offset: store.MaxLimit, Limit: store.MaxLimit + 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total2 != int64(wantTotal) {
+		t.Fatalf("total2: want %d, got %d", wantTotal, total2)
+	}
+	if len(page2) != wantTotal-store.MaxLimit {
+		t.Fatalf("page2 len: want %d, got %d", wantTotal-store.MaxLimit, len(page2))
+	}
+}

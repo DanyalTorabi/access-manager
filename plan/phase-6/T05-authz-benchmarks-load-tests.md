@@ -39,6 +39,9 @@ Measure **authz check** latency and throughput under realistic data sizes: **Go 
 ## Deferred from other PRs
 
 - **From T44 (#59 / PR #71) review:** add a perf/regression benchmark for `Store.ResourceAuthzUsersList` (sqlite) that simulates large user/membership counts (1000+ users with mixed direct + group-inherited grants on a single resource). Today the implementation uses a per-user `EXISTS` predicate plus two batched `IN` aggregation queries, bounded by `store.MaxLimit` (100). The benchmark should both establish a baseline and let us evaluate a single-query GROUP BY / aggregated bit-OR alternative if numbers warrant it.
+- **From T45 (#60 / PR #73) review:** external-agent comments **CML3** and **CML9**.
+  - **CML3:** `Store.ResourceAuthzGroupsList` (and the sibling `ResourceAuthzUsersList` / `GroupAuthzResourcesList`) batch-aggregates masks via `IN (?, …)` clauses bounded by `store.MaxLimit` (100). Safe today against SQLite's parameter cap (≥999), but if `MaxLimit` is ever raised significantly the `IN` approach must be reworked (chunk the IDs or fold mask aggregation into the page-select). Add a benchmark that varies the page size near the SQLite parameter cap and document the chunking strategy when triggered.
+  - **CML9:** `GroupSetParent`'s parent-chain cycle detection uses a defensive `maxSteps = 1_000_000` loop. Not a hot path today, but for very deep / pathological tenant graphs this could become expensive. Add a benchmark over a deep parent chain (e.g. 10k+ levels) so we can decide whether to lower the bound, switch to recursive CTE, or memoise.
 
 ## Dependencies
 

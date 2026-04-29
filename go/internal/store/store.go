@@ -72,6 +72,14 @@ type ResourceAuthzUser struct {
 	EffectiveMask uint64
 }
 
+// ResourceAuthzGroup is one row in the resource authz groups listing: a group
+// with at least one direct group_permissions grant on the resource. Mask is
+// the OR of contributing access_mask values.
+type ResourceAuthzGroup struct {
+	GroupID string
+	Mask    uint64
+}
+
 const (
 	DefaultLimit = 20
 	MaxLimit     = 100
@@ -198,6 +206,7 @@ type Store interface {
 	UserAuthzResourcesList(ctx context.Context, domainID, userID string, opts ListOpts) ([]UserAuthzResource, int64, error)
 	GroupAuthzResourcesList(ctx context.Context, domainID, groupID string, opts ListOpts) ([]GroupAuthzResource, int64, error)
 	ResourceAuthzUsersList(ctx context.Context, domainID, resourceID string, opts ListOpts) ([]ResourceAuthzUser, int64, error)
+	ResourceAuthzGroupsList(ctx context.Context, domainID, resourceID string, opts ListOpts) ([]ResourceAuthzGroup, int64, error)
 
 	DomainCreate(ctx context.Context, d *Domain) error
 	DomainGet(ctx context.Context, id string) (*Domain, error)

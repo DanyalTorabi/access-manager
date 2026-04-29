@@ -434,6 +434,18 @@ components:
           description: Effective mask (OR of direct user grants and group-membership grants) for this user/resource pair as decimal string.
           example: "7"
 
+    ResourceAuthzGroup:
+      type: object
+      required: [group_id, mask]
+      properties:
+        group_id:
+          type: string
+          format: uuid
+        mask:
+          type: string
+          description: OR of all direct group grants for this group/resource pair as decimal string.
+          example: "5"
+
 paths:
   /health:
     get:
@@ -1582,6 +1594,65 @@ paths:
                   offset: 0
                   limit: 20
                   sort: "user_id"
+                  order: "asc"
+        "400":
+          description: Bad request (invalid pagination params)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: Domain or resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v1/domains/{domainID}/resources/{resourceID}/authz/groups:
+    parameters:
+      - $ref: "#/components/parameters/domainID"
+      - $ref: "#/components/parameters/resourceID"
+    get:
+      tags: [Authz]
+      summary: List groups with direct access on a resource
+      description: |
+        Returns groups that have at least one direct grant via `group_permissions` on this resource.
+        Masks are returned as decimal strings (OR of all direct group grants per group).
+
+        Pagination: only `offset` and `limit` are supported. Results are always ordered by `group_id` ascending — `sort` and `order` are not honoured for this endpoint, and any of `search`, `search_type`, `sort`, or `order` in the query string will produce a `400`.
+      parameters:
+        - $ref: "#/components/parameters/offsetParam"
+        - $ref: "#/components/parameters/limitParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ResourceAuthzGroup"
+                  meta:
+                    $ref: "#/components/schemas/ListMeta"
+              example:
+                data:
+                  - group_id: "11111111-1111-1111-1111-111111111111"
+                    mask: "5"
+                meta:
+                  total: 1
+                  offset: 0
+                  limit: 20
+                  sort: "group_id"
                   order: "asc"
         "400":
           description: Bad request (invalid pagination params)
