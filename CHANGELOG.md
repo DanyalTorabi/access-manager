@@ -35,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **T47 / #68:** API numeric parsing for `bit` / `access_mask` (and `authz/check?access_bit=`) no longer leaks raw `strconv.ParseUint` text or echoes user input. Malformed values now return `400 Bad Request` with the stable message `invalid numeric value`; values above the signed-63 limit are rejected at the API boundary with the existing `mask value must be within signed 64-bit range` message before reaching the store.
+
 - **T36 / #47:** API error responses no longer expose internal SQL/driver details. All error bodies use stable, database-agnostic messages (`resource not found`, `referenced entity does not exist or is still referenced`, `internal server error`, etc.). Full errors are logged server-side for operator diagnostics.
 
 - **T46 / #67:** Temporary limitation — access masks are limited to the lower 63 bits (SQLite `INTEGER` is signed 64-bit and current storage casts to `int64`). The API now rejects access-type and permission create/patch requests whose `bit` or `access_mask` would set bit 63 with `400 Bad Request` ("mask value must be within signed 64-bit range"); the SQLite store enforces the same boundary defensively. To be removed by a v2 migration tracked in [#67](https://github.com/DanyalTorabi/access-manager/issues/67).
