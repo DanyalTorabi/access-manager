@@ -2507,8 +2507,9 @@ func TestWriteStoreErr_allCases(t *testing.T) {
 		{"not found", store.ErrNotFound, http.StatusNotFound, "resource not found"},
 		{"fk violation", store.ErrFKViolation, http.StatusBadRequest, "referenced entity does not exist or is still referenced"},
 		{"invalid input", store.ErrInvalidInput, http.StatusBadRequest, "invalid request"},
-		{"invalid input detail", fmt.Errorf("%w: cycle detected in group parent chain", store.ErrInvalidInput), http.StatusBadRequest, "cycle detected in group parent chain"},
-		{"invalid input mask range", fmt.Errorf("%w: mask value exceeds signed 64-bit range", store.ErrInvalidInput), http.StatusBadRequest, "mask value must be within signed 64-bit range"},
+		{"invalid input detail", store.NewInvalidInput("cycle detected in group parent chain"), http.StatusBadRequest, "cycle detected in group parent chain"},
+		{"invalid input wrapped detail", fmt.Errorf("ctx: %w", store.NewInvalidInput("empty patch")), http.StatusBadRequest, "empty patch"},
+		{"invalid input mask range", store.NewInvalidInput("mask value exceeds signed 64-bit range"), http.StatusBadRequest, "mask value must be within signed 64-bit range"},
 		{"conflict", store.ErrConflict, http.StatusConflict, "resource already exists"},
 		{"generic", fmt.Errorf("boom"), http.StatusInternalServerError, "internal server error"},
 	}
@@ -4463,5 +4464,31 @@ func TestAPI_accessTypeList_invalidOrder(t *testing.T) {
 	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode != http.StatusBadRequest {
 		t.Fatalf("want 400, got %d", res.StatusCode)
+	}
+}
+
+// TestPublicInvalidInputMsg_typedExtraction asserts that publicInvalidInputMsg
+// uses errors.As (not string-prefix parsing): a typed
+// store.InvalidInputError detail must be returned to the client even when
+// wrapped by an outer fmt.Errorf("%w", err). This is the regression that T48
+// fixed.
+func TestPublicInvalidInputMsg_typedExtraction(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"plain_typed", store.NewInvalidInput("empty patch"), "empty patch"},
+		{"wrapped_once", fmt.Errorf("ctx: %w", store.NewInvalidInput("empty patch")), "empty patch"},
+		{"wrapped_twice", fmt.Errorf("a: %w", fmt.Errorf("b: %w", store.NewInvalidInput("cycle detected in group parent chain"))), "cycle detected in group parent chain"},
+		{"mask_overflow_translated", store.NewInvalidInput("mask value exceeds signed 64-bit range"), "mask value must be within signed 64-bit range"},
+		{"plain_sentinel_falls_back", store.ErrInvalidInput, "invalid request"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := publicInvalidInputMsg(c.err); got != c.want {
+				t.Fatalf("publicInvalidInputMsg = %q, want %q", got, c.want)
+			}
+		})
 	}
 }

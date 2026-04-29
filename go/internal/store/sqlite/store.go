@@ -62,7 +62,7 @@ const maxInt64 = 1<<63 - 1
 // client-facing validation error when necessary.
 func maskToSQL(m uint64) (int64, error) {
 	if m > uint64(maxInt64) {
-		return 0, fmt.Errorf("%w: mask value exceeds signed 64-bit range", store.ErrInvalidInput)
+		return 0, store.NewInvalidInput("mask value exceeds signed 64-bit range")
 	}
 	return int64(m), nil
 }
@@ -216,7 +216,7 @@ func (s *Store) DomainDelete(ctx context.Context, id string) error {
 
 func (s *Store) DomainPatch(ctx context.Context, id string, title *string) (*store.Domain, error) {
 	if title == nil {
-		return nil, fmt.Errorf("%w: empty patch", store.ErrInvalidInput)
+		return nil, store.NewInvalidInput("empty patch")
 	}
 	if _, err := s.DomainGet(ctx, id); err != nil {
 		return nil, err
@@ -294,7 +294,7 @@ func (s *Store) UserDelete(ctx context.Context, domainID, id string) error {
 
 func (s *Store) UserPatch(ctx context.Context, domainID, id string, title *string) (*store.User, error) {
 	if title == nil {
-		return nil, fmt.Errorf("%w: empty patch", store.ErrInvalidInput)
+		return nil, store.NewInvalidInput("empty patch")
 	}
 	if _, err := s.UserGet(ctx, domainID, id); err != nil {
 		return nil, err
@@ -391,7 +391,7 @@ func groupGetTx(ctx context.Context, tx *sql.Tx, domainID, id string) (*store.Gr
 
 func groupSetParentTx(ctx context.Context, tx *sql.Tx, domainID, groupID string, parentID *string) error {
 	if parentID != nil && *parentID == groupID {
-		return fmt.Errorf("%w: group cannot be its own parent", store.ErrInvalidInput)
+		return store.NewInvalidInput("group cannot be its own parent")
 	}
 	if _, err := groupGetTx(ctx, tx, domainID, groupID); err != nil {
 		return err
@@ -402,13 +402,13 @@ func groupSetParentTx(ctx context.Context, tx *sql.Tx, domainID, groupID string,
 			return err
 		}
 		if p.DomainID != domainID {
-			return fmt.Errorf("%w: parent group wrong domain", store.ErrInvalidInput)
+			return store.NewInvalidInput("parent group wrong domain")
 		}
 		walk := *parentID
 		const maxSteps = 1_000_000
 		for i := 0; i < maxSteps; i++ {
 			if walk == groupID {
-				return fmt.Errorf("%w: cycle detected in group parent chain", store.ErrInvalidInput)
+				return store.NewInvalidInput("cycle detected in group parent chain")
 			}
 			pg, err := groupGetTx(ctx, tx, domainID, walk)
 			if err != nil {
@@ -457,7 +457,7 @@ func (s *Store) GroupDelete(ctx context.Context, domainID, id string) error {
 
 func (s *Store) GroupPatch(ctx context.Context, domainID, groupID string, p store.GroupPatchParams) (*store.Group, error) {
 	if p.Title == nil && !p.UpdateParent {
-		return nil, fmt.Errorf("%w: empty patch", store.ErrInvalidInput)
+		return nil, store.NewInvalidInput("empty patch")
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -550,7 +550,7 @@ func (s *Store) ResourceDelete(ctx context.Context, domainID, id string) error {
 
 func (s *Store) ResourcePatch(ctx context.Context, domainID, id string, title *string) (*store.Resource, error) {
 	if title == nil {
-		return nil, fmt.Errorf("%w: empty patch", store.ErrInvalidInput)
+		return nil, store.NewInvalidInput("empty patch")
 	}
 	if _, err := s.ResourceGet(ctx, domainID, id); err != nil {
 		return nil, err
@@ -636,7 +636,7 @@ func (s *Store) AccessTypeDelete(ctx context.Context, domainID, id string) error
 
 func (s *Store) AccessTypePatch(ctx context.Context, domainID, id string, p store.AccessTypePatchParams) (*store.AccessType, error) {
 	if p.Title == nil && p.Bit == nil {
-		return nil, fmt.Errorf("%w: empty patch", store.ErrInvalidInput)
+		return nil, store.NewInvalidInput("empty patch")
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -753,7 +753,7 @@ func (s *Store) PermissionDelete(ctx context.Context, domainID, id string) error
 
 func (s *Store) PermissionPatch(ctx context.Context, domainID, id string, p store.PermissionPatchParams) (*store.Permission, error) {
 	if p.Title == nil && p.ResourceID == nil && p.AccessMask == nil {
-		return nil, fmt.Errorf("%w: empty patch", store.ErrInvalidInput)
+		return nil, store.NewInvalidInput("empty patch")
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -812,7 +812,7 @@ func (s *Store) RemoveUserFromGroup(ctx context.Context, domainID, userID, group
 	res, err := s.db.ExecContext(ctx, `DELETE FROM group_members WHERE domain_id = ? AND user_id = ? AND group_id = ?`,
 		domainID, userID, groupID)
 	if err != nil {
-		return err
+		return wrapConstraintError(err)
 	}
 	n, _ := res.RowsAffected()
 	if n == 0 {
@@ -831,7 +831,7 @@ func (s *Store) RevokeUserPermission(ctx context.Context, domainID, userID, perm
 	res, err := s.db.ExecContext(ctx, `DELETE FROM user_permissions WHERE domain_id = ? AND user_id = ? AND permission_id = ?`,
 		domainID, userID, permissionID)
 	if err != nil {
-		return err
+		return wrapConstraintError(err)
 	}
 	n, _ := res.RowsAffected()
 	if n == 0 {
@@ -850,7 +850,7 @@ func (s *Store) RevokeGroupPermission(ctx context.Context, domainID, groupID, pe
 	res, err := s.db.ExecContext(ctx, `DELETE FROM group_permissions WHERE domain_id = ? AND group_id = ? AND permission_id = ?`,
 		domainID, groupID, permissionID)
 	if err != nil {
-		return err
+		return wrapConstraintError(err)
 	}
 	n, _ := res.RowsAffected()
 	if n == 0 {

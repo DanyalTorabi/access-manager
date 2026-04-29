@@ -14,6 +14,28 @@ var (
 	ErrConflict     = errors.New("store: conflict")
 )
 
+// InvalidInputError carries a machine-safe, client-presentable Detail
+// describing a validation failure raised by the store. It Unwraps to
+// ErrInvalidInput so that `errors.Is(err, store.ErrInvalidInput)` continues
+// to work, and the API layer can extract Detail via `errors.As` instead of
+// matching on free-form error strings.
+type InvalidInputError struct {
+	Detail string
+}
+
+func (e *InvalidInputError) Error() string {
+	if e == nil || e.Detail == "" {
+		return ErrInvalidInput.Error()
+	}
+	return ErrInvalidInput.Error() + ": " + e.Detail
+}
+
+func (e *InvalidInputError) Unwrap() error { return ErrInvalidInput }
+
+// NewInvalidInput returns an error wrapping ErrInvalidInput whose Detail is
+// safe to surface to API clients verbatim.
+func NewInvalidInput(detail string) error { return &InvalidInputError{Detail: detail} }
+
 type Domain struct {
 	ID    string
 	Title string
