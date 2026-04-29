@@ -243,9 +243,9 @@ func seedResource(t *testing.T, c *http.Client, domainID, title string) string {
 
 // seedAccessType posts a create-access-type request. The bit string is
 // passed verbatim to the API, which accepts both decimal ("4") and 0x-hex
-// ("0x4") forms via parseUint64. Callers should not normalize either form
-// here so the helpers stay in sync with the API contract documented in
-// api/openapi.yaml.
+// ("0x4") forms via parseUint64Validated. Callers should not normalize
+// either form here so the helpers stay in sync with the API contract
+// documented in api/openapi.yaml.
 func seedAccessType(t *testing.T, c *http.Client, domainID, title, bit string) string {
 	t.Helper()
 	body := fmt.Sprintf(`{"title":%q,"bit":%q}`, title, bit)
