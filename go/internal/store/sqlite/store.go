@@ -1104,18 +1104,28 @@ func (s *Store) GroupAuthzResourcesList(ctx context.Context, domainID, groupID s
 	return result, total, nil
 }
 
-// resourceAuthzGroupsBaseSQL joins permissions with group_permissions to
-// select groups holding at least one direct group_permissions grant on
-// (domainID, resourceID). domain_id appears twice: once for p (permissions
-// row) and once for gp (group_permissions row) because both tables carry
-// domain_id independently. p.access_mask > 0 mirrors GroupAuthzResourcesList
-// and ResourceAuthzUsersList: zero masks are no-ops, and any negative legacy
+// resourceAuthzGroupsBaseSQL joins permissions with group_permissions and
+// the groups table to select groups holding at least one direct
+// group_permissions grant on (domainID, resourceID).
+//
+// We must filter on BOTH gp.domain_id AND g.domain_id: the
+// group_permissions(group_id) FK references only groups(id) (not the
+// composite (domain_id, id)), and GrantGroupPermission does not validate
+// domain membership. Without the g.domain_id filter, a group from another
+// domain that was granted a permission under this domain (via an
+// out-of-band insert or future cross-domain bug) would leak into the
+// listing. domain_id therefore appears three times: once for p
+// (permissions), once for gp (group_permissions), once for g (groups).
+//
+// p.access_mask > 0 mirrors GroupAuthzResourcesList and
+// ResourceAuthzUsersList: zero masks are no-ops, and any negative legacy
 // values (which PermissionCreate disallows) are excluded for parity with
 // maskFromSQL.
 const resourceAuthzGroupsBaseSQL = `
 FROM permissions p
 INNER JOIN group_permissions gp ON gp.permission_id = p.id
-WHERE p.domain_id = ? AND gp.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0
+INNER JOIN groups g ON g.id = gp.group_id
+WHERE p.domain_id = ? AND gp.domain_id = ? AND g.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0
 `
 
 func (s *Store) ResourceAuthzGroupsList(ctx context.Context, domainID, resourceID string, opts store.ListOpts) ([]store.ResourceAuthzGroup, int64, error) {
@@ -1135,7 +1145,7 @@ func (s *Store) ResourceAuthzGroupsList(ctx context.Context, domainID, resourceI
 		return nil, 0, err
 	}
 
-	baseArgs := []any{domainID, domainID, resourceID}
+	baseArgs := []any{domainID, domainID, domainID, resourceID}
 
 	var total int64
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(DISTINCT gp.group_id) `+resourceAuthzGroupsBaseSQL, baseArgs...).Scan(&total); err != nil {
@@ -1181,10 +1191,11 @@ func (s *Store) ResourceAuthzGroupsList(ctx context.Context, domainID, resourceI
 	}
 	maskSQL := `SELECT gp.group_id, p.access_mask FROM permissions p ` + // #nosec G202
 		`INNER JOIN group_permissions gp ON gp.permission_id = p.id ` +
-		`WHERE p.domain_id = ? AND gp.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0 ` +
+		`INNER JOIN groups g ON g.id = gp.group_id ` +
+		`WHERE p.domain_id = ? AND gp.domain_id = ? AND g.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0 ` +
 		`AND gp.group_id IN (` + placeholders + `)`
-	maskArgs := make([]any, 0, 3+len(groupIDs))
-	maskArgs = append(maskArgs, domainID, domainID, resourceID)
+	maskArgs := make([]any, 0, 4+len(groupIDs))
+	maskArgs = append(maskArgs, domainID, domainID, domainID, resourceID)
 	for _, gid := range groupIDs {
 		maskArgs = append(maskArgs, gid)
 	}
