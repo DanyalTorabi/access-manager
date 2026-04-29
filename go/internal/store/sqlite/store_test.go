@@ -4201,17 +4201,17 @@ func TestT48_TypedInvalidInputError_RoundTrip(t *testing.T) {
 
 	cases := []struct {
 		name       string
-		call       func() error
+		call       func(t *testing.T) error
 		wantDetail string
 	}{
 		{
 			name:       "DomainPatch_emptyPatch",
-			call:       func() error { _, err := s.DomainPatch(ctx, domainID, nil); return err },
+			call:       func(t *testing.T) error { _, err := s.DomainPatch(ctx, domainID, nil); return err },
 			wantDetail: "empty patch",
 		},
 		{
 			name: "PermissionCreate_maskOverflow",
-			call: func() error {
+			call: func(t *testing.T) error {
 				rid := uuid.NewString()
 				if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: "r"}); err != nil {
 					t.Fatal(err)
@@ -4226,7 +4226,7 @@ func TestT48_TypedInvalidInputError_RoundTrip(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			err := c.call()
+			err := c.call(t)
 			if err == nil {
 				t.Fatal("want error, got nil")
 			}
