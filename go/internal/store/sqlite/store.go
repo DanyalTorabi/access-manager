@@ -1152,6 +1152,12 @@ func (s *Store) ResourceAuthzGroupsList(ctx context.Context, domainID, resourceI
 
 	baseArgs := []any{domainID, domainID, domainID, resourceID}
 
+	// COUNT and the page SELECT below are issued as separate statements,
+	// not wrapped in a read transaction. Under concurrent writes the page
+	// and total may briefly disagree (a row counted here may be deleted
+	// before the page query, or vice versa). This is acceptable for a
+	// listing endpoint; if strict consistency is ever required, both
+	// queries should run inside a single read transaction.
 	var total int64
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(DISTINCT gp.group_id) `+resourceAuthzGroupsBaseSQL, baseArgs...).Scan(&total); err != nil {
 		return nil, 0, err
