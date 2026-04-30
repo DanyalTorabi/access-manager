@@ -991,11 +991,11 @@ func (s *Server) authzCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	allowed := access.HasBit(mask, bit)
+	result = AuthzResultOK
 	writeJSON(w, http.StatusOK, map[string]any{
 		"allowed":        allowed,
 		"effective_mask": strconv.FormatUint(mask, 10),
 	})
-	result = AuthzResultOK
 }
 
 func (s *Server) authzMasks(w http.ResponseWriter, r *http.Request) {
@@ -1015,8 +1015,8 @@ func (s *Server) authzMasks(w http.ResponseWriter, r *http.Request) {
 		writeInternalErr(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"masks": masks})
 	result = AuthzResultOK
+	writeJSON(w, http.StatusOK, map[string]any{"masks": masks})
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
