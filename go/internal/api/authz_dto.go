@@ -7,7 +7,7 @@ import (
 )
 
 // userAuthzResourceDTO is the JSON response row for
-// GET /domains/{domainID}/users/{userID}/authz/resources.
+// GET /api/v1/domains/{domainID}/users/{userID}/authz/resources.
 // OpenAPI schema: UserAuthzResource.
 type userAuthzResourceDTO struct {
 	ResourceID    string `json:"resource_id"`
@@ -15,7 +15,7 @@ type userAuthzResourceDTO struct {
 }
 
 // groupAuthzResourceDTO is the JSON response row for
-// GET /domains/{domainID}/groups/{groupID}/authz/resources.
+// GET /api/v1/domains/{domainID}/groups/{groupID}/authz/resources.
 // OpenAPI schema: GroupAuthzResource.
 type groupAuthzResourceDTO struct {
 	ResourceID string `json:"resource_id"`
@@ -23,7 +23,7 @@ type groupAuthzResourceDTO struct {
 }
 
 // resourceAuthzUserDTO is the JSON response row for
-// GET /domains/{domainID}/resources/{resourceID}/authz/users.
+// GET /api/v1/domains/{domainID}/resources/{resourceID}/authz/users.
 // OpenAPI schema: ResourceAuthzUser.
 type resourceAuthzUserDTO struct {
 	UserID        string `json:"user_id"`
@@ -31,7 +31,7 @@ type resourceAuthzUserDTO struct {
 }
 
 // resourceAuthzGroupDTO is the JSON response row for
-// GET /domains/{domainID}/resources/{resourceID}/authz/groups.
+// GET /api/v1/domains/{domainID}/resources/{resourceID}/authz/groups.
 // OpenAPI schema: ResourceAuthzGroup.
 type resourceAuthzGroupDTO struct {
 	GroupID string `json:"group_id"`
