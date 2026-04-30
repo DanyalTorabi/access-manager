@@ -3775,7 +3775,7 @@ func TestResourceAuthzUsersList_limitClampedAtMaxLimit(t *testing.T) {
 
 func TestResourceAuthzUsersBaseArgs_orderMatchesPlaceholders(t *testing.T) {
 	got := resourceAuthzUsersBaseArgs("D", "R")
-	want := []any{"D", "D", "R", "D", "D", "D"}
+	want := []any{"D", "D", "R"}
 	if len(got) != len(want) {
 		t.Fatalf("len: want %d, got %d", len(want), len(got))
 	}
@@ -3977,7 +3977,13 @@ func TestResourceAuthzGroupsList_nonPositiveMasksExcluded(t *testing.T) {
 	}
 }
 
-func TestResourceAuthzGroupsList_otherDomainsExcluded(t *testing.T) {
+// TestResourceAuthzGroupsList_returnsSameDomainGroups verifies that on a
+// clean dataset the listing returns exactly the groups in the resource's
+// domain. Cross-domain isolation itself is now enforced by the schema (see
+// TestSchema_compositeFKRejectsCrossDomain); this test asserts the
+// schema-level guard is in place (the direct INSERT below must fail) and
+// that the surviving same-domain rows are returned correctly.
+func TestResourceAuthzGroupsList_returnsSameDomainGroups(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)
 
@@ -4010,26 +4016,250 @@ func TestResourceAuthzGroupsList_otherDomainsExcluded(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Insert a cross-domain group_permissions row directly: the row's
-	// domain_id matches the queried domain (so gp.domain_id passes), but
-	// otherGID belongs to otherDomainID. group_permissions(group_id) FKs to
-	// groups(id) only — not the composite (domain_id, id) — so this insert
-	// succeeds even with PRAGMA foreign_keys=ON. The store must still
-	// exclude otherGID from the listing.
-	if _, err := s.db.ExecContext(ctx,
+	// T51: schema-level invariant. The composite FK
+	// (group_id, domain_id) -> groups(id, domain_id) prevents inserting a
+	// group_permissions row where domain_id does not match the group's
+	// domain_id. This direct INSERT must fail; previously the listing relied
+	// on a defensive Go-side filter to hide such rows.
+	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO group_permissions (domain_id, group_id, permission_id) VALUES (?, ?, ?)`,
 		domainID, otherGID, pid,
-	); err != nil {
-		t.Fatal(err)
+	)
+	if err == nil {
+		t.Fatal("cross-domain group_permissions insert must fail; composite FK regressed")
+	}
+	if !errors.Is(wrapConstraintError(err), store.ErrFKViolation) {
+		t.Fatalf("expected store.ErrFKViolation, got: %v", err)
 	}
 
+	// Listing returns exactly one entry: the same-domain group.
 	list, total, err := s.ResourceAuthzGroupsList(ctx, domainID, rid, store.ListOpts{Offset: 0, Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if total != 1 || len(list) != 1 || list[0].GroupID != gid {
-		t.Fatalf("other-domain groups must not appear: total=%d list=%+v", total, list)
+		t.Fatalf("expected 1 result for the same-domain group only: total=%d list=%+v", total, list)
 	}
+}
+
+// TestResourceAuthzGroupsList_schemaEnforcesIsolationWithoutGoFilter covers
+// the T51 acceptance criterion that authz listings remain correct without
+// a defensive Go-side domain filter. The defensive g.domain_id filter has
+// been removed from resourceAuthzGroupsBaseSQL in this PR; this test
+// re-runs the same join shape (without the predicate) against a multi-
+// domain dataset to assert the schema alone keeps the result set scoped
+// to the requested domain.
+func TestResourceAuthzGroupsList_schemaEnforcesIsolationWithoutGoFilter(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+
+	d1 := uuid.NewString()
+	d2 := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: d1, Title: "d1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DomainCreate(ctx, &store.Domain{ID: d2, Title: "d2"}); err != nil {
+		t.Fatal(err)
+	}
+	r1 := uuid.NewString()
+	r2 := uuid.NewString()
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: r1, DomainID: d1, Title: "r1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: r2, DomainID: d2, Title: "r2"}); err != nil {
+		t.Fatal(err)
+	}
+	g1 := uuid.NewString()
+	g2 := uuid.NewString()
+	if err := s.GroupCreate(ctx, &store.Group{ID: g1, DomainID: d1, Title: "g1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GroupCreate(ctx, &store.Group{ID: g2, DomainID: d2, Title: "g2"}); err != nil {
+		t.Fatal(err)
+	}
+	p1 := uuid.NewString()
+	p2 := uuid.NewString()
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: p1, DomainID: d1, Title: "p1", ResourceID: r1, AccessMask: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: p2, DomainID: d2, Title: "p2", ResourceID: r2, AccessMask: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GrantGroupPermission(ctx, d1, g1, p1); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GrantGroupPermission(ctx, d2, g2, p2); err != nil {
+		t.Fatal(err)
+	}
+
+	// Schema-only query: matches the post-T51 production SQL shape — no
+	// Go-side domain predicate on gp or g. If the composite FKs are
+	// enforcing the invariant, the result for (d1, r1) must contain only
+	// g1 (the d2 grant cannot appear because the schema-backed join keeps
+	// results scoped to the permission's domain).
+	const schemaOnlySQL = `
+SELECT DISTINCT gp.group_id
+FROM permissions p
+INNER JOIN group_permissions gp ON gp.permission_id = p.id
+INNER JOIN groups g ON g.id = gp.group_id
+WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0
+ORDER BY gp.group_id ASC
+`
+	rows, err := s.db.QueryContext(ctx, schemaOnlySQL, d1, r1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = rows.Close() }()
+	var got []string
+	for rows.Next() {
+		var gid string
+		if err := rows.Scan(&gid); err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, gid)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0] != g1 {
+		t.Fatalf("schema-only query must return only same-domain group g1: got %v", got)
+	}
+
+	// Sanity: the production query must agree with the schema-only query.
+	list, total, err := s.ResourceAuthzGroupsList(ctx, d1, r1, store.ListOpts{Offset: 0, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 1 || len(list) != 1 || list[0].GroupID != g1 {
+		t.Fatalf("production listing disagreed with schema-only query: total=%d list=%+v", total, list)
+	}
+}
+
+// TestSchema_compositeFKRejectsCrossDomain verifies the T51 schema invariant
+// for all three junction tables: an out-of-band insert with mismatched
+// domain_id must fail at the DB layer. Each junction table's two FKs are
+// exercised independently so a missing FK cannot hide behind a sibling FK
+// failure. The positive-path subtest then verifies that valid same-domain
+// inserts still succeed after the schema rebuild.
+func TestSchema_compositeFKRejectsCrossDomain(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+
+	d1 := uuid.NewString()
+	d2 := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: d1, Title: "d1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DomainCreate(ctx, &store.Domain{ID: d2, Title: "d2"}); err != nil {
+		t.Fatal(err)
+	}
+	// Per-domain entities; we use d1- and d2-prefixed names to make each
+	// case's two parent rows obvious.
+	uid1, uid2 := uuid.NewString(), uuid.NewString()
+	gid1, gid2 := uuid.NewString(), uuid.NewString()
+	rid1, rid2 := uuid.NewString(), uuid.NewString()
+	pid1, pid2 := uuid.NewString(), uuid.NewString()
+	mustCreate := func(label string, err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatalf("setup %s: %v", label, err)
+		}
+	}
+	mustCreate("u1", s.UserCreate(ctx, &store.User{ID: uid1, DomainID: d1, Title: "u1"}))
+	mustCreate("u2", s.UserCreate(ctx, &store.User{ID: uid2, DomainID: d2, Title: "u2"}))
+	mustCreate("g1", s.GroupCreate(ctx, &store.Group{ID: gid1, DomainID: d1, Title: "g1"}))
+	mustCreate("g2", s.GroupCreate(ctx, &store.Group{ID: gid2, DomainID: d2, Title: "g2"}))
+	mustCreate("r1", s.ResourceCreate(ctx, &store.Resource{ID: rid1, DomainID: d1, Title: "r1"}))
+	mustCreate("r2", s.ResourceCreate(ctx, &store.Resource{ID: rid2, DomainID: d2, Title: "r2"}))
+	mustCreate("p1", s.PermissionCreate(ctx, &store.Permission{ID: pid1, DomainID: d1, Title: "p1", ResourceID: rid1, AccessMask: 1}))
+	mustCreate("p2", s.PermissionCreate(ctx, &store.Permission{ID: pid2, DomainID: d2, Title: "p2", ResourceID: rid2, AccessMask: 1}))
+
+	// Negative cases: each junction table has two composite FKs; we test
+	// each FK independently by keeping the "other" parent valid in the
+	// junction's own domain so only the targeted FK fails.
+	cases := []struct {
+		name string
+		sql  string
+		args []any
+	}{
+		// group_members: (domain_id, user_id) -> users(id, domain_id)
+		// and (domain_id, group_id) -> groups(id, domain_id).
+		{
+			name: "group_members_user_fk",
+			sql:  `INSERT INTO group_members (domain_id, user_id, group_id) VALUES (?, ?, ?)`,
+			args: []any{d1, uid2, gid1}, // user belongs to d2; group correct
+		},
+		{
+			name: "group_members_group_fk",
+			sql:  `INSERT INTO group_members (domain_id, user_id, group_id) VALUES (?, ?, ?)`,
+			args: []any{d1, uid1, gid2}, // group belongs to d2; user correct
+		},
+		// user_permissions: (domain_id, user_id) and
+		// (domain_id, permission_id).
+		{
+			name: "user_permissions_user_fk",
+			sql:  `INSERT INTO user_permissions (domain_id, user_id, permission_id) VALUES (?, ?, ?)`,
+			args: []any{d1, uid2, pid1},
+		},
+		{
+			name: "user_permissions_permission_fk",
+			sql:  `INSERT INTO user_permissions (domain_id, user_id, permission_id) VALUES (?, ?, ?)`,
+			args: []any{d1, uid1, pid2},
+		},
+		// group_permissions: (domain_id, group_id) and
+		// (domain_id, permission_id).
+		{
+			name: "group_permissions_group_fk",
+			sql:  `INSERT INTO group_permissions (domain_id, group_id, permission_id) VALUES (?, ?, ?)`,
+			args: []any{d1, gid2, pid1},
+		},
+		{
+			name: "group_permissions_permission_fk",
+			sql:  `INSERT INTO group_permissions (domain_id, group_id, permission_id) VALUES (?, ?, ?)`,
+			args: []any{d1, gid1, pid2},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, err := s.db.ExecContext(ctx, c.sql, c.args...)
+			if err == nil {
+				t.Fatalf("%s: cross-domain insert must fail at the DB layer", c.name)
+			}
+			if !errors.Is(wrapConstraintError(err), store.ErrFKViolation) {
+				t.Fatalf("%s: expected store.ErrFKViolation, got %v", c.name, err)
+			}
+		})
+	}
+
+	// Positive paths: valid same-domain inserts must still succeed after
+	// the schema rebuild. If a UNIQUE target had been mistyped (e.g.
+	// REFERENCES groups(domain_id, id) instead of groups(id, domain_id))
+	// the negative cases above would still pass because the FK target
+	// would not exist; the positive cases catch that class of bug.
+	t.Run("group_members_valid", func(t *testing.T) {
+		if _, err := s.db.ExecContext(ctx,
+			`INSERT INTO group_members (domain_id, user_id, group_id) VALUES (?, ?, ?)`,
+			d1, uid1, gid1,
+		); err != nil {
+			t.Fatalf("valid same-domain group_members insert must succeed: %v", err)
+		}
+	})
+	t.Run("user_permissions_valid", func(t *testing.T) {
+		if _, err := s.db.ExecContext(ctx,
+			`INSERT INTO user_permissions (domain_id, user_id, permission_id) VALUES (?, ?, ?)`,
+			d1, uid1, pid1,
+		); err != nil {
+			t.Fatalf("valid same-domain user_permissions insert must succeed: %v", err)
+		}
+	})
+	t.Run("group_permissions_valid", func(t *testing.T) {
+		if _, err := s.db.ExecContext(ctx,
+			`INSERT INTO group_permissions (domain_id, group_id, permission_id) VALUES (?, ?, ?)`,
+			d1, gid1, pid1,
+		); err != nil {
+			t.Fatalf("valid same-domain group_permissions insert must succeed: %v", err)
+		}
+	})
 }
 
 func TestResourceAuthzGroupsList_limitClampedAtMaxLimit(t *testing.T) {

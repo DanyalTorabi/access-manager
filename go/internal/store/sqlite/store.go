@@ -895,16 +895,21 @@ func (s *Store) RevokeGroupPermission(ctx context.Context, domainID, groupID, pe
 	return nil
 }
 
+// userEffectivePermissionPredicateSQL filters permissions p down to those
+// effectively held by a given user (direct grant OR via group membership).
+// T51 composite FKs guarantee that user_permissions / group_permissions /
+// group_members rows cannot reference cross-domain parents, so no
+// defensive domain_id filter is needed in the sub-EXISTS clauses.
 const userEffectivePermissionPredicateSQL = `
 AND (
 	EXISTS (
 		SELECT 1 FROM user_permissions up
-		WHERE up.permission_id = p.id AND up.domain_id = ? AND up.user_id = ?
+		WHERE up.permission_id = p.id AND up.user_id = ?
 	)
 	OR EXISTS (
 		SELECT 1 FROM group_permissions gp
 		INNER JOIN group_members gm ON gm.group_id = gp.group_id AND gm.user_id = ?
-		WHERE gp.permission_id = p.id AND gp.domain_id = ? AND gm.domain_id = ?
+		WHERE gp.permission_id = p.id
 	)
 )
 `
@@ -914,13 +919,17 @@ SELECT p.access_mask FROM permissions p
 WHERE p.domain_id = ? AND p.resource_id = ?
 ` + userEffectivePermissionPredicateSQL
 
+// userAuthzResourcesBaseSQL selects resources where the user has a non-
+// zero effective mask via direct grants OR group membership. T51 composite
+// FKs enforce cross-domain isolation at the schema level, so no
+// defensive domain_id filters are layered on top of the join.
 const userAuthzResourcesBaseSQL = `
 FROM permissions p
 WHERE p.domain_id = ? AND p.access_mask > 0
 ` + userEffectivePermissionPredicateSQL
 
-func userEffectivePermissionArgs(domainID, userID string) []any {
-	return []any{domainID, userID, userID, domainID, domainID}
+func userEffectivePermissionArgs(userID string) []any {
+	return []any{userID, userID}
 }
 
 func inPlaceholders(n int) (string, error) {
@@ -965,7 +974,7 @@ func (s *Store) UserAuthzResourcesList(ctx context.Context, domainID, userID str
 		return nil, 0, err
 	}
 
-	predicateArgs := userEffectivePermissionArgs(domainID, userID)
+	predicateArgs := userEffectivePermissionArgs(userID)
 	countArgs := append([]any{domainID}, predicateArgs...)
 	var total int64
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(DISTINCT p.resource_id) `+userAuthzResourcesBaseSQL, countArgs...).Scan(&total); err != nil {
@@ -1035,12 +1044,13 @@ func (s *Store) UserAuthzResourcesList(ctx context.Context, domainID, userID str
 }
 
 // groupAuthzResourcesBaseSQL joins permissions with group_permissions.
-// domain_id appears twice: once for p (permissions row) and once for gp
-// (group_permissions row) because both tables carry domain_id independently.
+// p.domain_id is the primary scope; T51 composite FKs guarantee that
+// matching group_permissions rows share the same domain, so no
+// gp.domain_id filter is needed.
 const groupAuthzResourcesBaseSQL = `
 FROM permissions p
 INNER JOIN group_permissions gp ON gp.permission_id = p.id
-WHERE p.domain_id = ? AND gp.domain_id = ? AND gp.group_id = ? AND p.access_mask > 0
+WHERE p.domain_id = ? AND gp.group_id = ? AND p.access_mask > 0
 `
 
 func (s *Store) GroupAuthzResourcesList(ctx context.Context, domainID, groupID string, opts store.ListOpts) ([]store.GroupAuthzResource, int64, error) {
@@ -1060,7 +1070,7 @@ func (s *Store) GroupAuthzResourcesList(ctx context.Context, domainID, groupID s
 		return nil, 0, err
 	}
 
-	baseArgs := []any{domainID, domainID, groupID}
+	baseArgs := []any{domainID, groupID}
 
 	var total int64
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(DISTINCT p.resource_id) `+groupAuthzResourcesBaseSQL, baseArgs...).Scan(&total); err != nil {
@@ -1106,9 +1116,9 @@ func (s *Store) GroupAuthzResourcesList(ctx context.Context, domainID, groupID s
 	}
 	maskSQL := `SELECT p.resource_id, p.access_mask FROM permissions p ` + // #nosec G202
 		`INNER JOIN group_permissions gp ON gp.permission_id = p.id ` +
-		`WHERE p.domain_id = ? AND gp.domain_id = ? AND gp.group_id = ? AND p.resource_id IN (` + placeholders + `) AND p.access_mask > 0`
-	maskArgs := make([]any, 0, 3+len(resourceIDs))
-	maskArgs = append(maskArgs, domainID, domainID, groupID)
+		`WHERE p.domain_id = ? AND gp.group_id = ? AND p.resource_id IN (` + placeholders + `) AND p.access_mask > 0`
+	maskArgs := make([]any, 0, 2+len(resourceIDs))
+	maskArgs = append(maskArgs, domainID, groupID)
 	for _, rid := range resourceIDs {
 		maskArgs = append(maskArgs, rid)
 	}
@@ -1144,19 +1154,10 @@ func (s *Store) GroupAuthzResourcesList(ctx context.Context, domainID, groupID s
 // the groups table to select groups holding at least one direct
 // group_permissions grant on (domainID, resourceID).
 //
-// We must filter on BOTH gp.domain_id AND g.domain_id: the
-// group_permissions(group_id) FK references only groups(id) (not the
-// composite (domain_id, id)), and GrantGroupPermission does not validate
-// domain membership. Without the g.domain_id filter, a group from another
-// domain that was granted a permission under this domain (via an
-// out-of-band insert or future cross-domain bug) would leak into the
-// listing. domain_id therefore appears three times: once for p
-// (permissions), once for gp (group_permissions), once for g (groups).
-//
-// TODO(T51): tighten the schema with a composite FK
-// (domain_id, group_id) -> groups(domain_id, id) so the redundant
-// g.domain_id filter can be dropped from this and the other authz
-// listings. See plan/phase-6/T51-composite-fk-cross-domain.md.
+// T51 composite FKs ((group_id, domain_id) -> groups(id, domain_id) and
+// (permission_id, domain_id) -> permissions(id, domain_id)) enforce
+// cross-domain isolation at the schema layer, so no defensive
+// gp.domain_id / g.domain_id filters are needed on the join.
 //
 // p.access_mask > 0 mirrors GroupAuthzResourcesList and
 // ResourceAuthzUsersList: zero masks are no-ops, and any negative legacy
@@ -1166,7 +1167,7 @@ const resourceAuthzGroupsBaseSQL = `
 FROM permissions p
 INNER JOIN group_permissions gp ON gp.permission_id = p.id
 INNER JOIN groups g ON g.id = gp.group_id
-WHERE p.domain_id = ? AND gp.domain_id = ? AND g.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0
+WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0
 `
 
 func (s *Store) ResourceAuthzGroupsList(ctx context.Context, domainID, resourceID string, opts store.ListOpts) ([]store.ResourceAuthzGroup, int64, error) {
@@ -1186,7 +1187,7 @@ func (s *Store) ResourceAuthzGroupsList(ctx context.Context, domainID, resourceI
 		return nil, 0, err
 	}
 
-	baseArgs := []any{domainID, domainID, domainID, resourceID}
+	baseArgs := []any{domainID, resourceID}
 
 	// COUNT and the page SELECT below are issued as separate statements,
 	// not wrapped in a read transaction. Under concurrent writes the page
@@ -1239,10 +1240,10 @@ func (s *Store) ResourceAuthzGroupsList(ctx context.Context, domainID, resourceI
 	maskSQL := `SELECT gp.group_id, p.access_mask FROM permissions p ` + // #nosec G202
 		`INNER JOIN group_permissions gp ON gp.permission_id = p.id ` +
 		`INNER JOIN groups g ON g.id = gp.group_id ` +
-		`WHERE p.domain_id = ? AND gp.domain_id = ? AND g.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0 ` +
+		`WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0 ` +
 		`AND gp.group_id IN (` + placeholders + `)`
-	maskArgs := make([]any, 0, 4+len(groupIDs))
-	maskArgs = append(maskArgs, domainID, domainID, domainID, resourceID)
+	maskArgs := make([]any, 0, 2+len(groupIDs))
+	maskArgs = append(maskArgs, domainID, resourceID)
 	for _, gid := range groupIDs {
 		maskArgs = append(maskArgs, gid)
 	}
@@ -1283,17 +1284,19 @@ func (s *Store) ResourceAuthzGroupsList(ctx context.Context, domainID, resourceI
 // from out-of-band/legacy writes (PermissionCreate validates the range), so
 // silently ignoring them in the listing is intentional and matches T42/T43.
 //
-// Placeholder map (six ?'s, all built from {domainID, resourceID}; keep this
+// Placeholder map (three ?'s, built from {domainID, resourceID}; keep this
 // table in sync with resourceAuthzUsersBaseArgs):
 //
 //	1: u.domain_id   = domainID
 //	2: p.domain_id   = domainID
 //	3: p.resource_id = resourceID
-//	4: up.domain_id  = domainID   (direct user grant branch)
-//	5: gp.domain_id  = domainID   (group-inherited grant branch)
-//	6: gm.domain_id  = domainID   (group-membership domain pin)
 //
-// Example with domainID="D" / resourceID="R": all six args are ["D","D","R","D","D","D"].
+// Example with domainID="D" / resourceID="R": args are ["D","D","R"].
+//
+// T51 composite FKs guarantee that user_permissions / group_permissions /
+// group_members rows cannot reference cross-domain parents, so no
+// defensive up.domain_id / gp.domain_id / gm.domain_id filter is needed
+// in the sub-EXISTS clauses.
 const resourceAuthzUsersBaseSQL = `
 FROM users u
 WHERE u.domain_id = ? AND EXISTS (
@@ -1302,22 +1305,22 @@ WHERE u.domain_id = ? AND EXISTS (
 	AND (
 		EXISTS (
 			SELECT 1 FROM user_permissions up
-			WHERE up.permission_id = p.id AND up.domain_id = ? AND up.user_id = u.id
+			WHERE up.permission_id = p.id AND up.user_id = u.id
 		)
 		OR EXISTS (
 			SELECT 1 FROM group_permissions gp
 			INNER JOIN group_members gm ON gm.group_id = gp.group_id AND gm.user_id = u.id
-			WHERE gp.permission_id = p.id AND gp.domain_id = ? AND gm.domain_id = ?
+			WHERE gp.permission_id = p.id
 		)
 	)
 )
 `
 
-// resourceAuthzUsersBaseArgs returns the six positional args for
+// resourceAuthzUsersBaseArgs returns the three positional args for
 // resourceAuthzUsersBaseSQL in placeholder order. Centralised so callers
 // (count + page-select) cannot drift out of sync with the SQL.
 func resourceAuthzUsersBaseArgs(domainID, resourceID string) []any {
-	return []any{domainID, domainID, resourceID, domainID, domainID, domainID}
+	return []any{domainID, domainID, resourceID}
 }
 
 func (s *Store) ResourceAuthzUsersList(ctx context.Context, domainID, resourceID string, opts store.ListOpts) ([]store.ResourceAuthzUser, int64, error) {
@@ -1393,10 +1396,10 @@ func (s *Store) ResourceAuthzUsersList(ctx context.Context, domainID, resourceID
 	// Direct user grants on this resource.
 	directSQL := `SELECT up.user_id, p.access_mask FROM user_permissions up ` + // #nosec G202
 		`INNER JOIN permissions p ON p.id = up.permission_id ` +
-		`WHERE up.domain_id = ? AND p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0 ` +
+		`WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0 ` +
 		`AND up.user_id IN (` + placeholders + `)`
-	directArgs := make([]any, 0, 3+len(userIDs))
-	directArgs = append(directArgs, domainID, domainID, resourceID)
+	directArgs := make([]any, 0, 2+len(userIDs))
+	directArgs = append(directArgs, domainID, resourceID)
 	for _, uid := range userIDs {
 		directArgs = append(directArgs, uid)
 	}
@@ -1408,10 +1411,10 @@ func (s *Store) ResourceAuthzUsersList(ctx context.Context, domainID, resourceID
 	indirectSQL := `SELECT gm.user_id, p.access_mask FROM group_members gm ` + // #nosec G202
 		`INNER JOIN group_permissions gp ON gp.group_id = gm.group_id ` +
 		`INNER JOIN permissions p ON p.id = gp.permission_id ` +
-		`WHERE gm.domain_id = ? AND gp.domain_id = ? AND p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0 ` +
+		`WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0 ` +
 		`AND gm.user_id IN (` + placeholders + `)`
-	indirectArgs := make([]any, 0, 4+len(userIDs))
-	indirectArgs = append(indirectArgs, domainID, domainID, domainID, resourceID)
+	indirectArgs := make([]any, 0, 2+len(userIDs))
+	indirectArgs = append(indirectArgs, domainID, resourceID)
 	for _, uid := range userIDs {
 		indirectArgs = append(indirectArgs, uid)
 	}
@@ -1444,9 +1447,9 @@ func scanUserMasks(ctx context.Context, s *Store, query string, args []any, into
 }
 
 func (s *Store) PermissionMasksForUserResource(ctx context.Context, domainID, userID, resourceID string) ([]uint64, error) {
-	args := make([]any, 0, 2+5)
+	args := make([]any, 0, 2+2)
 	args = append(args, domainID, resourceID)
-	args = append(args, userEffectivePermissionArgs(domainID, userID)...)
+	args = append(args, userEffectivePermissionArgs(userID)...)
 	rows, err := s.db.QueryContext(ctx, effectiveMaskSQL, args...)
 	if err != nil {
 		return nil, err
