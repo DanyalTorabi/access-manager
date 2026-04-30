@@ -28,9 +28,8 @@ Implement a PostgreSQL-backed `store.Store` in `go/internal/store/postgres/`, fo
 1. **Dependency**: Add the PostgreSQL driver to `go/go.mod`. Prefer `github.com/lib/pq` (pure Go) unless the team has a preference for `pgx`. Avoid adding both.
 2. **Open + migrate**: Port `sqlite/db.go` → `postgres/db.go`. The `Open` function sets sensible connection pool parameters (`SetMaxOpenConns`, `SetConnMaxLifetime`). Port `sqlite/migrate.go` → `postgres/migrate.go`; if the existing runner works with postgres (`pq`), reuse it, otherwise write a minimal file-scanning loop.
 3. **Store implementation**: Port all methods from `sqlite/store.go`. Key translation points:
-   - `$1, $2, …` placeholders instead of `?`.
-   - `INSERT INTO … RETURNING id` for cases where SQLite uses `LastInsertId` (not available in postgres).
-   - `SERIAL` / `GENERATED ALWAYS AS IDENTITY` is not used here (IDs are UUIDs/TEXT).
+   - `$1, $2, …` placeholders instead of `?`. Implement a package-level `rebind(query string) string` helper that replaces each `?` with `$N` (incrementing N). Call `rebind()` on every query string before executing so the rest of the store code remains structurally identical to `sqlite/store.go`.
+   - IDs are UUIDs generated in Go before insertion — `RETURNING id` and `LastInsertId` are never used.
    - Error mapping: `pq.Error` codes → `store.ErrConflict` (code `23505`), `store.ErrFKViolation` (code `23503`), `store.ErrNotFound` (sql.ErrNoRows).
    - `sql.NullString` for nullable `parent_group_id`.
    - Cycle detection in `GroupSetParent`: same bounded loop, dialect-agnostic Go code.
