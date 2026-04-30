@@ -5,13 +5,10 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/dtorabi/access-manager/internal/store"
-	sqlstore "github.com/dtorabi/access-manager/internal/store/sqlite"
-	"github.com/dtorabi/access-manager/internal/testutil"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -231,20 +228,8 @@ func TestMetrics_authzMasksValidationErrorIncrementsErr(t *testing.T) {
 // can assert authz error-path counters. See T50.
 func newBrokenTestAPIWithMetrics(t *testing.T) (*httptest.Server, *prometheus.Registry) {
 	t.Helper()
-	db, err := sqlstore.Open("file:" + filepath.Join(t.TempDir(), "broken.db") + "?_pragma=foreign_keys(1)")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := sqlstore.MigrateUp(db, testutil.SQLiteMigrationsDir(t)); err != nil {
-		_ = db.Close()
-		t.Fatal(err)
-	}
-	st := sqlstore.New(db)
-	_ = db.Close()
-	srv := &Server{Store: st}
 	reg := prometheus.NewRegistry()
-	ts := httptest.NewServer(srv.Router(reg, reg))
-	t.Cleanup(ts.Close)
+	ts := newBrokenTestAPIWithRegistry(t, reg)
 	return ts, reg
 }
 
