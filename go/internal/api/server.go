@@ -30,11 +30,16 @@ type Server struct {
 	metrics *Metrics
 }
 
-// Metrics returns the Prometheus collectors registered by the most recent
-// Router call, or nil if Router was called with reg == nil. Callers can use
-// it to wire store-level hooks (e.g. negative-mask counter) after Router
-// has built the registry.
-func (s *Server) Metrics() *Metrics { return s.metrics }
+// NegativeMaskCounter returns the store_negative_mask_observed_total
+// Prometheus counter, or nil when metrics are disabled. It is the narrow
+// accessor used by cmd/server to wire the SQLite store's negative-mask
+// hook without exposing the full Metrics struct.
+func (s *Server) NegativeMaskCounter() prometheus.Counter {
+	if s.metrics == nil {
+		return nil
+	}
+	return s.metrics.NegativeMaskTotal
+}
 
 // Router builds the chi router. reg and gather supply the Prometheus registry
 // for metrics middleware and the /metrics endpoint. Pass nil for both to
