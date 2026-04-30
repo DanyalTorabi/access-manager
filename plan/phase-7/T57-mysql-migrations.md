@@ -34,7 +34,7 @@ Create the three MySQL/MariaDB migration files that mirror the SQLite set, trans
    - Drop and re-add composite FKs on the three junction tables.
    - Replace `RAISE(ABORT, …)` with a stored procedure/event-free approach using `SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '…';` inside a before-insert trigger, or a stored procedure pre-check — choose whichever is more compatible across MySQL 8 / MariaDB 10.6.
 4. Write corresponding `.down.sql` for each migration.
-5. Verify migrations apply against a local MySQL 8 container (or via the test helper in T61).
+5. Verify migrations apply against a local MySQL 8 container (see T61 for docker-compose service wiring; for T57 a standalone `docker run mysql:8` is sufficient).
 
 ## Acceptance criteria
 
