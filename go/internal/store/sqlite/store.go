@@ -1117,19 +1117,12 @@ func (s *Store) GroupAuthzResourcesList(ctx context.Context, domainID, groupID s
 // the groups table to select groups holding at least one direct
 // group_permissions grant on (domainID, resourceID).
 //
-// We must filter on BOTH gp.domain_id AND g.domain_id: the
-// group_permissions(group_id) FK references only groups(id) (not the
-// composite (domain_id, id)), and GrantGroupPermission does not validate
-// domain membership. Without the g.domain_id filter, a group from another
-// domain that was granted a permission under this domain (via an
-// out-of-band insert or future cross-domain bug) would leak into the
-// listing. domain_id therefore appears three times: once for p
-// (permissions), once for gp (group_permissions), once for g (groups).
-//
-// TODO(T51): tighten the schema with a composite FK
-// (domain_id, group_id) -> groups(domain_id, id) so the redundant
-// g.domain_id filter can be dropped from this and the other authz
-// listings. See plan/phase-6/T51-composite-fk-cross-domain.md.
+// As of T51, the schema enforces composite FKs
+// (group_id, domain_id) -> groups(id, domain_id) and
+// (permission_id, domain_id) -> permissions(id, domain_id), so cross-domain
+// rows can no longer exist. The defensive g.domain_id filter is kept here
+// (and the parallel u.domain_id / p.domain_id filters in the other authz
+// listings) until a follow-up drops them in lockstep across all queries.
 //
 // p.access_mask > 0 mirrors GroupAuthzResourcesList and
 // ResourceAuthzUsersList: zero masks are no-ops, and any negative legacy

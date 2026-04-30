@@ -4010,25 +4010,95 @@ func TestResourceAuthzGroupsList_otherDomainsExcluded(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Insert a cross-domain group_permissions row directly: the row's
-	// domain_id matches the queried domain (so gp.domain_id passes), but
-	// otherGID belongs to otherDomainID. group_permissions(group_id) FKs to
-	// groups(id) only — not the composite (domain_id, id) — so this insert
-	// succeeds even with PRAGMA foreign_keys=ON. The store must still
-	// exclude otherGID from the listing.
-	if _, err := s.db.ExecContext(ctx,
+	// T51: schema-level invariant. The composite FK
+	// (group_id, domain_id) -> groups(id, domain_id) prevents inserting a
+	// group_permissions row where domain_id does not match the group's
+	// domain_id. This direct INSERT must fail; previously the listing relied
+	// on a defensive Go-side filter to hide such rows.
+	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO group_permissions (domain_id, group_id, permission_id) VALUES (?, ?, ?)`,
 		domainID, otherGID, pid,
-	); err != nil {
-		t.Fatal(err)
+	)
+	if err == nil {
+		t.Fatal("cross-domain group_permissions insert must fail; composite FK regressed")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "foreign key") {
+		t.Fatalf("expected foreign-key violation, got: %v", err)
 	}
 
+	// Listing remains correct on a clean dataset (no cross-domain rows).
 	list, total, err := s.ResourceAuthzGroupsList(ctx, domainID, rid, store.ListOpts{Offset: 0, Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if total != 1 || len(list) != 1 || list[0].GroupID != gid {
-		t.Fatalf("other-domain groups must not appear: total=%d list=%+v", total, list)
+		t.Fatalf("listing: total=%d list=%+v", total, list)
+	}
+}
+
+// TestSchema_compositeFKRejectsCrossDomain verifies the T51 schema invariant
+// for all three junction tables: an out-of-band insert with mismatched
+// domain_id must fail at the DB layer.
+func TestSchema_compositeFKRejectsCrossDomain(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+
+	d1 := uuid.NewString()
+	d2 := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: d1, Title: "d1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DomainCreate(ctx, &store.Domain{ID: d2, Title: "d2"}); err != nil {
+		t.Fatal(err)
+	}
+	uid := uuid.NewString()
+	if err := s.UserCreate(ctx, &store.User{ID: uid, DomainID: d2, Title: "u"}); err != nil {
+		t.Fatal(err)
+	}
+	gid := uuid.NewString()
+	if err := s.GroupCreate(ctx, &store.Group{ID: gid, DomainID: d2, Title: "g"}); err != nil {
+		t.Fatal(err)
+	}
+	rid := uuid.NewString()
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: d2, Title: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	pid := uuid.NewString()
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: pid, DomainID: d2, Title: "p", ResourceID: rid, AccessMask: 1}); err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		name string
+		sql  string
+		args []any
+	}{
+		{
+			name: "group_members_user_cross_domain",
+			sql:  `INSERT INTO group_members (domain_id, user_id, group_id) VALUES (?, ?, ?)`,
+			args: []any{d1, uid, gid},
+		},
+		{
+			name: "user_permissions_user_cross_domain",
+			sql:  `INSERT INTO user_permissions (domain_id, user_id, permission_id) VALUES (?, ?, ?)`,
+			args: []any{d1, uid, pid},
+		},
+		{
+			name: "group_permissions_group_cross_domain",
+			sql:  `INSERT INTO group_permissions (domain_id, group_id, permission_id) VALUES (?, ?, ?)`,
+			args: []any{d1, gid, pid},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, err := s.db.ExecContext(ctx, c.sql, c.args...)
+			if err == nil {
+				t.Fatalf("%s: cross-domain insert must fail at the DB layer", c.name)
+			}
+			if !strings.Contains(strings.ToLower(err.Error()), "foreign key") {
+				t.Fatalf("%s: expected foreign-key violation, got %v", c.name, err)
+			}
+		})
 	}
 }
 
