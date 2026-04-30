@@ -19,7 +19,7 @@ should be enforced at the schema level.
 ## Deliverables
 
 - New SQLite migration (`go/migrations/sqlite/000003_composite_fk_cross_domain.up.sql`)
-  adding composite `FOREIGN KEY (domain_id, group_id) REFERENCES groups
+  adding composite `FOREIGN KEY (group_id, domain_id) REFERENCES groups
   (id, domain_id)` (and the user / permission equivalents on the three
   junction tables), with a matching `UNIQUE (id, domain_id)` constraint on
   `users`/`groups`/`permissions` so the FK target exists.
