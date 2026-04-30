@@ -177,6 +177,8 @@ func setup(cfg config.Config) (*http.Server, *sql.DB, error) {
 	if c := srv.NegativeMaskCounter(); c != nil {
 		if hs, ok := st.(maskHookSetter); ok {
 			hs.SetNegativeMaskHook(c.Inc)
+		} else {
+			logger.Warn("store does not implement SetNegativeMaskHook; store_negative_mask_observed_total will not increment")
 		}
 	}
 
