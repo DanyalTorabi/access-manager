@@ -37,7 +37,7 @@ func rebind(query string) string {
 	n := 1
 	for _, c := range query {
 		if c == '?' {
-			out.WriteString(fmt.Sprintf("$%d", n))
+			fmt.Fprintf(&out, "$%d", n)
 			n++
 		} else {
 			out.WriteRune(c)
