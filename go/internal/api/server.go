@@ -984,11 +984,14 @@ func writeJSON(w http.ResponseWriter, r *http.Request, status int, v any) {
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		// The response header is already committed; log with request context for
 		// operator visibility so the failing endpoint can be identified.
-		logger.Error("response encode failed",
-			slog.String("err", err.Error()),
-			slog.String("method", r.Method),
-			slog.String("path", r.URL.Path),
-		)
+		attrs := []slog.Attr{slog.String("err", err.Error())}
+		if r != nil {
+			attrs = append(attrs,
+				slog.String("method", r.Method),
+				slog.String("path", r.URL.Path),
+			)
+		}
+		logger.Error("response encode failed", attrs...)
 	}
 }
 
