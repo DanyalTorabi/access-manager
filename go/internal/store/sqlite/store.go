@@ -1123,6 +1123,8 @@ func (s *Store) GroupAuthzResourcesList(ctx context.Context, domainID, groupID s
 // rows can no longer exist. The defensive g.domain_id filter is kept here
 // (and the parallel u.domain_id / p.domain_id filters in the other authz
 // listings) until a follow-up drops them in lockstep across all queries.
+// TODO(#85): drop the defensive g.domain_id filter once the schema-only
+// coverage in #85 lands.
 //
 // p.access_mask > 0 mirrors GroupAuthzResourcesList and
 // ResourceAuthzUsersList: zero masks are no-ops, and any negative legacy
