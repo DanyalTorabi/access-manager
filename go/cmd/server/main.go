@@ -140,7 +140,7 @@ func setup(cfg config.Config) (*http.Server, *sql.DB, error) {
 	// Wire the SQLite store's negative-mask observer to the Prometheus
 	// counter so operators can alert on legacy/out-of-band data. See T50.
 	if m := srv.Metrics(); m != nil {
-		sqlstore.SetNegativeMaskHook(func() { m.NegativeMaskTotal.Inc() })
+		st.SetNegativeMaskHook(func() { m.NegativeMaskTotal.Inc() })
 	}
 
 	return httpSrv, db, nil

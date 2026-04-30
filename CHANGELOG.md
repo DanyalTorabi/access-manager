@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **T50 / #74:** `authz_checks_total` now carries a `result` label (`ok`/`err`) and is incremented **exactly once per request** in `authzCheck` and `authzMasks` (previously success was double-counted and errors single-counted). Grafana dashboard panel updated to break down by `domain_id` and `result`. Existing alert rules or queries that select `authz_checks_total{...}` without aggregating across `result` must add the new label or wrap with `sum without(result)(...)`.
 - **T40 / #55:** `access-types` list default sort changed from `bit` to `title` for consistency with other entities. Clients relying on bit-order should sort client-side.
 - **T34 / #45 (breaking):** List endpoint responses changed from bare JSON arrays to paginated `{"data": [...], "meta": {...}}` envelope. Clients must update to read `data` for items and `meta` for pagination info.
 - Migrated `cmd/server` from `log.Printf` / `log.Fatal` to structured `internal/logger` calls
