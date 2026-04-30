@@ -3977,7 +3977,13 @@ func TestResourceAuthzGroupsList_nonPositiveMasksExcluded(t *testing.T) {
 	}
 }
 
-func TestResourceAuthzGroupsList_otherDomainsExcluded(t *testing.T) {
+// TestResourceAuthzGroupsList_returnsSameDomainGroups verifies that on a
+// clean dataset the listing returns exactly the groups in the resource's
+// domain. Cross-domain isolation itself is now enforced by the schema (see
+// TestSchema_compositeFKRejectsCrossDomain); this test asserts the
+// schema-level guard is in place (the direct INSERT below must fail) and
+// that the surviving same-domain rows are returned correctly.
+func TestResourceAuthzGroupsList_returnsSameDomainGroups(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)
 
@@ -4026,13 +4032,13 @@ func TestResourceAuthzGroupsList_otherDomainsExcluded(t *testing.T) {
 		t.Fatalf("expected store.ErrFKViolation, got: %v", err)
 	}
 
-	// Listing remains correct on a clean dataset (no cross-domain rows).
+	// Listing returns exactly one entry: the same-domain group.
 	list, total, err := s.ResourceAuthzGroupsList(ctx, domainID, rid, store.ListOpts{Offset: 0, Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if total != 1 || len(list) != 1 || list[0].GroupID != gid {
-		t.Fatalf("listing: total=%d list=%+v", total, list)
+		t.Fatalf("expected 1 result for the same-domain group only: total=%d list=%+v", total, list)
 	}
 }
 
