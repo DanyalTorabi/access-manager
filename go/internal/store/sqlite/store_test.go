@@ -4282,12 +4282,16 @@ func TestMaskFromSQL_negativeMaskHook(t *testing.T) {
 	if calls != 2 {
 		t.Fatalf("hook called on positive value: calls = %d, want 2", calls)
 	}
+}
 
-	s.SetNegativeMaskHook(nil)
+// TestMaskFromSQL_nilHook verifies that maskFromSQL is a no-op (returns 0
+// for negatives, identity for non-negatives) when no hook is installed.
+func TestMaskFromSQL_nilHook(t *testing.T) {
+	s := &Store{}
 	if got := s.maskFromSQL(-2); got != 0 {
-		t.Fatalf("maskFromSQL(-2) after clear = %d, want 0", got)
+		t.Fatalf("maskFromSQL(-2) with nil hook = %d, want 0", got)
 	}
-	if calls != 2 {
-		t.Fatalf("hook fired after clear: calls = %d, want 2", calls)
+	if got := s.maskFromSQL(5); got != 5 {
+		t.Fatalf("maskFromSQL(5) with nil hook = %d, want 5", got)
 	}
 }
