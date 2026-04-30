@@ -24,6 +24,18 @@ Measure **authz check** latency and throughput under realistic data sizes: **Go 
 2. Benchmark `EffectiveMask` and full HTTP `/authz/check`.
 3. Compare before/after **T4** if implemented.
 
+## Stress / soak (added)
+
+Beyond micro-benchmarks and short k6 load runs, this ticket also covers **stress and soak** scenarios that intentionally push the server past its happy-path operating point to find breakage modes:
+
+- **Saturation sweep**: increase k6 VUs (e.g. 10 → 50 → 200 → 500) until p99 latency degrades sharply or error rate exceeds 1%. Record the inflection point.
+- **Sustained soak**: run a steady moderate load (e.g. 50 VUs) for 30 minutes — watch for memory growth (`go_memstats_alloc_bytes`), goroutine leaks (`go_goroutines`), and SQLite WAL growth.
+- **Write-heavy stress**: many parallel writers issuing `POST /users`, `POST /permissions`, `PATCH ...` — confirm the store handles `SQLITE_BUSY` (or surfaces `503` / retry hints) instead of returning 500s.
+- **Mixed workload under failure injection**: kill the DB file mid-run (or `chmod 000` it briefly) and confirm the server returns 5xx cleanly and recovers when access is restored, without panicking or hanging.
+- Record results in a `test/load/RESULTS.md` (or appendix in the README) with date, hardware, server version, and parameters so regressions are visible release-over-release. Tie the release-cadence run into the **T66 / #102** release workflow as an optional pre-release gate.
+
+These stress runs are **not** in CI; they are run on demand or nightly via the optional CI job mentioned above.
+
 ## Files / paths
 
 - **Create:** `*_test.go` with `func Benchmark*`, optional `test/load/*`
