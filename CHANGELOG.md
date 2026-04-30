@@ -9,7 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **T50 / #74:** `store_negative_mask_observed_total` Prometheus counter, bumped whenever the SQLite store reads a negative `int64` access mask (via `maskFromSQL`). Wired in `cmd/server` through the new exported `sqlite.SetNegativeMaskHook`. Operators can alert on a non-zero value to detect legacy or out-of-band data. Existing `slog.Warn` is retained.
 - **T45 / #60:** `GET /api/v1/domains/{domainID}/resources/{resourceID}/authz/groups` — paginated list of groups holding at least one direct `group_permissions` grant on the resource. Each item carries `mask` (OR of all direct group grants for that `(domain, group, resource)`). Only `offset` and `limit` are supported; results are always ordered by `group_id` ascending (any `search`/`search_type`/`sort`/`order` query param returns `400`).
+
+### Changed
+
+- **T50 / #74:** `authz_checks_total` now carries a `result` label (`ok`/`err`) and is incremented **exactly once per request** in `authzCheck` and `authzMasks` (previously success was double-counted and errors single-counted). Grafana dashboard panel updated to break down by `domain_id` and `result`.
 - **T44 / #59:** `GET /api/v1/domains/{domainID}/resources/{resourceID}/authz/users` — paginated list of users in the resource's domain with non-zero effective access on the resource. Each item carries `effective_mask` (OR of direct user grants and grants inherited via group membership). Only `offset` and `limit` are supported; results are always ordered by `user_id` ascending (any `search`/`search_type`/`sort`/`order` query param returns `400`).
 - **T43 / #58:** `GET /api/v1/domains/{domainID}/groups/{groupID}/authz/resources` — paginated list of resources where the group has direct `group_permissions`, with `mask` = bitwise OR of all grants for that `(domain, group, resource)`.
 - **`make gosec`** target in `go/Makefile` and root `Makefile` for running `gosec` security scanner.

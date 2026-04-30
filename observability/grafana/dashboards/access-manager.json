@@ -77,14 +77,14 @@
       }
     },
     {
-      "title": "Authz Checks Rate by Domain",
+      "title": "Authz Checks Rate by Domain and Result",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum by (domain_id) (rate(authz_checks_total[1m]))",
-          "legendFormat": "{{ domain_id }}",
+          "expr": "sum by (domain_id, result) (rate(authz_checks_total[1m]))",
+          "legendFormat": "{{ domain_id }} / {{ result }}",
           "refId": "A"
         }
       ],

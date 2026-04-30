@@ -15,8 +15,23 @@ import (
 type Metrics struct {
 	ReqTotal    *prometheus.CounterVec
 	ReqDuration *prometheus.HistogramVec
-	AuthzTotal  *prometheus.CounterVec
+	// AuthzTotal counts authz handler calls (authzCheck, authzMasks). It is
+	// incremented exactly once per request via labels {domain_id, result}
+	// where result is "ok" on success and "err" on any failure path
+	// (validation, parse, store error). See T50.
+	AuthzTotal *prometheus.CounterVec
+	// NegativeMaskTotal is bumped whenever the SQLite store reads a
+	// negative int64 access mask (treated as 0 by maskFromSQL). Operators
+	// can alert on a non-zero value to detect out-of-band rows or legacy
+	// data inserted before T46's bit-63 guard. See T50 / T46.
+	NegativeMaskTotal prometheus.Counter
 }
+
+// Authz result label values used by AuthzTotal.
+const (
+	AuthzResultOK  = "ok"
+	AuthzResultErr = "err"
+)
 
 // NewMetrics registers HTTP and application metrics on reg and returns them.
 // If a collector is already registered (e.g. router rebuilt with the same
@@ -25,7 +40,8 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 	m := &Metrics{
 		ReqTotal:    registerOrReuse(reg, prometheus.NewCounterVec(prometheus.CounterOpts{Name: "http_requests_total", Help: "Total HTTP requests by method, route pattern, and status code."}, []string{"method", "route", "code"})).(*prometheus.CounterVec),
 		ReqDuration: registerOrReuse(reg, prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "http_request_duration_seconds", Help: "HTTP request latency in seconds by method and route pattern.", Buckets: prometheus.DefBuckets}, []string{"method", "route"})).(*prometheus.HistogramVec),
-		AuthzTotal:  registerOrReuse(reg, prometheus.NewCounterVec(prometheus.CounterOpts{Name: "authz_checks_total", Help: "Total authorization check calls by domain."}, []string{"domain_id"})).(*prometheus.CounterVec),
+		AuthzTotal:  registerOrReuse(reg, prometheus.NewCounterVec(prometheus.CounterOpts{Name: "authz_checks_total", Help: "Total authorization handler calls by domain and outcome (ok/err). Incremented exactly once per request."}, []string{"domain_id", "result"})).(*prometheus.CounterVec),
+		NegativeMaskTotal: registerOrReuse(reg, prometheus.NewCounter(prometheus.CounterOpts{Name: "store_negative_mask_observed_total", Help: "Number of negative access-mask values read from the store (treated as 0 by maskFromSQL). Non-zero indicates legacy or out-of-band data."})).(prometheus.Counter),
 	}
 	return m
 }

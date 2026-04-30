@@ -4249,3 +4249,44 @@ func TestT48_TypedInvalidInputError_RoundTrip(t *testing.T) {
 		})
 	}
 }
+
+// TestMaskFromSQL_negativeMaskHook documents that maskFromSQL invokes the
+// negative-mask hook exactly once per negative read and returns 0. See T50.
+func TestMaskFromSQL_negativeMaskHook(t *testing.T) {
+	t.Cleanup(func() { SetNegativeMaskHook(nil) })
+
+	if got := maskFromSQL(0); got != 0 {
+		t.Fatalf("maskFromSQL(0) = %d, want 0", got)
+	}
+	if got := maskFromSQL(42); got != 42 {
+		t.Fatalf("maskFromSQL(42) = %d, want 42", got)
+	}
+
+	var calls int
+	SetNegativeMaskHook(func() { calls++ })
+
+	if got := maskFromSQL(-1); got != 0 {
+		t.Fatalf("maskFromSQL(-1) = %d, want 0", got)
+	}
+	if got := maskFromSQL(-9999); got != 0 {
+		t.Fatalf("maskFromSQL(-9999) = %d, want 0", got)
+	}
+	if calls != 2 {
+		t.Fatalf("hook calls = %d, want 2", calls)
+	}
+
+	if got := maskFromSQL(7); got != 7 {
+		t.Fatalf("maskFromSQL(7) = %d, want 7", got)
+	}
+	if calls != 2 {
+		t.Fatalf("hook called on positive value: calls = %d, want 2", calls)
+	}
+
+	SetNegativeMaskHook(nil)
+	if got := maskFromSQL(-2); got != 0 {
+		t.Fatalf("maskFromSQL(-2) after clear = %d, want 0", got)
+	}
+	if calls != 2 {
+		t.Fatalf("hook fired after clear: calls = %d, want 2", calls)
+	}
+}

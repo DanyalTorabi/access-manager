@@ -30,6 +30,12 @@ type Server struct {
 	metrics *Metrics
 }
 
+// Metrics returns the Prometheus collectors registered by the most recent
+// Router call, or nil if Router was called with reg == nil. Callers can use
+// it to wire store-level hooks (e.g. negative-mask counter) after Router
+// has built the registry.
+func (s *Server) Metrics() *Metrics { return s.metrics }
+
 // Router builds the chi router. reg and gather supply the Prometheus registry
 // for metrics middleware and the /metrics endpoint. Pass nil for both to
 // disable instrumentation (e.g. in tests that don't care about metrics).
@@ -950,8 +956,22 @@ func (s *Server) revokeGroupPermission(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// recordAuthz increments AuthzTotal exactly once per request with the
+// outcome label (ok/err). Safe to call from a defer with a pointer to the
+// outcome variable; nil metrics are a no-op so tests without a registry
+// still work.
+func (s *Server) recordAuthz(domainID string, result *string) {
+	if s.metrics == nil {
+		return
+	}
+	s.metrics.AuthzTotal.WithLabelValues(domainID, *result).Inc()
+}
+
 func (s *Server) authzCheck(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
+	result := AuthzResultErr
+	defer s.recordAuthz(domainID, &result)
+
 	q := r.URL.Query()
 	userID := q.Get("user_id")
 	resourceID := q.Get("resource_id")
@@ -965,26 +985,24 @@ func (s *Server) authzCheck(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
-	if s.metrics != nil {
-		s.metrics.AuthzTotal.WithLabelValues(domainID).Inc()
-	}
 	mask, err := s.Store.EffectiveMask(r.Context(), domainID, userID, resourceID)
 	if err != nil {
 		writeInternalErr(w, r, err)
 		return
-	}
-	if s.metrics != nil {
-		s.metrics.AuthzTotal.WithLabelValues(domainID).Inc()
 	}
 	allowed := access.HasBit(mask, bit)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"allowed":        allowed,
 		"effective_mask": strconv.FormatUint(mask, 10),
 	})
+	result = AuthzResultOK
 }
 
 func (s *Server) authzMasks(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
+	result := AuthzResultErr
+	defer s.recordAuthz(domainID, &result)
+
 	q := r.URL.Query()
 	userID := q.Get("user_id")
 	resourceID := q.Get("resource_id")
@@ -992,18 +1010,13 @@ func (s *Server) authzMasks(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "user_id and resource_id are required", http.StatusBadRequest)
 		return
 	}
-	if s.metrics != nil {
-		s.metrics.AuthzTotal.WithLabelValues(domainID).Inc()
-	}
 	masks, err := s.Store.PermissionMasksForUserResource(r.Context(), domainID, userID, resourceID)
 	if err != nil {
 		writeInternalErr(w, r, err)
 		return
 	}
-	if s.metrics != nil {
-		s.metrics.AuthzTotal.WithLabelValues(domainID).Inc()
-	}
 	writeJSON(w, http.StatusOK, map[string]any{"masks": masks})
+	result = AuthzResultOK
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

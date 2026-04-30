@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync/atomic"
 
 	"github.com/dtorabi/access-manager/internal/access"
 	"github.com/dtorabi/access-manager/internal/store"
@@ -67,12 +68,32 @@ func maskToSQL(m uint64) (int64, error) {
 	return int64(m), nil
 }
 
+// negativeMaskHook is invoked once per negative mask read by maskFromSQL.
+// It is set by callers (typically the API layer) to bump a Prometheus
+// counter so dashboards can alert on out-of-band or legacy data. The
+// default is a no-op. See T50.
+var negativeMaskHook atomic.Pointer[func()]
+
+// SetNegativeMaskHook installs a callback invoked whenever maskFromSQL
+// observes a negative int64 value. Pass nil to clear. Safe for concurrent
+// use; calls are non-blocking.
+func SetNegativeMaskHook(f func()) {
+	if f == nil {
+		negativeMaskHook.Store(nil)
+		return
+	}
+	negativeMaskHook.Store(&f)
+}
+
 // maskFromSQL converts an int64 value read from SQLite into uint64. If a
 // negative value is encountered, log a warning and treat it as zero to avoid
 // propagating unexpected large unsigned values.
 func maskFromSQL(v int64) uint64 {
 	if v < 0 {
 		slog.Warn("negative mask value read from DB; treating as 0", "value", v)
+		if h := negativeMaskHook.Load(); h != nil {
+			(*h)()
+		}
 		return 0
 	}
 	return uint64(v)

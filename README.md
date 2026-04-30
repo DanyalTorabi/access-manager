@@ -87,7 +87,8 @@ Grafana is provisioned with a Prometheus datasource and an **Access Manager** da
 Exported metrics:
 - `http_requests_total` — counter (labels: `method`, `route`, `code`)
 - `http_request_duration_seconds` — histogram (labels: `method`, `route`)
-- `authz_checks_total` — counter (label: `domain_id`)
+- `authz_checks_total` — counter (labels: `domain_id`, `result`). `result` is `ok` on success and `err` on any failure path (validation, parse, store error). Incremented exactly once per request.
+- `store_negative_mask_observed_total` — counter, bumped when the SQLite store reads a negative `int64` access mask (treated as `0` by `maskFromSQL`). Non-zero values indicate legacy or out-of-band data; alert and investigate.
 
 Config files live under **[`observability/`](observability/)**.
 
