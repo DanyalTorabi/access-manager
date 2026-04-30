@@ -38,6 +38,17 @@ Extend [internal/database/open.go](../../go/internal/database/open.go) and add *
 
 - Cockroach-specific quirks unless required; read replicas.
 
+## Pending follow-ups from other tickets
+
+- **T51 (#77 / PR #83):** Composite-FK migration for cross-domain
+  protection. Implemented in `go/migrations/sqlite/000003_composite_fk_cross_domain.up.sql`;
+  the MySQL/PostgreSQL equivalents are deferred here. When this ticket
+  lands, port the migration (composite UNIQUE on `users`/`groups`/
+  `permissions` and composite FKs on the three junction tables) and
+  carry over the `RAISE(ABORT, ...)` pre-check in dialect-appropriate
+  form (PostgreSQL: `RAISE EXCEPTION` in a DO block; MySQL: `SIGNAL
+  SQLSTATE`).
+
 ## Dependencies
 
 - **T19/T13** for CI services; **T26** for DSN config.
