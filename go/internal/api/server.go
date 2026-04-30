@@ -1025,6 +1025,10 @@ func (s *Server) authzMasks(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"masks": masks})
 }
 
+// TODO(T54): inject *slog.Logger via Server.Log so tests can capture logs without
+// mutating the package-level global (enables t.Parallel()).
+// TODO(T55): pass *http.Request to this function so encode-failure logs include
+// method and path (depends on T54).
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
