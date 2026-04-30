@@ -4022,8 +4022,8 @@ func TestResourceAuthzGroupsList_otherDomainsExcluded(t *testing.T) {
 	if err == nil {
 		t.Fatal("cross-domain group_permissions insert must fail; composite FK regressed")
 	}
-	if !strings.Contains(strings.ToLower(err.Error()), "foreign key") {
-		t.Fatalf("expected foreign-key violation, got: %v", err)
+	if !errors.Is(wrapConstraintError(err), store.ErrFKViolation) {
+		t.Fatalf("expected store.ErrFKViolation, got: %v", err)
 	}
 
 	// Listing remains correct on a clean dataset (no cross-domain rows).
@@ -4095,8 +4095,8 @@ func TestSchema_compositeFKRejectsCrossDomain(t *testing.T) {
 			if err == nil {
 				t.Fatalf("%s: cross-domain insert must fail at the DB layer", c.name)
 			}
-			if !strings.Contains(strings.ToLower(err.Error()), "foreign key") {
-				t.Fatalf("%s: expected foreign-key violation, got %v", c.name, err)
+			if !errors.Is(wrapConstraintError(err), store.ErrFKViolation) {
+				t.Fatalf("%s: expected store.ErrFKViolation, got %v", c.name, err)
 			}
 		})
 	}
