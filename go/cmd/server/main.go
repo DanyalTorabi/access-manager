@@ -116,12 +116,23 @@ func serve(httpSrv *http.Server, ln net.Listener, timeout time.Duration, stop <-
 func setup(cfg config.Config) (*http.Server, *sql.DB, error) {
 	maybeWarnAPIAuth(cfg)
 
-	db, _, err := database.Open(cfg.DatabaseDriver, cfg.DatabaseURL)
+	db, migDirFromDriver, err := database.Open(cfg.DatabaseDriver, cfg.DatabaseURL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("open database: %w", err)
 	}
 
+	// Use cfg.MigrationsDir as the authoritative source, but auto-correct the common
+	// misconfiguration where DATABASE_DRIVER is changed without updating MIGRATIONS_DIR.
+	// If the migrations dir still has the compile-time sqlite default but the selected
+	// driver is not sqlite, fall back to the driver-canonical path and log a warning.
 	migDir := cfg.MigrationsDir
+	if migDir == "migrations/sqlite" && migDirFromDriver != "migrations/sqlite" {
+		logger.Warn("MIGRATIONS_DIR not updated from default; using driver-canonical path",
+			slog.String("driver", cfg.DatabaseDriver),
+			slog.String("migrations_dir", migDirFromDriver),
+		)
+		migDir = migDirFromDriver
+	}
 	if !filepath.IsAbs(migDir) {
 		if wd, err := os.Getwd(); err == nil {
 			migDir = filepath.Join(wd, migDir)
