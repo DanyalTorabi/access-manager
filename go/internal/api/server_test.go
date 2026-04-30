@@ -4744,10 +4744,12 @@ func TestReadJSON_failureKindsLogged(t *testing.T) {
 	}{
 		// Empty body → io.EOF → kind=empty_body.
 		{"empty_body", ``, "empty_body", http.StatusBadRequest},
-		// Malformed JSON → *json.SyntaxError → kind=json_syntax.
+		// Truncated body → io.ErrUnexpectedEOF → kind=json_syntax.
 		{"syntax_error", `{"title":`, "json_syntax", http.StatusBadRequest},
 		// Wrong JSON type for a string field → *json.UnmarshalTypeError → kind=json_type.
 		{"type_error", `{"title":123}`, "json_type", http.StatusBadRequest},
+		// Unknown field → kind=json_unknown_field.
+		{"unknown_field", `{"title":"x","injected":1}`, "json_unknown_field", http.StatusBadRequest},
 		// Trailing data after first value → kind=trailing_data.
 		{"trailing_data", `{"title":"x"}{"extra":1}`, "trailing_data", http.StatusBadRequest},
 	}
@@ -4770,7 +4772,10 @@ func TestReadJSON_failureKindsLogged(t *testing.T) {
 				t.Fatalf("want %d, got %d", tt.wantStatus, res.StatusCode)
 			}
 
+			// Scan all log entries first, then assert. Failing on the first
+			// matching entry would mask later entries with the correct kind.
 			logBuf := buf.String()
+			var foundKind string
 			for _, line := range strings.Split(logBuf, "\n") {
 				line = strings.TrimSpace(line)
 				if line == "" {
@@ -4783,14 +4788,59 @@ func TestReadJSON_failureKindsLogged(t *testing.T) {
 				if entry["msg"] != "request body decode failed" {
 					continue
 				}
-				if got, _ := entry["kind"].(string); got == tt.wantKind {
-					return // found the expected log entry
-				}
-				t.Fatalf("log entry 'request body decode failed' has kind=%q, want %q\nlog: %s",
-					entry["kind"], tt.wantKind, logBuf)
+				foundKind, _ = entry["kind"].(string)
+				break // take the first matching log entry
 			}
-			t.Fatalf("no 'request body decode failed' log entry found\nlog: %s", logBuf)
+			if foundKind == "" {
+				t.Fatalf("no 'request body decode failed' log entry found\nlog: %s", logBuf)
+			}
+			if foundKind != tt.wantKind {
+				t.Fatalf("kind=%q, want %q\nlog: %s", foundKind, tt.wantKind, logBuf)
+			}
 		})
+	}
+}
+
+// TestReadJSON_bodyTooLargeKindLogged asserts that a body exceeding the 1 MiB
+// limit returns 413 and logs kind=body_too_large.
+func TestReadJSON_bodyTooLargeKindLogged(t *testing.T) {
+	var buf bytes.Buffer
+	logger.Init(slog.LevelWarn, &buf)
+	t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
+
+	ts, _ := newTestAPI(t)
+	// Build a body just over 1 MiB; wrap in a JSON object so it parses until
+	// the size limit is hit.
+	oversized := `{"title":"` + strings.Repeat("x", maxRequestBodySize+1) + `"}`
+	res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(oversized))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = io.Copy(io.Discard, res.Body)
+	_ = res.Body.Close()
+
+	if res.StatusCode != http.StatusRequestEntityTooLarge {
+		t.Fatalf("want 413, got %d", res.StatusCode)
+	}
+
+	logBuf := buf.String()
+	var foundKind string
+	for _, line := range strings.Split(logBuf, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var entry map[string]any
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			continue
+		}
+		if entry["msg"] == "request body decode failed" {
+			foundKind, _ = entry["kind"].(string)
+			break
+		}
+	}
+	if foundKind != "body_too_large" {
+		t.Fatalf("want kind=body_too_large in log, got %q\nlog: %s", foundKind, logBuf)
 	}
 }
 
