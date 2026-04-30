@@ -172,6 +172,9 @@ func TestMetrics_authzMasksIncrementsExactlyOnce(t *testing.T) {
 	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"result": "ok"}); got != 1 {
 		t.Fatalf("authz_checks_total{result=ok} want 1, got %v", got)
 	}
+	if got := findCounterWithLabelsOrZero(t, reg, "authz_checks_total", map[string]string{"result": "err"}); got != 0 {
+		t.Fatalf("authz_checks_total{result=err} want 0, got %v", got)
+	}
 }
 
 // TestMetrics_authzCheckValidationErrorIncrementsErr verifies that a
