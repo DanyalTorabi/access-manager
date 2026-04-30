@@ -7,33 +7,64 @@
 -- follow-up (kept for now per the plan note).
 
 -- Step 0: pre-check. Abort migration if any cross-domain row exists in the
--- three junction tables. The pattern uses a CHECK that fires only when the
--- INSERT actually receives a row (i.e. when at least one violation is
--- present). On clean datasets the INSERT is a no-op and the table is
--- dropped at the end.
+-- three junction tables. SQLite's RAISE(ABORT, 'msg') is only callable
+-- inside a trigger body, so install a temporary BEFORE INSERT trigger on a
+-- marker table that fires RAISE when the cross-domain count is non-zero.
+-- The custom message surfaces directly through the SQLite driver and the
+-- migration runner (e.g. 'exec migration 3: T51: cross-domain ...').
+--
+-- Audit query to identify the offending rows before retrying:
+--
+--   SELECT 'group_permissions.group_domain' AS src, gp.domain_id, gp.group_id, gp.permission_id
+--     FROM group_permissions gp JOIN groups g ON gp.group_id = g.id
+--     WHERE gp.domain_id <> g.domain_id
+--   UNION ALL
+--   SELECT 'group_permissions.permission_domain', gp.domain_id, gp.group_id, gp.permission_id
+--     FROM group_permissions gp JOIN permissions p ON gp.permission_id = p.id
+--     WHERE gp.domain_id <> p.domain_id
+--   UNION ALL
+--   SELECT 'user_permissions.user_domain', up.domain_id, up.user_id, up.permission_id
+--     FROM user_permissions up JOIN users u ON up.user_id = u.id
+--     WHERE up.domain_id <> u.domain_id
+--   UNION ALL
+--   SELECT 'user_permissions.permission_domain', up.domain_id, up.user_id, up.permission_id
+--     FROM user_permissions up JOIN permissions p ON up.permission_id = p.id
+--     WHERE up.domain_id <> p.domain_id
+--   UNION ALL
+--   SELECT 'group_members.user_domain', gm.domain_id, gm.user_id, gm.group_id
+--     FROM group_members gm JOIN users u ON gm.user_id = u.id
+--     WHERE gm.domain_id <> u.domain_id
+--   UNION ALL
+--   SELECT 'group_members.group_domain', gm.domain_id, gm.user_id, gm.group_id
+--     FROM group_members gm JOIN groups g ON gm.group_id = g.id
+--     WHERE gm.domain_id <> g.domain_id;
 
-CREATE TABLE _mig_abort_t51 (msg TEXT NOT NULL CHECK (msg = ''));
+CREATE TABLE _mig_t51_marker (x INTEGER);
 
-INSERT INTO _mig_abort_t51 (msg)
-SELECT 'cross-domain rows detected in junction tables: '
-       || COALESCE(SUM(n), 0)
-       || ' (run audit query before retrying)'
-FROM (
-  SELECT COUNT(*) AS n FROM group_permissions gp JOIN groups g ON gp.group_id = g.id WHERE gp.domain_id <> g.domain_id
-  UNION ALL
-  SELECT COUNT(*) FROM group_permissions gp JOIN permissions p ON gp.permission_id = p.id WHERE gp.domain_id <> p.domain_id
-  UNION ALL
-  SELECT COUNT(*) FROM user_permissions up JOIN users u ON up.user_id = u.id WHERE up.domain_id <> u.domain_id
-  UNION ALL
-  SELECT COUNT(*) FROM user_permissions up JOIN permissions p ON up.permission_id = p.id WHERE up.domain_id <> p.domain_id
-  UNION ALL
-  SELECT COUNT(*) FROM group_members gm JOIN users u ON gm.user_id = u.id WHERE gm.domain_id <> u.domain_id
-  UNION ALL
-  SELECT COUNT(*) FROM group_members gm JOIN groups g ON gm.group_id = g.id WHERE gm.domain_id <> g.domain_id
-)
-HAVING COALESCE(SUM(n), 0) > 0;
+CREATE TRIGGER _mig_t51_check BEFORE INSERT ON _mig_t51_marker
+WHEN (
+  SELECT COALESCE(SUM(n), 0) FROM (
+    SELECT COUNT(*) AS n FROM group_permissions gp JOIN groups g ON gp.group_id = g.id WHERE gp.domain_id <> g.domain_id
+    UNION ALL
+    SELECT COUNT(*) FROM group_permissions gp JOIN permissions p ON gp.permission_id = p.id WHERE gp.domain_id <> p.domain_id
+    UNION ALL
+    SELECT COUNT(*) FROM user_permissions up JOIN users u ON up.user_id = u.id WHERE up.domain_id <> u.domain_id
+    UNION ALL
+    SELECT COUNT(*) FROM user_permissions up JOIN permissions p ON up.permission_id = p.id WHERE up.domain_id <> p.domain_id
+    UNION ALL
+    SELECT COUNT(*) FROM group_members gm JOIN users u ON gm.user_id = u.id WHERE gm.domain_id <> u.domain_id
+    UNION ALL
+    SELECT COUNT(*) FROM group_members gm JOIN groups g ON gm.group_id = g.id WHERE gm.domain_id <> g.domain_id
+  )
+) > 0
+BEGIN
+  SELECT RAISE(ABORT, 'T51: cross-domain junction rows detected; see audit query in migration header before retrying');
+END;
 
-DROP TABLE _mig_abort_t51;
+INSERT INTO _mig_t51_marker (x) VALUES (1);
+
+DROP TRIGGER _mig_t51_check;
+DROP TABLE _mig_t51_marker;
 
 -- Step 1: rebuild schema. SQLite cannot ALTER TABLE to add UNIQUE or FK
 -- constraints, so use the standard CREATE-COPY-DROP-RENAME dance with
