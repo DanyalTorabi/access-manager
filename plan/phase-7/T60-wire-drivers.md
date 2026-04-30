@@ -35,9 +35,9 @@ Extend `go/internal/database/open.go` to dispatch to `internal/store/postgres` a
 5. **Config docs**: Update `go/.env.example` with:
    ```
    # DATABASE_DRIVER=postgres
-   # DATABASE_DSN=postgres://localhost:5432/access_manager?sslmode=disable
+   # DATABASE_URL=postgres://localhost:5432/access_manager?sslmode=disable
    # DATABASE_DRIVER=mysql
-   # DATABASE_DSN=root:@tcp(localhost:3306)/access_manager?parseTime=true
+   # DATABASE_URL=root:@tcp(localhost:3306)/access_manager?parseTime=true
    ```
 6. **README**: Add a "Supported databases" section or update the existing one with driver names and minimum version requirements (PostgreSQL 15+, MySQL 8+ / MariaDB 10.6+).
 7. **Tests**: Update existing `TestMigrateUp_sqlite` to pass the driver argument. Add tests for `Open("postgres", ...)` and `Open("mysql", ...)` returning ping errors (no running DB needed — just verify routing). Extend `TestOpen_unsupportedDriver` to verify the error lists all supported drivers.
