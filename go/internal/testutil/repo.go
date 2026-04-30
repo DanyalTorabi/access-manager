@@ -28,3 +28,9 @@ func PostgresMigrationsDir(t *testing.T) string {
 	t.Helper()
 	return filepath.Join(RepoRoot(t), "migrations", "postgres")
 }
+
+// MySQLMigrationsDir returns migrations/mysql under the module root.
+func MySQLMigrationsDir(t *testing.T) string {
+	t.Helper()
+	return filepath.Join(RepoRoot(t), "migrations", "mysql")
+}
