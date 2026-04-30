@@ -796,11 +796,6 @@ func (s *Server) revokeUserPermission(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-type userAuthzResourceResponse struct {
-	ResourceID    string `json:"resource_id"`
-	EffectiveMask string `json:"effective_mask"`
-}
-
 const userAuthzResourcesSortField = "resource_id"
 
 func (s *Server) userAuthzResources(w http.ResponseWriter, r *http.Request) {
@@ -820,19 +815,7 @@ func (s *Server) userAuthzResources(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
-	resp := make([]userAuthzResourceResponse, 0, len(list))
-	for _, it := range list {
-		resp = append(resp, userAuthzResourceResponse{
-			ResourceID:    it.ResourceID,
-			EffectiveMask: strconv.FormatUint(it.EffectiveMask, 10),
-		})
-	}
-	writeList(w, resp, total, opts)
-}
-
-type groupAuthzResourceResponse struct {
-	ResourceID string `json:"resource_id"`
-	Mask       string `json:"mask"`
+	writeList(w, userAuthzResourceDTOs(list), total, opts)
 }
 
 const groupAuthzResourcesSortField = "resource_id"
@@ -853,19 +836,7 @@ func (s *Server) groupAuthzResources(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
-	resp := make([]groupAuthzResourceResponse, 0, len(list))
-	for _, it := range list {
-		resp = append(resp, groupAuthzResourceResponse{
-			ResourceID: it.ResourceID,
-			Mask:       strconv.FormatUint(it.Mask, 10),
-		})
-	}
-	writeList(w, resp, total, opts)
-}
-
-type resourceAuthzUserResponse struct {
-	UserID        string `json:"user_id"`
-	EffectiveMask string `json:"effective_mask"`
+	writeList(w, groupAuthzResourceDTOs(list), total, opts)
 }
 
 // resourceAuthzUsersSortField is the meta.sort label returned to clients.
@@ -894,19 +865,7 @@ func (s *Server) resourceAuthzUsers(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
-	resp := make([]resourceAuthzUserResponse, 0, len(list))
-	for _, it := range list {
-		resp = append(resp, resourceAuthzUserResponse{
-			UserID:        it.UserID,
-			EffectiveMask: strconv.FormatUint(it.EffectiveMask, 10),
-		})
-	}
-	writeList(w, resp, total, opts)
-}
-
-type resourceAuthzGroupResponse struct {
-	GroupID string `json:"group_id"`
-	Mask    string `json:"mask"`
+	writeList(w, resourceAuthzUserDTOs(list), total, opts)
 }
 
 const resourceAuthzGroupsSortField = "group_id"
@@ -928,14 +887,7 @@ func (s *Server) resourceAuthzGroups(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
-	resp := make([]resourceAuthzGroupResponse, 0, len(list))
-	for _, it := range list {
-		resp = append(resp, resourceAuthzGroupResponse{
-			GroupID: it.GroupID,
-			Mask:    strconv.FormatUint(it.Mask, 10),
-		})
-	}
-	writeList(w, resp, total, opts)
+	writeList(w, resourceAuthzGroupDTOs(list), total, opts)
 }
 
 func (s *Server) grantGroupPermission(w http.ResponseWriter, r *http.Request) {

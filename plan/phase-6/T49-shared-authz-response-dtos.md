@@ -14,30 +14,40 @@ Reduce duplication in the small per-handler response structs used by the three a
 
 ## Deliverables
 
-- One small DTO package (or a few exported types in `go/internal/api`) covering the authz listing response shapes:
-  - `{principal_id (or resource_id), mask-as-decimal-string}` rows
-  - shared mapping helper that converts `[]store.X` → `[]DTO`
-- Handlers (`userAuthzResources`, `groupAuthzResources`, `resourceAuthzUsers`, plus T45 once landed) updated to use the shared DTO/helper.
+- A new `go/internal/api/authz_dto.go` file containing:
+  - Four **unexported** DTO types (replacing the unexported `*Response` structs in `server.go`):
+    - `userAuthzResourceDTO` — `resource_id` + `effective_mask` (OpenAPI: `UserAuthzResource`)
+    - `groupAuthzResourceDTO` — `resource_id` + `mask` (OpenAPI: `GroupAuthzResource`)
+    - `resourceAuthzUserDTO` — `user_id` + `effective_mask` (OpenAPI: `ResourceAuthzUser`)
+    - `resourceAuthzGroupDTO` — `group_id` + `mask` (OpenAPI: `ResourceAuthzGroup`)
+  - Four types are required (not two) because all four shapes have distinct JSON field names for both the entity ID and the mask; merging any pair would require renaming a wire field.
+  - Four typed converter functions (`userAuthzResourceDTOs`, etc.) each with a direct `make/for/append` loop — avoids a generic intermediate layer that added indirection without proportional gain.
+  - Doc comments on each type referencing the corresponding OpenAPI schema component and full `/api/v1/...` endpoint path.
+- `go/internal/api/authz_dto_test.go` with unit tests covering nil input, empty input, and field-level mapping for all four converters.
+- Handlers (`userAuthzResources`, `groupAuthzResources`, `resourceAuthzUsers`, `resourceAuthzGroups`) updated to use the new converter functions.
 - No JSON wire-format change — every existing field name and decimal-string formatting must be preserved exactly. Existing API/integration/e2e tests must pass without modification.
-- Optional: short doc comment on the shared type referencing the OpenAPI schemas (`UserAuthzResource`, `GroupAuthzResource`, `ResourceAuthzUser`, `ResourceAuthzGroup`).
 
 ## Steps
 
-1. Inventory the existing per-handler response structs in `go/internal/api/server.go`:
-   `userAuthzResourceResponse`, `groupAuthzResourceResponse`, `resourceAuthzUserResponse`, plus T45's response when added.
-2. Decide on the shared shape — likely two small types because the JSON field names differ (`resource_id` vs `user_id`/`group_id` and `effective_mask` vs `mask`).
-3. Extract those types and a `toDTOSlice` helper (generic over the source row type) and route all four handlers through it.
-4. Run `make test` (existing API + e2e tests) and `make lint`; confirm no JSON payload diffs.
+1. Inventory the four existing per-handler response structs in `go/internal/api/server.go`:
+   `userAuthzResourceResponse`, `groupAuthzResourceResponse`, `resourceAuthzUserResponse`, `resourceAuthzGroupResponse`.
+2. Create `go/internal/api/authz_dto.go` with four unexported DTO types (named `*DTO` to distinguish from store types) and four typed converter functions with direct loops. Add doc comments with full `/api/v1/...` endpoint paths and OpenAPI schema names.
+3. Remove the four unexported `*Response` struct definitions from `server.go` and update the four handlers to use the new converter functions.
+4. Add `go/internal/api/authz_dto_test.go` with unit tests for nil/empty input and field-level mapping.
+5. Run `make test` and `make lint`; confirm no JSON payload diffs.
 
 ## Files / paths
 
-- `go/internal/api/server.go` (DTO extraction + handler updates)
-- `go/internal/api/server_test.go` (no behavioural change expected; only update if struct names referenced)
-- Possibly a new `go/internal/api/authz_dto.go` if grouping is preferred.
+- `go/internal/api/authz_dto.go` (new file — unexported DTO types + typed converter functions)
+- `go/internal/api/authz_dto_test.go` (new file — unit tests for converter functions)
+- `go/internal/api/server.go` (remove 4 unexported `*Response` structs; update 4 handlers)
 
 ## Acceptance criteria
 
-- The four authz listing handlers share their response DTOs / mapping helper instead of defining bespoke per-handler structs.
+- The four authz listing handlers share their response DTO types and converter functions instead of defining bespoke per-handler structs and duplicated mapping loops.
+- DTO types are unexported; converter functions are unexported. No exported identifiers without callers are added.
+- Doc comments on DTO types include the full `/api/v1/...` endpoint path and OpenAPI schema name.
+- Converter functions are directly tested (nil input, empty input, field mapping).
 - Wire format (field names, decimal-string masks, list envelope) is unchanged — existing API and e2e tests pass without edits.
 - `make test` and `make lint` clean.
 
