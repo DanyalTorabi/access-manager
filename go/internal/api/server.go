@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -1027,7 +1028,10 @@ func (s *Server) authzMasks(w http.ResponseWriter, r *http.Request) {
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		// The response header is already committed; log for operator visibility.
+		logger.Error("response encode failed", slog.String("err", err.Error()))
+	}
 }
 
 func writeErr(w http.ResponseWriter, status int, err error) {
@@ -1062,7 +1066,10 @@ func writeStoreErr(w http.ResponseWriter, r *http.Request, err error) {
 }
 
 // writeInternalErr logs the full error and returns a generic 500 to the client.
-// Use for non-store errors (list queries, authz) that should never leak details.
+// Intended for read/list operations where the store returns only unexpected DB
+// errors, not structured store errors (ErrNotFound, ErrConflict, ErrFKViolation,
+// etc.). For single-entity operations use writeStoreErr, which maps those errors
+// to appropriate HTTP status codes.
 func writeInternalErr(w http.ResponseWriter, r *http.Request, err error) {
 	logRequestErr(r, http.StatusInternalServerError, err)
 	writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
@@ -1267,13 +1274,67 @@ func readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	if err := dec.Decode(dst); err != nil {
 		var maxErr *http.MaxBytesError
 		if errors.As(err, &maxErr) {
+			logReadJSONErr(r, "body_too_large", err)
 			writeErr(w, http.StatusRequestEntityTooLarge, errors.New("request body too large"))
 			return false
 		}
-		writeErr(w, http.StatusBadRequest, err)
+		logReadJSONErr(r, readJSONErrKind(err), err)
+		writeErr(w, http.StatusBadRequest, sanitizeDecodeErr(err))
+		return false
+	}
+	if dec.More() {
+		logReadJSONErr(r, "trailing_data", errors.New("trailing data after first JSON value"))
+		writeErr(w, http.StatusBadRequest, errors.New("request body must contain exactly one JSON value"))
 		return false
 	}
 	return true
+}
+
+// readJSONErrKind classifies a JSON decode error for structured server-side
+// logging. Labels: empty_body, json_syntax, json_type, json_decode.
+func readJSONErrKind(err error) string {
+	var synErr *json.SyntaxError
+	var typeErr *json.UnmarshalTypeError
+	switch {
+	case errors.Is(err, io.EOF):
+		return "empty_body"
+	case errors.Is(err, io.ErrUnexpectedEOF), errors.As(err, &synErr):
+		return "json_syntax"
+	case errors.As(err, &typeErr):
+		return "json_type"
+	default:
+		return "json_decode"
+	}
+}
+
+// sanitizeDecodeErr returns a stable, client-safe error message for a JSON body
+// decode failure. Raw user input (characters, field names) is never exposed;
+// the detailed error is logged server-side by logReadJSONErr.
+func sanitizeDecodeErr(err error) error {
+	var synErr *json.SyntaxError
+	var typeErr *json.UnmarshalTypeError
+	switch {
+	case errors.Is(err, io.EOF):
+		return errors.New("request body must not be empty")
+	case errors.Is(err, io.ErrUnexpectedEOF), errors.As(err, &synErr):
+		return errors.New("request body contains malformed JSON")
+	case errors.As(err, &typeErr):
+		return errors.New("request body contains an invalid field value")
+	default:
+		return errors.New("invalid request body")
+	}
+}
+
+// logReadJSONErr logs a server-side warning for request body parse failures.
+// The kind label distinguishes: empty_body, json_syntax, json_type, json_decode,
+// body_too_large, trailing_data — without echoing raw user input.
+func logReadJSONErr(r *http.Request, kind string, err error) {
+	logger.Warn("request body decode failed",
+		slog.String("kind", kind),
+		slog.String("method", r.Method),
+		slog.String("path", r.URL.Path),
+		slog.String("err", err.Error()),
+	)
 }
 
 // errInvalidNumericValue is the stable, client-safe error returned when a

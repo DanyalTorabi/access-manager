@@ -4685,3 +4685,150 @@ func TestAPI_authzCheck_accessBitOutOfRange(t *testing.T) {
 		t.Fatalf(`body["error"] = %q, want %q`, got, want)
 	}
 }
+
+// --- T52: request/response error hardening tests ---
+
+// TestWriteJSON_encodeErrorLogged asserts that a response encoding failure is
+// logged at ERROR level rather than silently swallowed. Because the status
+// header is already committed, the only observable signal is the log entry.
+func TestWriteJSON_encodeErrorLogged(t *testing.T) {
+	var buf bytes.Buffer
+	logger.Init(slog.LevelError, &buf)
+	t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
+
+	w := httptest.NewRecorder()
+	// A channel is not JSON-serializable and will cause Encode to fail.
+	writeJSON(w, http.StatusOK, map[string]any{"v": make(chan int)})
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("want status 200 (header already committed), got %d", w.Code)
+	}
+	if !strings.Contains(buf.String(), "response encode failed") {
+		t.Fatalf("expected 'response encode failed' in server log, got: %s", buf.String())
+	}
+}
+
+// TestReadJSON_trailingDataRejected asserts that sending two JSON objects in a
+// single request body returns 400 with a stable, client-safe message.
+func TestReadJSON_trailingDataRejected(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	// Second JSON object after the first — trailing data.
+	body := `{"title":"first"}{"title":"second"}`
+	res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("want 400 for trailing JSON, got %d: %s", res.StatusCode, b)
+	}
+	var out map[string]string
+	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	const wantMsg = "request body must contain exactly one JSON value"
+	if got := out["error"]; got != wantMsg {
+		t.Fatalf(`body["error"] = %q, want %q`, got, wantMsg)
+	}
+}
+
+// TestReadJSON_failureKindsLogged asserts that readJSON logs the correct
+// structured kind label for each class of decode failure.
+func TestReadJSON_failureKindsLogged(t *testing.T) {
+	tests := []struct {
+		name       string
+		body       string
+		wantKind   string
+		wantStatus int
+	}{
+		// Empty body → io.EOF → kind=empty_body.
+		{"empty_body", ``, "empty_body", http.StatusBadRequest},
+		// Malformed JSON → *json.SyntaxError → kind=json_syntax.
+		{"syntax_error", `{"title":`, "json_syntax", http.StatusBadRequest},
+		// Wrong JSON type for a string field → *json.UnmarshalTypeError → kind=json_type.
+		{"type_error", `{"title":123}`, "json_type", http.StatusBadRequest},
+		// Trailing data after first value → kind=trailing_data.
+		{"trailing_data", `{"title":"x"}{"extra":1}`, "trailing_data", http.StatusBadRequest},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			logger.Init(slog.LevelWarn, &buf)
+			t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
+
+			ts, _ := newTestAPI(t)
+			res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(tt.body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _ = io.Copy(io.Discard, res.Body)
+			_ = res.Body.Close()
+
+			if res.StatusCode != tt.wantStatus {
+				t.Fatalf("want %d, got %d", tt.wantStatus, res.StatusCode)
+			}
+
+			logBuf := buf.String()
+			for _, line := range strings.Split(logBuf, "\n") {
+				line = strings.TrimSpace(line)
+				if line == "" {
+					continue
+				}
+				var entry map[string]any
+				if err := json.Unmarshal([]byte(line), &entry); err != nil {
+					continue
+				}
+				if entry["msg"] != "request body decode failed" {
+					continue
+				}
+				if got, _ := entry["kind"].(string); got == tt.wantKind {
+					return // found the expected log entry
+				}
+				t.Fatalf("log entry 'request body decode failed' has kind=%q, want %q\nlog: %s",
+					entry["kind"], tt.wantKind, logBuf)
+			}
+			t.Fatalf("no 'request body decode failed' log entry found\nlog: %s", logBuf)
+		})
+	}
+}
+
+// TestReadJSON_clientMessagesDoNotLeakRawInput asserts that the client-visible
+// error messages for decode failures are stable and never include raw user input
+// (e.g. invalid characters, field names from the request body).
+func TestReadJSON_clientMessagesDoNotLeakRawInput(t *testing.T) {
+	tests := []struct {
+		name    string
+		body    string
+		wantMsg string
+	}{
+		{"empty_body", ``, "request body must not be empty"},
+		{"syntax_error", `{"title":`, "request body contains malformed JSON"},
+		{"type_error", `{"title":123}`, "request body contains an invalid field value"},
+		{"unknown_field", `{"title":"x","injected_field":1}`, "invalid request body"},
+		{"trailing_data", `{"title":"x"}{"extra":1}`, "request body must contain exactly one JSON value"},
+	}
+
+	ts, _ := newTestAPI(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(tt.body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = res.Body.Close() }()
+			if res.StatusCode != http.StatusBadRequest {
+				b, _ := io.ReadAll(res.Body)
+				t.Fatalf("want 400, got %d: %s", res.StatusCode, b)
+			}
+			var out map[string]string
+			if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+				t.Fatalf("decode body: %v", err)
+			}
+			if got := out["error"]; got != tt.wantMsg {
+				t.Fatalf(`body["error"] = %q, want %q`, got, tt.wantMsg)
+			}
+		})
+	}
+}
