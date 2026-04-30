@@ -1,4 +1,4 @@
-.PHONY: build test integration cover cover-func run tidy lint vuln gosec e2e
+.PHONY: build test integration cover cover-func run tidy lint vuln gosec e2e test-integration-postgres
 
 # golang/go#75031: GOTOOLCHAIN=auto can make `go test -cover` fail with "no such tool covdata".
 # Pin the minimum toolchain to the `go` version in go.mod (override: `make test GOTOOLCHAIN=local`).
@@ -43,6 +43,10 @@ gosec:
 
 integration:
 	go test -race -count=1 -run '^TestIntegration' ./internal/api/...
+
+# T58 — requires DATABASE_DSN_POSTGRES env to point to a running Postgres 15+ instance.
+test-integration-postgres:
+	go test -race -count=1 -tags=integration ./internal/store/postgres/...
 
 # T16 — requires a running API (default BASE_URL http://127.0.0.1:8080). Bash twin: ../../test/e2e/bash/run.sh
 e2e:

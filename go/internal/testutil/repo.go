@@ -22,3 +22,9 @@ func SQLiteMigrationsDir(t *testing.T) string {
 	t.Helper()
 	return filepath.Join(RepoRoot(t), "migrations", "sqlite")
 }
+
+// PostgresMigrationsDir returns migrations/postgres under the module root.
+func PostgresMigrationsDir(t *testing.T) string {
+	t.Helper()
+	return filepath.Join(RepoRoot(t), "migrations", "postgres")
+}
