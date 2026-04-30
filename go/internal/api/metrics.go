@@ -29,8 +29,8 @@ type Metrics struct {
 
 // Authz result label values used by AuthzTotal.
 const (
-	AuthzResultOK  = "ok"
-	AuthzResultErr = "err"
+	authzResultOK  = "ok"
+	authzResultErr = "err"
 )
 
 // NewMetrics registers HTTP and application metrics on reg and returns them.

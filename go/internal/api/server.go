@@ -974,7 +974,7 @@ func (s *Server) recordAuthz(domainID, result string) {
 
 func (s *Server) authzCheck(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
-	result := AuthzResultErr
+	result := authzResultErr
 	defer func() { s.recordAuthz(domainID, result) }()
 
 	q := r.URL.Query()
@@ -996,7 +996,7 @@ func (s *Server) authzCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	allowed := access.HasBit(mask, bit)
-	result = AuthzResultOK
+	result = authzResultOK
 	writeJSON(w, http.StatusOK, map[string]any{
 		"allowed":        allowed,
 		"effective_mask": strconv.FormatUint(mask, 10),
@@ -1005,7 +1005,7 @@ func (s *Server) authzCheck(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) authzMasks(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
-	result := AuthzResultErr
+	result := authzResultErr
 	defer func() { s.recordAuthz(domainID, result) }()
 
 	q := r.URL.Query()
@@ -1020,7 +1020,7 @@ func (s *Server) authzMasks(w http.ResponseWriter, r *http.Request) {
 		writeInternalErr(w, r, err)
 		return
 	}
-	result = AuthzResultOK
+	result = authzResultOK
 	writeJSON(w, http.StatusOK, map[string]any{"masks": masks})
 }
 
