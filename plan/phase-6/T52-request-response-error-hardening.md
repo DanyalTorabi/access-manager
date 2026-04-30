@@ -14,16 +14,27 @@ Harden the HTTP helper layer so request parsing, response encoding, and handler 
 
 ## Deliverables
 
-- `writeJSON` checks the `json.Encoder.Encode` error path and returns/logs a server-side failure signal when encoding fails.
-- `readJSON` rejects trailing JSON tokens after the first decoded value.
-- Request parse/logging helpers distinguish parse failures, decoder failures, and range failures in server logs without exposing raw input to clients.
-- List handlers either document or explicitly classify store errors rather than relying on incidental generic 500s.
-- Unit tests cover the above behavior.
+- `writeJSON` checks the `json.Encoder.Encode` error path and logs a server-side failure signal when encoding fails.
+- `readJSON` rejects trailing JSON tokens after the first decoded value using `dec.Decode(&extra)` + `io.EOF` check (the `dec.More()` approach is explicitly avoided — its documented scope is array/object iteration, not top-level stream exhaustion).
+- A unified `classifyDecodeErr` helper assigns a structured `kind` label to each decode failure (`empty_body`, `json_syntax`, `json_type`, `json_unknown_field`, `json_decode`, `body_too_large`, `trailing_data`) and returns both the kind and the sanitized client/log messages in one step.
+- `logReadJSONErr` receives only pre-sanitized strings — attacker-controlled field names (from `DisallowUnknownFields`) are never logged.
+- List handlers document the use of `writeInternalErr` as intentional (they expect only unexpected DB errors, not structured store errors).
+- Unit tests cover all of the above behavior.
 
-## Deferred from other PRs
+## Status of deferred items from earlier PRs
 
-- PR #78 / T47: CML-T47-1, CML-T47-2, CML-T47-8, CML-T47-11.
-- PR #79 / T48: CML-T48-3, CML-T48-4, CML-T48-8, CML-T48-10.
+The T52 plan originally referenced internal conversation review labels from PR #78 (T47) and PR #79 (T48). All GitHub review threads for those PRs were resolved before this PR was opened. The items listed below are summarized from those conversations:
+
+| Item | PR | Topic | Status |
+|------|-----|-------|--------|
+| CML-T47-1 | #78 | `gofmt` formatting on new test block | Resolved in PR #78 |
+| CML-T47-2 | #78 | `parseUint64Validated` base-0 accepted octal inputs | Resolved in PR #78 (base switched to explicit 10 / 16) |
+| CML-T47-8 | #78 | (conversation-level, no open GitHub thread) | N/A — no open thread |
+| CML-T47-11 | #78 | (conversation-level, no open GitHub thread) | N/A — no open thread |
+| CML-T48-3 | #79 | `t.Fatal` captured outer `t` in subtest closure | Resolved in PR #79 |
+| CML-T48-4 | #79 | (conversation-level, no open GitHub thread) | N/A — no open thread |
+| CML-T48-8 | #79 | (conversation-level, no open GitHub thread) | N/A — no open thread |
+| CML-T48-10 | #79 | (conversation-level, no open GitHub thread) | N/A — no open thread |
 
 ## Steps
 

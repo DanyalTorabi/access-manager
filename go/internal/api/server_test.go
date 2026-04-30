@@ -2587,6 +2587,46 @@ func TestWriteInternalErr_generic(t *testing.T) {
 	}
 }
 
+// TestWriteInternalErr_misuse asserts that passing a structured store sentinel
+// (e.g. ErrNotFound) to writeInternalErr logs an ERROR-level misuse alert while
+// still returning a generic 500 to the client — making the wrong call site
+// immediately visible in production.
+func TestWriteInternalErr_misuse(t *testing.T) {
+	sentinels := []struct {
+		name string
+		err  error
+	}{
+		{"ErrNotFound", store.ErrNotFound},
+		{"ErrConflict", store.ErrConflict},
+		{"ErrFKViolation", store.ErrFKViolation},
+		{"ErrInvalidInput", store.ErrInvalidInput},
+	}
+	for _, tt := range sentinels {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			logger.Init(slog.LevelError, &buf)
+			t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
+
+			w := httptest.NewRecorder()
+			writeInternalErr(w, dummyRequest(), tt.err)
+
+			if w.Code != http.StatusInternalServerError {
+				t.Fatalf("want 500, got %d", w.Code)
+			}
+			var body map[string]string
+			if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+				t.Fatalf("decode body: %v", err)
+			}
+			if body["error"] != "internal server error" {
+				t.Fatalf("body[error] = %q, want generic 500", body["error"])
+			}
+			if !strings.Contains(buf.String(), "writeInternalErr misuse") {
+				t.Fatalf("expected misuse alert in log, got: %s", buf.String())
+			}
+		})
+	}
+}
+
 // --- store-error tests using a broken (closed-DB) store ---
 
 // newBrokenTestAPIWithRegistry builds a Server backed by a closed DB so any
@@ -4683,5 +4723,202 @@ func TestAPI_authzCheck_accessBitOutOfRange(t *testing.T) {
 	}
 	if got, want := body["error"], "mask value must be within signed 64-bit range"; got != want {
 		t.Fatalf(`body["error"] = %q, want %q`, got, want)
+	}
+}
+
+// --- T52: request/response error hardening tests ---
+
+// TestWriteJSON_encodeErrorLogged asserts that a response encoding failure is
+// logged at ERROR level rather than silently swallowed. Because the status
+// header is already committed, the only observable signal is the log entry.
+func TestWriteJSON_encodeErrorLogged(t *testing.T) {
+	var buf bytes.Buffer
+	logger.Init(slog.LevelError, &buf)
+	t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
+
+	w := httptest.NewRecorder()
+	// A channel is not JSON-serializable and will cause Encode to fail.
+	writeJSON(w, http.StatusOK, map[string]any{"v": make(chan int)})
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("want status 200 (header already committed), got %d", w.Code)
+	}
+	if !strings.Contains(buf.String(), "response encode failed") {
+		t.Fatalf("expected 'response encode failed' in server log, got: %s", buf.String())
+	}
+}
+
+// TestReadJSON_trailingDataRejected asserts that sending two JSON objects in a
+// single request body returns 400 with a stable, client-safe message.
+func TestReadJSON_trailingDataRejected(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	// Second JSON object after the first — trailing data.
+	body := `{"title":"first"}{"title":"second"}`
+	res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("want 400 for trailing JSON, got %d: %s", res.StatusCode, b)
+	}
+	var out map[string]string
+	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	const wantMsg = "request body must contain exactly one JSON value"
+	if got := out["error"]; got != wantMsg {
+		t.Fatalf(`body["error"] = %q, want %q`, got, wantMsg)
+	}
+}
+
+// TestReadJSON_failureKindsLogged asserts that readJSON logs the correct
+// structured kind label for each class of decode failure.
+func TestReadJSON_failureKindsLogged(t *testing.T) {
+	tests := []struct {
+		name       string
+		body       string
+		wantKind   string
+		wantStatus int
+	}{
+		// Empty body → io.EOF → kind=empty_body.
+		{"empty_body", ``, "empty_body", http.StatusBadRequest},
+		// Truncated body → io.ErrUnexpectedEOF → kind=json_syntax.
+		{"syntax_error", `{"title":`, "json_syntax", http.StatusBadRequest},
+		// Wrong JSON type for a string field → *json.UnmarshalTypeError → kind=json_type.
+		{"type_error", `{"title":123}`, "json_type", http.StatusBadRequest},
+		// Unknown field → kind=json_unknown_field.
+		{"unknown_field", `{"title":"x","injected":1}`, "json_unknown_field", http.StatusBadRequest},
+		// Trailing data after first value → kind=trailing_data.
+		{"trailing_data", `{"title":"x"}{"extra":1}`, "trailing_data", http.StatusBadRequest},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			logger.Init(slog.LevelWarn, &buf)
+			t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
+
+			ts, _ := newTestAPI(t)
+			res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(tt.body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _ = io.Copy(io.Discard, res.Body)
+			_ = res.Body.Close()
+
+			if res.StatusCode != tt.wantStatus {
+				t.Fatalf("want %d, got %d", tt.wantStatus, res.StatusCode)
+			}
+
+			// Scan all log entries first, then assert. Failing on the first
+			// matching entry would mask later entries with the correct kind.
+			logBuf := buf.String()
+			var foundKind string
+			for _, line := range strings.Split(logBuf, "\n") {
+				line = strings.TrimSpace(line)
+				if line == "" {
+					continue
+				}
+				var entry map[string]any
+				if err := json.Unmarshal([]byte(line), &entry); err != nil {
+					continue
+				}
+				if entry["msg"] != "request body decode failed" {
+					continue
+				}
+				foundKind, _ = entry["kind"].(string)
+				break // take the first matching log entry
+			}
+			if foundKind == "" {
+				t.Fatalf("no 'request body decode failed' log entry found\nlog: %s", logBuf)
+			}
+			if foundKind != tt.wantKind {
+				t.Fatalf("kind=%q, want %q\nlog: %s", foundKind, tt.wantKind, logBuf)
+			}
+		})
+	}
+}
+
+// TestReadJSON_bodyTooLargeKindLogged asserts that a body exceeding the 1 MiB
+// limit returns 413 and logs kind=body_too_large.
+func TestReadJSON_bodyTooLargeKindLogged(t *testing.T) {
+	var buf bytes.Buffer
+	logger.Init(slog.LevelWarn, &buf)
+	t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
+
+	ts, _ := newTestAPI(t)
+	// Build a body just over 1 MiB; wrap in a JSON object so it parses until
+	// the size limit is hit.
+	oversized := `{"title":"` + strings.Repeat("x", maxRequestBodySize+1) + `"}`
+	res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(oversized))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = io.Copy(io.Discard, res.Body)
+	_ = res.Body.Close()
+
+	if res.StatusCode != http.StatusRequestEntityTooLarge {
+		t.Fatalf("want 413, got %d", res.StatusCode)
+	}
+
+	logBuf := buf.String()
+	var foundKind string
+	for _, line := range strings.Split(logBuf, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var entry map[string]any
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			continue
+		}
+		if entry["msg"] == "request body decode failed" {
+			foundKind, _ = entry["kind"].(string)
+			break
+		}
+	}
+	if foundKind != "body_too_large" {
+		t.Fatalf("want kind=body_too_large in log, got %q\nlog: %s", foundKind, logBuf)
+	}
+}
+
+// TestReadJSON_clientMessagesDoNotLeakRawInput asserts that the client-visible
+// error messages for decode failures are stable and never include raw user input
+// (e.g. invalid characters, field names from the request body).
+func TestReadJSON_clientMessagesDoNotLeakRawInput(t *testing.T) {
+	tests := []struct {
+		name    string
+		body    string
+		wantMsg string
+	}{
+		{"empty_body", ``, "request body must not be empty"},
+		{"syntax_error", `{"title":`, "request body contains malformed JSON"},
+		{"type_error", `{"title":123}`, "request body contains an invalid field value"},
+		{"unknown_field", `{"title":"x","injected_field":1}`, "invalid request body"},
+		{"trailing_data", `{"title":"x"}{"extra":1}`, "request body must contain exactly one JSON value"},
+	}
+
+	ts, _ := newTestAPI(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(tt.body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = res.Body.Close() }()
+			if res.StatusCode != http.StatusBadRequest {
+				b, _ := io.ReadAll(res.Body)
+				t.Fatalf("want 400, got %d: %s", res.StatusCode, b)
+			}
+			var out map[string]string
+			if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+				t.Fatalf("decode body: %v", err)
+			}
+			if got := out["error"]; got != tt.wantMsg {
+				t.Fatalf(`body["error"] = %q, want %q`, got, tt.wantMsg)
+			}
+		})
 	}
 }
