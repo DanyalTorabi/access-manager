@@ -61,6 +61,11 @@ Extend `go/internal/database/open.go` to dispatch to `internal/store/postgres` a
 - Migration SQL files — T56, T57.
 - CI integration test targets — T61.
 
+## Deferred follow-ups
+
+- **Driver-dispatch consolidation (three switches):** `database.Open`, `database.MigrateUp`, and `setup()` each independently switch on the driver string. Adding a new dialect requires changes in three places. Introducing a shared `driverConfig` struct or collapsing store selection into `database.Open` would create a single authoritative list. Deferred — track in a new issue.
+- **`internal/database` layering violation:** `open.go` imports all three store packages (`internal/store/sqlite`, `internal/store/postgres`, `internal/store/mysql`), which registers all three drivers at `init()` time regardless of which driver is configured. This inflates the binary and couples the low-level database package to higher-level store implementations. Fixing this would require a refactor (e.g., moving driver-registration-only sub-packages or separating `sql.Open` from store construction). Deferred — track in a new issue.
+
 ## Dependencies
 
 - **T56, T57** — Postgres/MySQL migration dirs must exist.
