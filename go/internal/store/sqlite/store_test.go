@@ -4478,3 +4478,49 @@ func TestT48_TypedInvalidInputError_RoundTrip(t *testing.T) {
 		})
 	}
 }
+
+// TestMaskFromSQL_negativeMaskHook documents that maskFromSQL invokes the
+// negative-mask hook exactly once per negative read and returns 0. See T50.
+func TestMaskFromSQL_negativeMaskHook(t *testing.T) {
+	s := &Store{}
+	t.Cleanup(func() { s.SetNegativeMaskHook(nil) })
+
+	if got := s.maskFromSQL(0); got != 0 {
+		t.Fatalf("maskFromSQL(0) = %d, want 0", got)
+	}
+	if got := s.maskFromSQL(42); got != 42 {
+		t.Fatalf("maskFromSQL(42) = %d, want 42", got)
+	}
+
+	var calls int
+	s.SetNegativeMaskHook(func() { calls++ })
+
+	if got := s.maskFromSQL(-1); got != 0 {
+		t.Fatalf("maskFromSQL(-1) = %d, want 0", got)
+	}
+	if got := s.maskFromSQL(-9999); got != 0 {
+		t.Fatalf("maskFromSQL(-9999) = %d, want 0", got)
+	}
+	if calls != 2 {
+		t.Fatalf("hook calls = %d, want 2", calls)
+	}
+
+	if got := s.maskFromSQL(7); got != 7 {
+		t.Fatalf("maskFromSQL(7) = %d, want 7", got)
+	}
+	if calls != 2 {
+		t.Fatalf("hook called on positive value: calls = %d, want 2", calls)
+	}
+}
+
+// TestMaskFromSQL_nilHook verifies that maskFromSQL is a no-op (returns 0
+// for negatives, identity for non-negatives) when no hook is installed.
+func TestMaskFromSQL_nilHook(t *testing.T) {
+	s := &Store{}
+	if got := s.maskFromSQL(-2); got != 0 {
+		t.Fatalf("maskFromSQL(-2) with nil hook = %d, want 0", got)
+	}
+	if got := s.maskFromSQL(5); got != 5 {
+		t.Fatalf("maskFromSQL(5) with nil hook = %d, want 5", got)
+	}
+}

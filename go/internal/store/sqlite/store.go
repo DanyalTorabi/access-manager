@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync/atomic"
 
 	"github.com/dtorabi/access-manager/internal/access"
 	"github.com/dtorabi/access-manager/internal/store"
@@ -17,6 +18,11 @@ import (
 // Store implements store.Store for SQLite.
 type Store struct {
 	db *sql.DB
+	// negativeMaskHook is invoked once per negative mask read by
+	// (*Store).maskFromSQL. Callers (typically the API layer) install a
+	// callback to bump a Prometheus counter so dashboards can alert on
+	// out-of-band or legacy data. The default is a no-op. See T50.
+	negativeMaskHook atomic.Pointer[func()]
 }
 
 func New(db *sql.DB) *Store {
@@ -67,12 +73,33 @@ func maskToSQL(m uint64) (int64, error) {
 	return int64(m), nil
 }
 
+// negativeMaskHook is invoked once per negative mask read by maskFromSQL.
+// It is set by callers (typically the API layer) to bump a Prometheus
+// counter so dashboards can alert on out-of-band or legacy data. The
+// default is a no-op. See T50.
+
+// SetNegativeMaskHook installs a callback invoked whenever this Store
+// observes a negative int64 mask value via maskFromSQL. Pass nil to clear.
+// Safe for concurrent use. The hook is invoked synchronously inside the
+// row-scan path, so implementations must be fast (e.g. a single atomic
+// counter increment) and must not block.
+func (s *Store) SetNegativeMaskHook(f func()) {
+	if f == nil {
+		s.negativeMaskHook.Store(nil)
+		return
+	}
+	s.negativeMaskHook.Store(&f)
+}
+
 // maskFromSQL converts an int64 value read from SQLite into uint64. If a
 // negative value is encountered, log a warning and treat it as zero to avoid
 // propagating unexpected large unsigned values.
-func maskFromSQL(v int64) uint64 {
+func (s *Store) maskFromSQL(v int64) uint64 {
 	if v < 0 {
 		slog.Warn("negative mask value read from DB; treating as 0", "value", v)
+		if h := s.negativeMaskHook.Load(); h != nil {
+			(*h)()
+		}
 		return 0
 	}
 	return uint64(v)
@@ -599,7 +626,7 @@ func (s *Store) AccessTypeList(ctx context.Context, domainID string, opts store.
 		if err := rows.Scan(&a.ID, &a.DomainID, &a.Title, &bit); err != nil {
 			return nil, 0, err
 		}
-		a.Bit = maskFromSQL(bit)
+		a.Bit = s.maskFromSQL(bit)
 		list = append(list, a)
 	}
 	return list, total, rows.Err()
@@ -615,7 +642,7 @@ func (s *Store) AccessTypeGet(ctx context.Context, domainID, id string) (*store.
 		}
 		return nil, err
 	}
-	out.Bit = maskFromSQL(bit)
+	out.Bit = s.maskFromSQL(bit)
 	return &out, nil
 }
 
@@ -656,7 +683,7 @@ func (s *Store) AccessTypePatch(ctx context.Context, domainID, id string, p stor
 	if p.Title != nil {
 		title = *p.Title
 	}
-	bit := maskFromSQL(curBit)
+	bit := s.maskFromSQL(curBit)
 	if p.Bit != nil {
 		bit = *p.Bit
 	}
@@ -694,7 +721,7 @@ func (s *Store) PermissionGet(ctx context.Context, domainID, id string) (*store.
 		}
 		return nil, err
 	}
-	out.AccessMask = maskFromSQL(m)
+	out.AccessMask = s.maskFromSQL(m)
 	return &out, nil
 }
 
@@ -730,7 +757,7 @@ func (s *Store) PermissionList(ctx context.Context, domainID string, opts store.
 		if err := rows.Scan(&p.ID, &p.DomainID, &p.Title, &p.ResourceID, &m); err != nil {
 			return nil, 0, err
 		}
-		p.AccessMask = maskFromSQL(m)
+		p.AccessMask = s.maskFromSQL(m)
 		list = append(list, p)
 	}
 	return list, total, rows.Err()
@@ -784,7 +811,7 @@ func (s *Store) PermissionPatch(ctx context.Context, domainID, id string, p stor
 		}
 		resourceID = *p.ResourceID
 	}
-	mask := maskFromSQL(curMask)
+	mask := s.maskFromSQL(curMask)
 	if p.AccessMask != nil {
 		mask = *p.AccessMask
 	}
@@ -1002,7 +1029,7 @@ func (s *Store) UserAuthzResourcesList(ctx context.Context, domainID, userID str
 		if err := maskRows.Scan(&resourceID, &m); err != nil {
 			return nil, 0, err
 		}
-		masksByResource[resourceID] |= maskFromSQL(m)
+		masksByResource[resourceID] |= s.maskFromSQL(m)
 	}
 	if err := maskRows.Err(); err != nil {
 		return nil, 0, err
@@ -1109,7 +1136,7 @@ func (s *Store) GroupAuthzResourcesList(ctx context.Context, domainID, groupID s
 		if err := maskRows.Scan(&resourceID, &m); err != nil {
 			return nil, 0, err
 		}
-		masksByResource[resourceID] |= maskFromSQL(m)
+		masksByResource[resourceID] |= s.maskFromSQL(m)
 	}
 	if err := maskRows.Err(); err != nil {
 		return nil, 0, err
@@ -1234,7 +1261,7 @@ func (s *Store) ResourceAuthzGroupsList(ctx context.Context, domainID, resourceI
 		if err := maskRows.Scan(&gid, &m); err != nil {
 			return nil, 0, err
 		}
-		masksByGroup[gid] |= maskFromSQL(m)
+		masksByGroup[gid] |= s.maskFromSQL(m)
 	}
 	if err := maskRows.Err(); err != nil {
 		return nil, 0, err
@@ -1376,7 +1403,7 @@ func (s *Store) ResourceAuthzUsersList(ctx context.Context, domainID, resourceID
 	for _, uid := range userIDs {
 		directArgs = append(directArgs, uid)
 	}
-	if err := scanUserMasks(ctx, s.db, directSQL, directArgs, masksByUser); err != nil {
+	if err := scanUserMasks(ctx, s, directSQL, directArgs, masksByUser); err != nil {
 		return nil, 0, err
 	}
 
@@ -1391,7 +1418,7 @@ func (s *Store) ResourceAuthzUsersList(ctx context.Context, domainID, resourceID
 	for _, uid := range userIDs {
 		indirectArgs = append(indirectArgs, uid)
 	}
-	if err := scanUserMasks(ctx, s.db, indirectSQL, indirectArgs, masksByUser); err != nil {
+	if err := scanUserMasks(ctx, s, indirectSQL, indirectArgs, masksByUser); err != nil {
 		return nil, 0, err
 	}
 
@@ -1402,8 +1429,8 @@ func (s *Store) ResourceAuthzUsersList(ctx context.Context, domainID, resourceID
 	return result, total, nil
 }
 
-func scanUserMasks(ctx context.Context, db *sql.DB, query string, args []any, into map[string]uint64) error {
-	rows, err := db.QueryContext(ctx, query, args...)
+func scanUserMasks(ctx context.Context, s *Store, query string, args []any, into map[string]uint64) error {
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return err
 	}
@@ -1414,7 +1441,7 @@ func scanUserMasks(ctx context.Context, db *sql.DB, query string, args []any, in
 		if err := rows.Scan(&uid, &m); err != nil {
 			return err
 		}
-		into[uid] |= maskFromSQL(m)
+		into[uid] |= s.maskFromSQL(m)
 	}
 	return rows.Err()
 }
@@ -1434,7 +1461,7 @@ func (s *Store) PermissionMasksForUserResource(ctx context.Context, domainID, us
 		if err := rows.Scan(&m); err != nil {
 			return nil, err
 		}
-		masks = append(masks, maskFromSQL(m))
+		masks = append(masks, s.maskFromSQL(m))
 	}
 	return masks, rows.Err()
 }
