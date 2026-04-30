@@ -48,6 +48,13 @@ Provide **proposed** commit message and PR description text only. Do **not** run
 - The `Tnn` identifier must match the corresponding plan file under `plan/phase-*/Tnn-...md` when applicable. Include a link to the plan file in the issue or PR body.
 - If no plan ticket applies, follow a short, imperative title (e.g. `ci: fix linting error`).
 
+### Milestone
+
+- Every new issue must be assigned to the **current active milestone** (e.g. `26Q2`).
+- When creating an issue via `gh issue create`, add `--milestone "<milestone title>"` (e.g. `--milestone "26Q2"`).
+- When creating via the GitHub UI, select the milestone from the **Milestone** dropdown before submitting.
+- The current milestone is **26Q2** (April–June 2026, due 2026-06-30). Update this line when a new milestone is created.
+
 
 ### Before you open a PR (self-review)
 
