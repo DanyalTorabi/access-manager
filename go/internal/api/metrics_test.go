@@ -139,10 +139,10 @@ func TestMetrics_authzCheckIncrementsExactlyOnce(t *testing.T) {
 		t.Fatalf("want 200, got %d", res.StatusCode)
 	}
 
-	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"domain_id": dom.ID, "result": "ok"}); got != 1 {
-		t.Fatalf("authz_checks_total{domain_id=%q,result=ok} want 1, got %v", dom.ID, got)
+	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"result": "ok"}); got != 1 {
+		t.Fatalf("authz_checks_total{result=ok} want 1, got %v", got)
 	}
-	if got := findCounterWithLabelsOrZero(t, reg, "authz_checks_total", map[string]string{"domain_id": dom.ID, "result": "err"}); got != 0 {
+	if got := findCounterWithLabelsOrZero(t, reg, "authz_checks_total", map[string]string{"result": "err"}); got != 0 {
 		t.Fatalf("authz_checks_total{result=err} want 0, got %v", got)
 	}
 }
@@ -169,8 +169,11 @@ func TestMetrics_authzMasksIncrementsExactlyOnce(t *testing.T) {
 		t.Fatalf("want 200, got %d", res.StatusCode)
 	}
 
-	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"domain_id": dom.ID, "result": "ok"}); got != 1 {
+	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"result": "ok"}); got != 1 {
 		t.Fatalf("authz_checks_total{result=ok} want 1, got %v", got)
+	}
+	if got := findCounterWithLabelsOrZero(t, reg, "authz_checks_total", map[string]string{"result": "err"}); got != 0 {
+		t.Fatalf("authz_checks_total{result=err} want 0, got %v", got)
 	}
 }
 
@@ -193,10 +196,10 @@ func TestMetrics_authzCheckValidationErrorIncrementsErr(t *testing.T) {
 		t.Fatalf("want 400, got %d", res.StatusCode)
 	}
 
-	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"domain_id": dom.ID, "result": "err"}); got != 1 {
+	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"result": "err"}); got != 1 {
 		t.Fatalf("authz_checks_total{result=err} want 1, got %v", got)
 	}
-	if got := findCounterWithLabelsOrZero(t, reg, "authz_checks_total", map[string]string{"domain_id": dom.ID, "result": "ok"}); got != 0 {
+	if got := findCounterWithLabelsOrZero(t, reg, "authz_checks_total", map[string]string{"result": "ok"}); got != 0 {
 		t.Fatalf("authz_checks_total{result=ok} want 0, got %v", got)
 	}
 }
@@ -218,7 +221,7 @@ func TestMetrics_authzMasksValidationErrorIncrementsErr(t *testing.T) {
 		t.Fatalf("want 400, got %d", res.StatusCode)
 	}
 
-	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"domain_id": dom.ID, "result": "err"}); got != 1 {
+	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"result": "err"}); got != 1 {
 		t.Fatalf("authz_checks_total{result=err} want 1, got %v", got)
 	}
 }
@@ -251,10 +254,10 @@ func TestMetrics_authzCheckStoreErrorIncrementsErr(t *testing.T) {
 		t.Fatalf("want 500, got %d", res.StatusCode)
 	}
 
-	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"domain_id": domID, "result": "err"}); got != 1 {
+	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"result": "err"}); got != 1 {
 		t.Fatalf("authz_checks_total{result=err} want 1, got %v", got)
 	}
-	if got := findCounterWithLabelsOrZero(t, reg, "authz_checks_total", map[string]string{"domain_id": domID, "result": "ok"}); got != 0 {
+	if got := findCounterWithLabelsOrZero(t, reg, "authz_checks_total", map[string]string{"result": "ok"}); got != 0 {
 		t.Fatalf("authz_checks_total{result=ok} want 0, got %v", got)
 	}
 }
@@ -275,12 +278,57 @@ func TestMetrics_authzMasksStoreErrorIncrementsErr(t *testing.T) {
 		t.Fatalf("want 500, got %d", res.StatusCode)
 	}
 
-	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"domain_id": domID, "result": "err"}); got != 1 {
+	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"result": "err"}); got != 1 {
 		t.Fatalf("authz_checks_total{result=err} want 1, got %v", got)
 	}
-	if got := findCounterWithLabelsOrZero(t, reg, "authz_checks_total", map[string]string{"domain_id": domID, "result": "ok"}); got != 0 {
+	if got := findCounterWithLabelsOrZero(t, reg, "authz_checks_total", map[string]string{"result": "ok"}); got != 0 {
 		t.Fatalf("authz_checks_total{result=ok} want 0, got %v", got)
 	}
+}
+
+// TestMetrics_authzChecksLabelCardinalityBounded asserts that every sample in
+// authz_checks_total has exactly one label key ("result"). This guards against
+// accidental reintroduction of high-cardinality labels such as domain_id. T53.
+func TestMetrics_authzChecksLabelCardinalityBounded(t *testing.T) {
+	ts, _, reg := newTestAPIWithMetrics(t)
+
+	var dom store.Domain
+	mustUnmarshal(t, mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"d"}`), &dom)
+
+	var user store.User
+	mustUnmarshal(t, mustPostJSON201(t, ts.URL+"/api/v1/domains/"+dom.ID+"/users", `{"title":"u"}`), &user)
+
+	var resource store.Resource
+	mustUnmarshal(t, mustPostJSON201(t, ts.URL+"/api/v1/domains/"+dom.ID+"/resources", `{"title":"r"}`), &resource)
+
+	url := ts.URL + "/api/v1/domains/" + dom.ID + "/authz/check?user_id=" + user.ID + "&resource_id=" + resource.ID + "&access_bit=1"
+	res, err := http.Get(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+
+	mfs, err := reg.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mf := range mfs {
+		if mf.GetName() != "authz_checks_total" {
+			continue
+		}
+		for _, m := range mf.GetMetric() {
+			labels := m.GetLabel()
+			if len(labels) != 1 || labels[0].GetName() != "result" {
+				got := make([]string, len(labels))
+				for i, lp := range labels {
+					got[i] = lp.GetName() + "=" + lp.GetValue()
+				}
+				t.Fatalf("authz_checks_total sample has unexpected label set %v; want [result]", got)
+			}
+		}
+		return
+	}
+	t.Fatal("authz_checks_total not found after authz request")
 }
 
 func findCounter(t *testing.T, reg *prometheus.Registry, name string) float64 {
