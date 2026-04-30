@@ -887,6 +887,14 @@ SELECT p.access_mask FROM permissions p
 WHERE p.domain_id = ? AND p.resource_id = ?
 ` + userEffectivePermissionPredicateSQL
 
+// userAuthzResourcesBaseSQL selects resources where the user has a non-
+// zero effective mask via direct grants OR group membership. As of T51 the
+// schema enforces composite FKs across the joined tables, so the embedded
+// up.domain_id / gp.domain_id / gm.domain_id filters in
+// userEffectivePermissionPredicateSQL are redundant. They are kept for
+// defence-in-depth until #85 drops them in lockstep across all authz
+// listings. TODO(#85): drop the defensive domain_id filters once the
+// schema-only coverage in #85 lands.
 const userAuthzResourcesBaseSQL = `
 FROM permissions p
 WHERE p.domain_id = ? AND p.access_mask > 0
@@ -1010,6 +1018,12 @@ func (s *Store) UserAuthzResourcesList(ctx context.Context, domainID, userID str
 // groupAuthzResourcesBaseSQL joins permissions with group_permissions.
 // domain_id appears twice: once for p (permissions row) and once for gp
 // (group_permissions row) because both tables carry domain_id independently.
+//
+// As of T51 the schema enforces composite FKs across these tables, so the
+// p.domain_id and gp.domain_id filters are redundant. They are kept for
+// defence-in-depth until #85 drops them in lockstep across all authz
+// listings. TODO(#85): drop the defensive p.domain_id / gp.domain_id
+// filters once the schema-only coverage in #85 lands.
 const groupAuthzResourcesBaseSQL = `
 FROM permissions p
 INNER JOIN group_permissions gp ON gp.permission_id = p.id
@@ -1262,6 +1276,12 @@ func (s *Store) ResourceAuthzGroupsList(ctx context.Context, domainID, resourceI
 //	6: gm.domain_id  = domainID   (group-membership domain pin)
 //
 // Example with domainID="D" / resourceID="R": all six args are ["D","D","R","D","D","D"].
+//
+// As of T51 the schema enforces composite FKs across the joined tables,
+// so the up.domain_id / gp.domain_id / gm.domain_id filters are
+// redundant. They are kept for defence-in-depth until #85 drops them in
+// lockstep across all authz listings. TODO(#85): drop the defensive
+// domain_id filters once the schema-only coverage in #85 lands.
 const resourceAuthzUsersBaseSQL = `
 FROM users u
 WHERE u.domain_id = ? AND EXISTS (
