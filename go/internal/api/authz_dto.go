@@ -6,34 +6,34 @@ import (
 	"github.com/dtorabi/access-manager/internal/store"
 )
 
-// UserAuthzResourceDTO is the JSON response row for
+// userAuthzResourceDTO is the JSON response row for
 // GET /domains/{domainID}/users/{userID}/authz/resources.
 // OpenAPI schema: UserAuthzResource.
-type UserAuthzResourceDTO struct {
+type userAuthzResourceDTO struct {
 	ResourceID    string `json:"resource_id"`
 	EffectiveMask string `json:"effective_mask"`
 }
 
-// GroupAuthzResourceDTO is the JSON response row for
+// groupAuthzResourceDTO is the JSON response row for
 // GET /domains/{domainID}/groups/{groupID}/authz/resources.
 // OpenAPI schema: GroupAuthzResource.
-type GroupAuthzResourceDTO struct {
+type groupAuthzResourceDTO struct {
 	ResourceID string `json:"resource_id"`
 	Mask       string `json:"mask"`
 }
 
-// ResourceAuthzUserDTO is the JSON response row for
+// resourceAuthzUserDTO is the JSON response row for
 // GET /domains/{domainID}/resources/{resourceID}/authz/users.
 // OpenAPI schema: ResourceAuthzUser.
-type ResourceAuthzUserDTO struct {
+type resourceAuthzUserDTO struct {
 	UserID        string `json:"user_id"`
 	EffectiveMask string `json:"effective_mask"`
 }
 
-// ResourceAuthzGroupDTO is the JSON response row for
+// resourceAuthzGroupDTO is the JSON response row for
 // GET /domains/{domainID}/resources/{resourceID}/authz/groups.
 // OpenAPI schema: ResourceAuthzGroup.
-type ResourceAuthzGroupDTO struct {
+type resourceAuthzGroupDTO struct {
 	GroupID string `json:"group_id"`
 	Mask    string `json:"mask"`
 }
@@ -49,9 +49,9 @@ func toAuthzDTOs[S, D any](list []S, fn func(S) D) []D {
 }
 
 // userAuthzResourceDTOs converts a UserAuthzResource store slice to DTOs.
-func userAuthzResourceDTOs(list []store.UserAuthzResource) []UserAuthzResourceDTO {
-	return toAuthzDTOs(list, func(it store.UserAuthzResource) UserAuthzResourceDTO {
-		return UserAuthzResourceDTO{
+func userAuthzResourceDTOs(list []store.UserAuthzResource) []userAuthzResourceDTO {
+	return toAuthzDTOs(list, func(it store.UserAuthzResource) userAuthzResourceDTO {
+		return userAuthzResourceDTO{
 			ResourceID:    it.ResourceID,
 			EffectiveMask: strconv.FormatUint(it.EffectiveMask, 10),
 		}
@@ -59,9 +59,9 @@ func userAuthzResourceDTOs(list []store.UserAuthzResource) []UserAuthzResourceDT
 }
 
 // groupAuthzResourceDTOs converts a GroupAuthzResource store slice to DTOs.
-func groupAuthzResourceDTOs(list []store.GroupAuthzResource) []GroupAuthzResourceDTO {
-	return toAuthzDTOs(list, func(it store.GroupAuthzResource) GroupAuthzResourceDTO {
-		return GroupAuthzResourceDTO{
+func groupAuthzResourceDTOs(list []store.GroupAuthzResource) []groupAuthzResourceDTO {
+	return toAuthzDTOs(list, func(it store.GroupAuthzResource) groupAuthzResourceDTO {
+		return groupAuthzResourceDTO{
 			ResourceID: it.ResourceID,
 			Mask:       strconv.FormatUint(it.Mask, 10),
 		}
@@ -69,9 +69,9 @@ func groupAuthzResourceDTOs(list []store.GroupAuthzResource) []GroupAuthzResourc
 }
 
 // resourceAuthzUserDTOs converts a ResourceAuthzUser store slice to DTOs.
-func resourceAuthzUserDTOs(list []store.ResourceAuthzUser) []ResourceAuthzUserDTO {
-	return toAuthzDTOs(list, func(it store.ResourceAuthzUser) ResourceAuthzUserDTO {
-		return ResourceAuthzUserDTO{
+func resourceAuthzUserDTOs(list []store.ResourceAuthzUser) []resourceAuthzUserDTO {
+	return toAuthzDTOs(list, func(it store.ResourceAuthzUser) resourceAuthzUserDTO {
+		return resourceAuthzUserDTO{
 			UserID:        it.UserID,
 			EffectiveMask: strconv.FormatUint(it.EffectiveMask, 10),
 		}
@@ -79,9 +79,9 @@ func resourceAuthzUserDTOs(list []store.ResourceAuthzUser) []ResourceAuthzUserDT
 }
 
 // resourceAuthzGroupDTOs converts a ResourceAuthzGroup store slice to DTOs.
-func resourceAuthzGroupDTOs(list []store.ResourceAuthzGroup) []ResourceAuthzGroupDTO {
-	return toAuthzDTOs(list, func(it store.ResourceAuthzGroup) ResourceAuthzGroupDTO {
-		return ResourceAuthzGroupDTO{
+func resourceAuthzGroupDTOs(list []store.ResourceAuthzGroup) []resourceAuthzGroupDTO {
+	return toAuthzDTOs(list, func(it store.ResourceAuthzGroup) resourceAuthzGroupDTO {
+		return resourceAuthzGroupDTO{
 			GroupID: it.GroupID,
 			Mask:    strconv.FormatUint(it.Mask, 10),
 		}
