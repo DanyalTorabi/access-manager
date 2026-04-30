@@ -4038,7 +4038,10 @@ func TestResourceAuthzGroupsList_otherDomainsExcluded(t *testing.T) {
 
 // TestSchema_compositeFKRejectsCrossDomain verifies the T51 schema invariant
 // for all three junction tables: an out-of-band insert with mismatched
-// domain_id must fail at the DB layer.
+// domain_id must fail at the DB layer. Each junction table's two FKs are
+// exercised independently so a missing FK cannot hide behind a sibling FK
+// failure. The positive-path subtest then verifies that valid same-domain
+// inserts still succeed after the schema rebuild.
 func TestSchema_compositeFKRejectsCrossDomain(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)
@@ -4051,42 +4054,70 @@ func TestSchema_compositeFKRejectsCrossDomain(t *testing.T) {
 	if err := s.DomainCreate(ctx, &store.Domain{ID: d2, Title: "d2"}); err != nil {
 		t.Fatal(err)
 	}
-	uid := uuid.NewString()
-	if err := s.UserCreate(ctx, &store.User{ID: uid, DomainID: d2, Title: "u"}); err != nil {
-		t.Fatal(err)
+	// Per-domain entities; we use d1- and d2-prefixed names to make each
+	// case's two parent rows obvious.
+	uid1, uid2 := uuid.NewString(), uuid.NewString()
+	gid1, gid2 := uuid.NewString(), uuid.NewString()
+	rid1, rid2 := uuid.NewString(), uuid.NewString()
+	pid1, pid2 := uuid.NewString(), uuid.NewString()
+	mustCreate := func(label string, err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatalf("setup %s: %v", label, err)
+		}
 	}
-	gid := uuid.NewString()
-	if err := s.GroupCreate(ctx, &store.Group{ID: gid, DomainID: d2, Title: "g"}); err != nil {
-		t.Fatal(err)
-	}
-	rid := uuid.NewString()
-	if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: d2, Title: "r"}); err != nil {
-		t.Fatal(err)
-	}
-	pid := uuid.NewString()
-	if err := s.PermissionCreate(ctx, &store.Permission{ID: pid, DomainID: d2, Title: "p", ResourceID: rid, AccessMask: 1}); err != nil {
-		t.Fatal(err)
-	}
+	mustCreate("u1", s.UserCreate(ctx, &store.User{ID: uid1, DomainID: d1, Title: "u1"}))
+	mustCreate("u2", s.UserCreate(ctx, &store.User{ID: uid2, DomainID: d2, Title: "u2"}))
+	mustCreate("g1", s.GroupCreate(ctx, &store.Group{ID: gid1, DomainID: d1, Title: "g1"}))
+	mustCreate("g2", s.GroupCreate(ctx, &store.Group{ID: gid2, DomainID: d2, Title: "g2"}))
+	mustCreate("r1", s.ResourceCreate(ctx, &store.Resource{ID: rid1, DomainID: d1, Title: "r1"}))
+	mustCreate("r2", s.ResourceCreate(ctx, &store.Resource{ID: rid2, DomainID: d2, Title: "r2"}))
+	mustCreate("p1", s.PermissionCreate(ctx, &store.Permission{ID: pid1, DomainID: d1, Title: "p1", ResourceID: rid1, AccessMask: 1}))
+	mustCreate("p2", s.PermissionCreate(ctx, &store.Permission{ID: pid2, DomainID: d2, Title: "p2", ResourceID: rid2, AccessMask: 1}))
 
+	// Negative cases: each junction table has two composite FKs; we test
+	// each FK independently by keeping the "other" parent valid in the
+	// junction's own domain so only the targeted FK fails.
 	cases := []struct {
 		name string
 		sql  string
 		args []any
 	}{
+		// group_members: (domain_id, user_id) -> users(id, domain_id)
+		// and (domain_id, group_id) -> groups(id, domain_id).
 		{
-			name: "group_members_user_cross_domain",
+			name: "group_members_user_fk",
 			sql:  `INSERT INTO group_members (domain_id, user_id, group_id) VALUES (?, ?, ?)`,
-			args: []any{d1, uid, gid},
+			args: []any{d1, uid2, gid1}, // user belongs to d2; group correct
 		},
 		{
-			name: "user_permissions_user_cross_domain",
+			name: "group_members_group_fk",
+			sql:  `INSERT INTO group_members (domain_id, user_id, group_id) VALUES (?, ?, ?)`,
+			args: []any{d1, uid1, gid2}, // group belongs to d2; user correct
+		},
+		// user_permissions: (domain_id, user_id) and
+		// (domain_id, permission_id).
+		{
+			name: "user_permissions_user_fk",
 			sql:  `INSERT INTO user_permissions (domain_id, user_id, permission_id) VALUES (?, ?, ?)`,
-			args: []any{d1, uid, pid},
+			args: []any{d1, uid2, pid1},
 		},
 		{
-			name: "group_permissions_group_cross_domain",
+			name: "user_permissions_permission_fk",
+			sql:  `INSERT INTO user_permissions (domain_id, user_id, permission_id) VALUES (?, ?, ?)`,
+			args: []any{d1, uid1, pid2},
+		},
+		// group_permissions: (domain_id, group_id) and
+		// (domain_id, permission_id).
+		{
+			name: "group_permissions_group_fk",
 			sql:  `INSERT INTO group_permissions (domain_id, group_id, permission_id) VALUES (?, ?, ?)`,
-			args: []any{d1, gid, pid},
+			args: []any{d1, gid2, pid1},
+		},
+		{
+			name: "group_permissions_permission_fk",
+			sql:  `INSERT INTO group_permissions (domain_id, group_id, permission_id) VALUES (?, ?, ?)`,
+			args: []any{d1, gid1, pid2},
 		},
 	}
 	for _, c := range cases {
@@ -4100,6 +4131,36 @@ func TestSchema_compositeFKRejectsCrossDomain(t *testing.T) {
 			}
 		})
 	}
+
+	// Positive paths: valid same-domain inserts must still succeed after
+	// the schema rebuild. If a UNIQUE target had been mistyped (e.g.
+	// REFERENCES groups(domain_id, id) instead of groups(id, domain_id))
+	// the negative cases above would still pass because the FK target
+	// would not exist; the positive cases catch that class of bug.
+	t.Run("group_members_valid", func(t *testing.T) {
+		if _, err := s.db.ExecContext(ctx,
+			`INSERT INTO group_members (domain_id, user_id, group_id) VALUES (?, ?, ?)`,
+			d1, uid1, gid1,
+		); err != nil {
+			t.Fatalf("valid same-domain group_members insert must succeed: %v", err)
+		}
+	})
+	t.Run("user_permissions_valid", func(t *testing.T) {
+		if _, err := s.db.ExecContext(ctx,
+			`INSERT INTO user_permissions (domain_id, user_id, permission_id) VALUES (?, ?, ?)`,
+			d1, uid1, pid1,
+		); err != nil {
+			t.Fatalf("valid same-domain user_permissions insert must succeed: %v", err)
+		}
+	})
+	t.Run("group_permissions_valid", func(t *testing.T) {
+		if _, err := s.db.ExecContext(ctx,
+			`INSERT INTO group_permissions (domain_id, group_id, permission_id) VALUES (?, ?, ?)`,
+			d1, gid1, pid1,
+		); err != nil {
+			t.Fatalf("valid same-domain group_permissions insert must succeed: %v", err)
+		}
+	})
 }
 
 func TestResourceAuthzGroupsList_limitClampedAtMaxLimit(t *testing.T) {
