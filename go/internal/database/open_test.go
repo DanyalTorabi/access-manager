@@ -39,40 +39,10 @@ func TestOpen_postgres_pingError(t *testing.T) {
 	}
 }
 
-func TestOpen_postgres_migrationsDir(t *testing.T) {
-	// Verify the routing returns the correct migrations dir before the ping fails.
-	// We check the error message is a ping error (not an "unsupported driver" error).
-	_, migDir, err := Open("postgres", "postgres://invalid:invalid@127.0.0.1:1/nodb?sslmode=disable&connect_timeout=1")
-	if err == nil {
-		t.Skip("unexpected successful postgres connection")
-	}
-	// migDir is empty on error — but we verify the driver was dispatched (no "unsupported driver" in error).
-	if migDir != "" {
-		t.Fatalf("migDir should be empty on error, got %q", migDir)
-	}
-	if strings.Contains(err.Error(), "unsupported driver") {
-		t.Fatalf("should not be unsupported driver error, got: %v", err)
-	}
-}
-
 func TestOpen_mysql_pingError(t *testing.T) {
 	_, _, err := Open("mysql", "invalid:invalid@tcp(127.0.0.1:1)/nodb?parseTime=true&timeout=1s&readTimeout=1s&writeTimeout=1s")
 	if err == nil {
 		t.Fatal("want error for unreachable mysql DSN")
-	}
-}
-
-func TestOpen_mysql_migrationsDir(t *testing.T) {
-	// Verify routing is reached (no "unsupported driver" error).
-	_, migDir, err := Open("mysql", "invalid:invalid@tcp(127.0.0.1:1)/nodb?parseTime=true&timeout=1s&readTimeout=1s&writeTimeout=1s")
-	if err == nil {
-		t.Skip("unexpected successful mysql connection")
-	}
-	if migDir != "" {
-		t.Fatalf("migDir should be empty on error, got %q", migDir)
-	}
-	if strings.Contains(err.Error(), "unsupported driver") {
-		t.Fatalf("should not be unsupported driver error, got: %v", err)
 	}
 }
 
@@ -141,5 +111,10 @@ func TestMigrateUp_unsupportedDriver(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "unsupported driver") {
 		t.Errorf("error %q should mention 'unsupported driver'", err.Error())
+	}
+	for _, d := range []string{"sqlite", "postgres", "mysql"} {
+		if !strings.Contains(err.Error(), d) {
+			t.Errorf("error %q does not mention supported driver %q", err.Error(), d)
+		}
 	}
 }
