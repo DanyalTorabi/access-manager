@@ -1070,7 +1070,20 @@ func writeStoreErr(w http.ResponseWriter, r *http.Request, err error) {
 // errors, not structured store errors (ErrNotFound, ErrConflict, ErrFKViolation,
 // etc.). For single-entity operations use writeStoreErr, which maps those errors
 // to appropriate HTTP status codes.
+//
+// Misuse guard: if a known structured store sentinel is passed here by mistake,
+// the function logs an additional ERROR-level alert so the incorrect call site
+// is immediately visible in production instead of silently producing a 500 for
+// errors that should map to 4xx. The client always receives the generic 500.
 func writeInternalErr(w http.ResponseWriter, r *http.Request, err error) {
+	if errors.Is(err, store.ErrNotFound) || errors.Is(err, store.ErrConflict) ||
+		errors.Is(err, store.ErrFKViolation) || errors.Is(err, store.ErrInvalidInput) {
+		logger.Error("writeInternalErr misuse: structured store error must use writeStoreErr",
+			slog.String("err", err.Error()),
+			slog.String("method", r.Method),
+			slog.String("path", r.URL.Path),
+		)
+	}
 	logRequestErr(r, http.StatusInternalServerError, err)
 	writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
 }

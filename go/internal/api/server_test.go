@@ -2587,6 +2587,46 @@ func TestWriteInternalErr_generic(t *testing.T) {
 	}
 }
 
+// TestWriteInternalErr_misuse asserts that passing a structured store sentinel
+// (e.g. ErrNotFound) to writeInternalErr logs an ERROR-level misuse alert while
+// still returning a generic 500 to the client — making the wrong call site
+// immediately visible in production.
+func TestWriteInternalErr_misuse(t *testing.T) {
+	sentinels := []struct {
+		name string
+		err  error
+	}{
+		{"ErrNotFound", store.ErrNotFound},
+		{"ErrConflict", store.ErrConflict},
+		{"ErrFKViolation", store.ErrFKViolation},
+		{"ErrInvalidInput", store.ErrInvalidInput},
+	}
+	for _, tt := range sentinels {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			logger.Init(slog.LevelError, &buf)
+			t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
+
+			w := httptest.NewRecorder()
+			writeInternalErr(w, dummyRequest(), tt.err)
+
+			if w.Code != http.StatusInternalServerError {
+				t.Fatalf("want 500, got %d", w.Code)
+			}
+			var body map[string]string
+			if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+				t.Fatalf("decode body: %v", err)
+			}
+			if body["error"] != "internal server error" {
+				t.Fatalf("body[error] = %q, want generic 500", body["error"])
+			}
+			if !strings.Contains(buf.String(), "writeInternalErr misuse") {
+				t.Fatalf("expected misuse alert in log, got: %s", buf.String())
+			}
+		})
+	}
+}
+
 // --- store-error tests using a broken (closed-DB) store ---
 
 // newBrokenTestAPIWithRegistry builds a Server backed by a closed DB so any
