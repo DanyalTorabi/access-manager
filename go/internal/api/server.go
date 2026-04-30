@@ -123,8 +123,8 @@ func (s *Server) Router(reg prometheus.Registerer, gather prometheus.Gatherer) c
 	return r
 }
 
-func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+func (s *Server) health(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, r, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 type titleBody struct {
@@ -190,18 +190,18 @@ func (s *Server) domainCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logger.Audit(r.Context(), "domain_create", slog.String("domain_id", d.ID))
-	writeJSON(w, http.StatusCreated, d)
+	writeJSON(w, r, http.StatusCreated, d)
 }
 
 func (s *Server) domainList(w http.ResponseWriter, r *http.Request) {
 	opts, err := parseListOpts(r)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	opts.Sort, opts.Order, err = parseSortOrder(r.URL.Query(), store.DomainSortFields)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	list, total, err := s.Store.DomainList(r.Context(), opts)
@@ -212,7 +212,7 @@ func (s *Server) domainList(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []store.Domain{}
 	}
-	writeList(w, list, total, opts)
+	writeList(w, r, list, total, opts)
 }
 
 func (s *Server) domainGet(w http.ResponseWriter, r *http.Request) {
@@ -222,7 +222,7 @@ func (s *Server) domainGet(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, d)
+	writeJSON(w, r, http.StatusOK, d)
 }
 
 func (s *Server) domainPatch(w http.ResponseWriter, r *http.Request) {
@@ -232,7 +232,7 @@ func (s *Server) domainPatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if b.Title == nil {
-		writeErr(w, http.StatusBadRequest, errors.New("title is required for patch"))
+		writeErr(w, r, http.StatusBadRequest, errors.New("title is required for patch"))
 		return
 	}
 	d, err := s.Store.DomainPatch(r.Context(), id, b.Title)
@@ -241,7 +241,7 @@ func (s *Server) domainPatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logger.Audit(r.Context(), "domain_patch", slog.String("domain_id", id))
-	writeJSON(w, http.StatusOK, d)
+	writeJSON(w, r, http.StatusOK, d)
 }
 
 func (s *Server) domainDelete(w http.ResponseWriter, r *http.Request) {
@@ -266,18 +266,18 @@ func (s *Server) userCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logger.Audit(r.Context(), "user_create", slog.String("domain_id", domainID), slog.String("user_id", u.ID))
-	writeJSON(w, http.StatusCreated, u)
+	writeJSON(w, r, http.StatusCreated, u)
 }
 
 func (s *Server) userList(w http.ResponseWriter, r *http.Request) {
 	opts, err := parseListOpts(r)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	opts.Sort, opts.Order, err = parseSortOrder(r.URL.Query(), store.UserSortFields)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	domainID := chi.URLParam(r, "domainID")
@@ -289,7 +289,7 @@ func (s *Server) userList(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []store.User{}
 	}
-	writeList(w, list, total, opts)
+	writeList(w, r, list, total, opts)
 }
 
 func (s *Server) userGet(w http.ResponseWriter, r *http.Request) {
@@ -300,7 +300,7 @@ func (s *Server) userGet(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, u)
+	writeJSON(w, r, http.StatusOK, u)
 }
 
 func (s *Server) userPatch(w http.ResponseWriter, r *http.Request) {
@@ -311,7 +311,7 @@ func (s *Server) userPatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if b.Title == nil {
-		writeErr(w, http.StatusBadRequest, errors.New("title is required for patch"))
+		writeErr(w, r, http.StatusBadRequest, errors.New("title is required for patch"))
 		return
 	}
 	u, err := s.Store.UserPatch(r.Context(), domainID, id, b.Title)
@@ -320,7 +320,7 @@ func (s *Server) userPatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logger.Audit(r.Context(), "user_patch", slog.String("domain_id", domainID), slog.String("user_id", id))
-	writeJSON(w, http.StatusOK, u)
+	writeJSON(w, r, http.StatusOK, u)
 }
 
 func (s *Server) userDelete(w http.ResponseWriter, r *http.Request) {
@@ -351,18 +351,18 @@ func (s *Server) groupCreate(w http.ResponseWriter, r *http.Request) {
 	gaudit := []slog.Attr{slog.String("domain_id", domainID), slog.String("group_id", g.ID)}
 	gaudit = append(gaudit, parentGroupAuditAttrs(b.ParentGroupID, false)...)
 	logger.Audit(r.Context(), "group_create", gaudit...)
-	writeJSON(w, http.StatusCreated, g)
+	writeJSON(w, r, http.StatusCreated, g)
 }
 
 func (s *Server) groupList(w http.ResponseWriter, r *http.Request) {
 	opts, err := parseGroupListOpts(r)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	opts.Sort, opts.Order, err = parseSortOrder(r.URL.Query(), store.GroupSortFields)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	domainID := chi.URLParam(r, "domainID")
@@ -374,7 +374,7 @@ func (s *Server) groupList(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []store.Group{}
 	}
-	writeList(w, list, total, opts.ListOpts)
+	writeList(w, r, list, total, opts.ListOpts)
 }
 
 func (s *Server) groupGet(w http.ResponseWriter, r *http.Request) {
@@ -385,7 +385,7 @@ func (s *Server) groupGet(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, g)
+	writeJSON(w, r, http.StatusOK, g)
 }
 
 func (s *Server) groupPatch(w http.ResponseWriter, r *http.Request) {
@@ -405,14 +405,14 @@ func (s *Server) groupPatch(w http.ResponseWriter, r *http.Request) {
 		default:
 			var pid string
 			if err := json.Unmarshal(trimmed, &pid); err != nil {
-				writeErr(w, http.StatusBadRequest, errors.New("parent_group_id must be a UUID string or null"))
+				writeErr(w, r, http.StatusBadRequest, errors.New("parent_group_id must be a UUID string or null"))
 				return
 			}
 			params.ParentGroupID = &pid
 		}
 	}
 	if params.Title == nil && !params.UpdateParent {
-		writeErr(w, http.StatusBadRequest, errors.New("at least one of title, parent_group_id is required"))
+		writeErr(w, r, http.StatusBadRequest, errors.New("at least one of title, parent_group_id is required"))
 		return
 	}
 	g, err := s.Store.GroupPatch(r.Context(), domainID, groupID, params)
@@ -428,7 +428,7 @@ func (s *Server) groupPatch(w http.ResponseWriter, r *http.Request) {
 		gaudit = append(gaudit, parentGroupAuditAttrs(params.ParentGroupID, true)...)
 	}
 	logger.Audit(r.Context(), "group_patch", gaudit...)
-	writeJSON(w, http.StatusOK, g)
+	writeJSON(w, r, http.StatusOK, g)
 }
 
 func (s *Server) groupDelete(w http.ResponseWriter, r *http.Request) {
@@ -471,18 +471,18 @@ func (s *Server) resourceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logger.Audit(r.Context(), "resource_create", slog.String("domain_id", domainID), slog.String("resource_id", res.ID))
-	writeJSON(w, http.StatusCreated, res)
+	writeJSON(w, r, http.StatusCreated, res)
 }
 
 func (s *Server) resourceList(w http.ResponseWriter, r *http.Request) {
 	opts, err := parseListOpts(r)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	opts.Sort, opts.Order, err = parseSortOrder(r.URL.Query(), store.ResourceSortFields)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	domainID := chi.URLParam(r, "domainID")
@@ -494,7 +494,7 @@ func (s *Server) resourceList(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []store.Resource{}
 	}
-	writeList(w, list, total, opts)
+	writeList(w, r, list, total, opts)
 }
 
 func (s *Server) resourceGet(w http.ResponseWriter, r *http.Request) {
@@ -505,7 +505,7 @@ func (s *Server) resourceGet(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, res)
+	writeJSON(w, r, http.StatusOK, res)
 }
 
 func (s *Server) resourcePatch(w http.ResponseWriter, r *http.Request) {
@@ -516,7 +516,7 @@ func (s *Server) resourcePatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if b.Title == nil {
-		writeErr(w, http.StatusBadRequest, errors.New("title is required for patch"))
+		writeErr(w, r, http.StatusBadRequest, errors.New("title is required for patch"))
 		return
 	}
 	res, err := s.Store.ResourcePatch(r.Context(), domainID, id, b.Title)
@@ -525,7 +525,7 @@ func (s *Server) resourcePatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logger.Audit(r.Context(), "resource_patch", slog.String("domain_id", domainID), slog.String("resource_id", id))
-	writeJSON(w, http.StatusOK, res)
+	writeJSON(w, r, http.StatusOK, res)
 }
 
 func (s *Server) resourceDelete(w http.ResponseWriter, r *http.Request) {
@@ -547,7 +547,7 @@ func (s *Server) accessTypeCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	bit, err := parseUint64Validated(b.Bit, maxAccessMask)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	a := &store.AccessType{ID: uuid.NewString(), DomainID: domainID, Title: b.Title, Bit: bit}
@@ -560,18 +560,18 @@ func (s *Server) accessTypeCreate(w http.ResponseWriter, r *http.Request) {
 		slog.String("access_type_id", a.ID),
 		slog.Uint64("bit", a.Bit),
 	)
-	writeJSON(w, http.StatusCreated, a)
+	writeJSON(w, r, http.StatusCreated, a)
 }
 
 func (s *Server) accessTypeList(w http.ResponseWriter, r *http.Request) {
 	opts, err := parseListOpts(r)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	opts.Sort, opts.Order, err = parseSortOrder(r.URL.Query(), store.AccessTypeSortFields)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	domainID := chi.URLParam(r, "domainID")
@@ -583,7 +583,7 @@ func (s *Server) accessTypeList(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []store.AccessType{}
 	}
-	writeList(w, list, total, opts)
+	writeList(w, r, list, total, opts)
 }
 
 func (s *Server) accessTypeGet(w http.ResponseWriter, r *http.Request) {
@@ -594,7 +594,7 @@ func (s *Server) accessTypeGet(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, a)
+	writeJSON(w, r, http.StatusOK, a)
 }
 
 func (s *Server) accessTypePatch(w http.ResponseWriter, r *http.Request) {
@@ -605,14 +605,14 @@ func (s *Server) accessTypePatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if b.Title == nil && b.Bit == nil {
-		writeErr(w, http.StatusBadRequest, errors.New("at least one of title, bit is required"))
+		writeErr(w, r, http.StatusBadRequest, errors.New("at least one of title, bit is required"))
 		return
 	}
 	params := store.AccessTypePatchParams{Title: b.Title}
 	if b.Bit != nil {
 		bit, err := parseUint64Validated(*b.Bit, maxAccessMask)
 		if err != nil {
-			writeErr(w, http.StatusBadRequest, err)
+			writeErr(w, r, http.StatusBadRequest, err)
 			return
 		}
 		params.Bit = &bit
@@ -627,7 +627,7 @@ func (s *Server) accessTypePatch(w http.ResponseWriter, r *http.Request) {
 		slog.String("access_type_id", id),
 		slog.Uint64("bit", a.Bit),
 	)
-	writeJSON(w, http.StatusOK, a)
+	writeJSON(w, r, http.StatusOK, a)
 }
 
 func (s *Server) accessTypeDelete(w http.ResponseWriter, r *http.Request) {
@@ -649,7 +649,7 @@ func (s *Server) permissionCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	mask, err := parseUint64Validated(b.AccessMask, maxAccessMask)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	p := &store.Permission{
@@ -666,18 +666,18 @@ func (s *Server) permissionCreate(w http.ResponseWriter, r *http.Request) {
 		slog.String("resource_id", p.ResourceID),
 		slog.Uint64("access_mask", p.AccessMask),
 	)
-	writeJSON(w, http.StatusCreated, p)
+	writeJSON(w, r, http.StatusCreated, p)
 }
 
 func (s *Server) permissionList(w http.ResponseWriter, r *http.Request) {
 	opts, err := parsePermissionListOpts(r)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	opts.Sort, opts.Order, err = parseSortOrder(r.URL.Query(), store.PermissionSortFields)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	domainID := chi.URLParam(r, "domainID")
@@ -689,7 +689,7 @@ func (s *Server) permissionList(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []store.Permission{}
 	}
-	writeList(w, list, total, opts.ListOpts)
+	writeList(w, r, list, total, opts.ListOpts)
 }
 
 func (s *Server) permissionGet(w http.ResponseWriter, r *http.Request) {
@@ -700,7 +700,7 @@ func (s *Server) permissionGet(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, p)
+	writeJSON(w, r, http.StatusOK, p)
 }
 
 func (s *Server) permissionPatch(w http.ResponseWriter, r *http.Request) {
@@ -711,14 +711,14 @@ func (s *Server) permissionPatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if b.Title == nil && b.ResourceID == nil && b.AccessMask == nil {
-		writeErr(w, http.StatusBadRequest, errors.New("at least one of title, resource_id, access_mask is required"))
+		writeErr(w, r, http.StatusBadRequest, errors.New("at least one of title, resource_id, access_mask is required"))
 		return
 	}
 	params := store.PermissionPatchParams{Title: b.Title, ResourceID: b.ResourceID}
 	if b.AccessMask != nil {
 		mask, err := parseUint64Validated(*b.AccessMask, maxAccessMask)
 		if err != nil {
-			writeErr(w, http.StatusBadRequest, err)
+			writeErr(w, r, http.StatusBadRequest, err)
 			return
 		}
 		params.AccessMask = &mask
@@ -734,7 +734,7 @@ func (s *Server) permissionPatch(w http.ResponseWriter, r *http.Request) {
 		slog.String("resource_id", p.ResourceID),
 		slog.Uint64("access_mask", p.AccessMask),
 	)
-	writeJSON(w, http.StatusOK, p)
+	writeJSON(w, r, http.StatusOK, p)
 }
 
 func (s *Server) permissionDelete(w http.ResponseWriter, r *http.Request) {
@@ -801,7 +801,7 @@ const userAuthzResourcesSortField = "resource_id"
 func (s *Server) userAuthzResources(w http.ResponseWriter, r *http.Request) {
 	opts, err := parseOffsetLimitOpts(r)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	// This endpoint only exposes pagination and uses a fixed stable ordering.
@@ -815,7 +815,7 @@ func (s *Server) userAuthzResources(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
-	writeList(w, userAuthzResourceDTOs(list), total, opts)
+	writeList(w, r, userAuthzResourceDTOs(list), total, opts)
 }
 
 const groupAuthzResourcesSortField = "resource_id"
@@ -823,7 +823,7 @@ const groupAuthzResourcesSortField = "resource_id"
 func (s *Server) groupAuthzResources(w http.ResponseWriter, r *http.Request) {
 	opts, err := parseOffsetLimitOpts(r)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	opts.Sort = groupAuthzResourcesSortField
@@ -836,7 +836,7 @@ func (s *Server) groupAuthzResources(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
-	writeList(w, groupAuthzResourceDTOs(list), total, opts)
+	writeList(w, r, groupAuthzResourceDTOs(list), total, opts)
 }
 
 // resourceAuthzUsersSortField is the meta.sort label returned to clients.
@@ -851,7 +851,7 @@ const resourceAuthzUsersSortField = "user_id"
 func (s *Server) resourceAuthzUsers(w http.ResponseWriter, r *http.Request) {
 	opts, err := parseOffsetLimitOpts(r)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	// Populated for meta only; the store enforces fixed ORDER BY users.id ASC.
@@ -865,7 +865,7 @@ func (s *Server) resourceAuthzUsers(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
-	writeList(w, resourceAuthzUserDTOs(list), total, opts)
+	writeList(w, r, resourceAuthzUserDTOs(list), total, opts)
 }
 
 const resourceAuthzGroupsSortField = "group_id"
@@ -873,7 +873,7 @@ const resourceAuthzGroupsSortField = "group_id"
 func (s *Server) resourceAuthzGroups(w http.ResponseWriter, r *http.Request) {
 	opts, err := parseOffsetLimitOpts(r)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	// Populated for meta only; the store enforces fixed ORDER BY group_permissions.group_id ASC.
@@ -887,7 +887,7 @@ func (s *Server) resourceAuthzGroups(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, r, err)
 		return
 	}
-	writeList(w, resourceAuthzGroupDTOs(list), total, opts)
+	writeList(w, r, resourceAuthzGroupDTOs(list), total, opts)
 }
 
 func (s *Server) grantGroupPermission(w http.ResponseWriter, r *http.Request) {
@@ -940,7 +940,7 @@ func (s *Server) authzCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	bit, err := parseUint64Validated(bitStr, maxAccessMask)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, err)
+		writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	mask, err := s.Store.EffectiveMask(r.Context(), domainID, userID, resourceID)
@@ -950,7 +950,7 @@ func (s *Server) authzCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	allowed := access.HasBit(mask, bit)
 	result = authzResultOK
-	writeJSON(w, http.StatusOK, map[string]any{
+	writeJSON(w, r, http.StatusOK, map[string]any{
 		"allowed":        allowed,
 		"effective_mask": strconv.FormatUint(mask, 10),
 	})
@@ -974,24 +974,29 @@ func (s *Server) authzMasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result = authzResultOK
-	writeJSON(w, http.StatusOK, map[string]any{"masks": masks})
+	writeJSON(w, r, http.StatusOK, map[string]any{"masks": masks})
 }
 
-// TODO(T54): inject *slog.Logger via Server.Log so tests can capture logs without
-// mutating the package-level global (enables t.Parallel()).
-// TODO(T55): pass *http.Request to this function so encode-failure logs include
-// method and path (depends on T54).
-func writeJSON(w http.ResponseWriter, status int, v any) {
+// TODO(T54): replace r-threading with logWith(r) once T54 injectable logger lands.
+func writeJSON(w http.ResponseWriter, r *http.Request, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
-		// The response header is already committed; log for operator visibility.
-		logger.Error("response encode failed", slog.String("err", err.Error()))
+		// The response header is already committed; log with request context for
+		// operator visibility so the failing endpoint can be identified.
+		attrs := []slog.Attr{slog.String("err", err.Error())}
+		if r != nil {
+			attrs = append(attrs,
+				slog.String("method", r.Method),
+				slog.String("path", r.URL.Path),
+			)
+		}
+		logger.Error("response encode failed", attrs...)
 	}
 }
 
-func writeErr(w http.ResponseWriter, status int, err error) {
-	writeJSON(w, status, map[string]string{"error": err.Error()})
+func writeErr(w http.ResponseWriter, r *http.Request, status int, err error) {
+	writeJSON(w, r, status, map[string]string{"error": err.Error()})
 }
 
 // writeStoreErr classifies a store-layer error into the correct HTTP status
@@ -1018,7 +1023,7 @@ func writeStoreErr(w http.ResponseWriter, r *http.Request, err error) {
 		msg = "internal server error"
 	}
 	logRequestErr(r, status, err)
-	writeJSON(w, status, map[string]string{"error": msg})
+	writeJSON(w, r, status, map[string]string{"error": msg})
 }
 
 // writeInternalErr logs the full error and returns a generic 500 to the client.
@@ -1041,7 +1046,7 @@ func writeInternalErr(w http.ResponseWriter, r *http.Request, err error) {
 		)
 	}
 	logRequestErr(r, http.StatusInternalServerError, err)
-	writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+	writeJSON(w, r, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
 }
 
 // logRequestErr logs the error with request context. 5xx errors are logged at
@@ -1223,8 +1228,8 @@ func parseSortOrder(q url.Values, allowed []string) (string, store.SortOrder, er
 	return sortField, order, nil
 }
 
-func writeList(w http.ResponseWriter, data any, total int64, opts store.ListOpts) {
-	writeJSON(w, http.StatusOK, listEnvelope{
+func writeList(w http.ResponseWriter, r *http.Request, data any, total int64, opts store.ListOpts) {
+	writeJSON(w, r, http.StatusOK, listEnvelope{
 		Data: data,
 		Meta: listMeta{
 			Total:  total,
@@ -1244,12 +1249,12 @@ func readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 		var maxErr *http.MaxBytesError
 		if errors.As(err, &maxErr) {
 			logReadJSONErr(r, "body_too_large", "request body too large")
-			writeErr(w, http.StatusRequestEntityTooLarge, errors.New("request body too large"))
+			writeErr(w, r, http.StatusRequestEntityTooLarge, errors.New("request body too large"))
 			return false
 		}
 		cls := classifyDecodeErr(err)
 		logReadJSONErr(r, cls.kind, cls.logMsg)
-		writeErr(w, http.StatusBadRequest, errors.New(cls.clientMsg))
+		writeErr(w, r, http.StatusBadRequest, errors.New(cls.clientMsg))
 		return false
 	}
 	// Decode a second value to verify the stream is exhausted. io.EOF means
@@ -1261,7 +1266,7 @@ func readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	var extra json.RawMessage
 	if err := dec.Decode(&extra); !errors.Is(err, io.EOF) {
 		logReadJSONErr(r, "trailing_data", "trailing data after first JSON value")
-		writeErr(w, http.StatusBadRequest, errors.New("request body must contain exactly one JSON value"))
+		writeErr(w, r, http.StatusBadRequest, errors.New("request body must contain exactly one JSON value"))
 		return false
 	}
 	return true

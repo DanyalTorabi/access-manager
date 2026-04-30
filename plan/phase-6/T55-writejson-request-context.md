@@ -55,13 +55,22 @@ server log so operators can identify which endpoint triggered the error.
 - New test: assert that an unserializable value passed to a handler produces an
   ERROR log entry that includes both `method` and `path` fields.
 
-## Steps
+## Implementation (shipped in PR #90)
 
-1. Decide approach (preferred: T54 logger injection, or standalone parameter).
-2. Update `writeJSON` signature and all call sites in `server.go`.
-3. Update unit test helpers that call `writeJSON` directly.
-4. Add test asserting method+path appear in the encode-failure log entry.
-5. Verify `make test` and `make lint` pass.
+The **alternative (`*http.Request`) approach** was used because T54 (#76) is
+still open. `*http.Request` was added as the second parameter to `writeJSON`,
+`writeErr`, and `writeList`; all ~60 handler call sites in `server.go` updated.
+The `health` handler's blank `_` identifier was changed to `r` so it can be
+passed through. `TestWriteJSON_encodeErrorLogged` was extended to assert that
+both `method` and `path` appear in the ERROR log entry.
+
+## Steps (all completed — see Implementation above)
+
+1. ✓ Decided approach — alternative (`*http.Request`) chosen; T54 still open.
+2. ✓ Updated `writeJSON` signature and all call sites in `server.go`.
+3. ✓ Updated unit test helpers that call `writeJSON` directly.
+4. ✓ Added test asserting method+path key-value pairs appear in the ERROR log entry.
+5. ✓ `make test` and `make lint` pass.
 
 ## Dependencies
 
