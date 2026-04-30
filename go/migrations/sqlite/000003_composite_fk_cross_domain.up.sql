@@ -5,6 +5,13 @@
 -- pair references it. Authz list queries can then drop the redundant
 -- defensive g.domain_id / u.domain_id / p.domain_id filters in a
 -- follow-up (kept for now per the plan note).
+--
+-- Rollback note: a companion .down.sql is intentionally not shipped in
+-- this change because reconstructing the pre-T51 per-column FKs is non-
+-- trivial and out of scope here. Manual rollback requires another
+-- CREATE-COPY-DROP-RENAME pass that drops UNIQUE (id, domain_id) and
+-- restores per-column foreign keys (REFERENCES users (id) etc.). Tracked
+-- in https://github.com/DanyalTorabi/access-manager/issues/84.
 
 -- Step 0: pre-check. Abort migration if any cross-domain row exists in the
 -- three junction tables. SQLite's RAISE(ABORT, 'msg') is only callable
