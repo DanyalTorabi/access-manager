@@ -20,8 +20,11 @@ type Metrics struct {
 	// is "ok" on success and "err" on any failure path (validation, parse,
 	// store error). Cardinality is bounded to 2 series (ok/err); domain_id
 	// was deliberately removed — domain IDs are UUIDs with unbounded
-	// cardinality. Per-domain debugging uses the structured audit log.
-	// See T50, T53.
+	// cardinality. Per-domain debugging is available via the request URL
+	// path (/api/v1/domains/{domainID}/authz/...) in standard HTTP access
+	// logs; error paths also emit a slog WARN/ERROR via logRequestErr.
+	// Note: authz handlers are read-only and do NOT emit structured audit
+	// events. See T50, T53.
 	AuthzTotal *prometheus.CounterVec
 	// NegativeMaskTotal is bumped whenever the SQLite store reads a
 	// negative int64 access mask (treated as 0 by maskFromSQL). Operators

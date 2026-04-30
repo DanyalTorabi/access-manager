@@ -15,7 +15,7 @@ Reduce the operational risk of the authz metric by removing the unbounded `domai
 
 ## Decision
 
-**Remove the `domain_id` label.** The metric retains only `{result: ok|err}`, bounding cardinality to exactly 2 active time series regardless of tenant count. This aligns with how `http_requests_total` is already bounded (route pattern, not per-entity URLs). The `domain_id` field is available in the structured audit log for per-domain debugging; it does not need to be in a counter metric.
+**Remove the `domain_id` label.** The metric retains only `{result: ok|err}`, bounding cardinality to exactly 2 active time series regardless of tenant count. This aligns with how `http_requests_total` is already bounded (route pattern, not per-entity URLs). Per-domain debugging for read requests is available via the HTTP request URL path (`/api/v1/domains/{domainID}/authz/...`) in standard infrastructure access logs; error paths also emit a slog WARN/ERROR via `logRequestErr` with the full path. Note: `authzCheck` and `authzMasks` are **read-only handlers and do not emit structured audit events** — only mutation handlers call `logger.Audit()`.
 
 Cardinality budget after this change: **2 series** (`result=ok`, `result=err`).
 
