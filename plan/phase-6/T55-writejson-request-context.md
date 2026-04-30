@@ -64,13 +64,13 @@ The `health` handler's blank `_` identifier was changed to `r` so it can be
 passed through. `TestWriteJSON_encodeErrorLogged` was extended to assert that
 both `method` and `path` appear in the ERROR log entry.
 
-## Steps
+## Steps (all completed — see Implementation above)
 
-1. Decide approach (preferred: T54 logger injection, or standalone parameter).
-2. Update `writeJSON` signature and all call sites in `server.go`.
-3. Update unit test helpers that call `writeJSON` directly.
-4. Add test asserting method+path appear in the encode-failure log entry.
-5. Verify `make test` and `make lint` pass.
+1. ✓ Decided approach — alternative (`*http.Request`) chosen; T54 still open.
+2. ✓ Updated `writeJSON` signature and all call sites in `server.go`.
+3. ✓ Updated unit test helpers that call `writeJSON` directly.
+4. ✓ Added test asserting method+path key-value pairs appear in the ERROR log entry.
+5. ✓ `make test` and `make lint` pass.
 
 ## Dependencies
 
