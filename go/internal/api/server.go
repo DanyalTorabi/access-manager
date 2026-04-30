@@ -965,17 +965,17 @@ func (s *Server) revokeGroupPermission(w http.ResponseWriter, r *http.Request) {
 // outcome label (ok/err). Intended to be called from a deferred closure
 // that captures the outcome variable. Nil metrics are a no-op so tests
 // without a registry still work.
-func (s *Server) recordAuthz(domainID, result string) {
+func (s *Server) recordAuthz(result string) {
 	if s.metrics == nil {
 		return
 	}
-	s.metrics.AuthzTotal.WithLabelValues(domainID, result).Inc()
+	s.metrics.AuthzTotal.WithLabelValues(result).Inc()
 }
 
 func (s *Server) authzCheck(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
 	result := authzResultErr
-	defer func() { s.recordAuthz(domainID, result) }()
+	defer func() { s.recordAuthz(result) }()
 
 	q := r.URL.Query()
 	userID := q.Get("user_id")
@@ -1006,7 +1006,7 @@ func (s *Server) authzCheck(w http.ResponseWriter, r *http.Request) {
 func (s *Server) authzMasks(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
 	result := authzResultErr
-	defer func() { s.recordAuthz(domainID, result) }()
+	defer func() { s.recordAuthz(result) }()
 
 	q := r.URL.Query()
 	userID := q.Get("user_id")

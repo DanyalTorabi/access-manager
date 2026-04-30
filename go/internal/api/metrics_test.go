@@ -139,10 +139,10 @@ func TestMetrics_authzCheckIncrementsExactlyOnce(t *testing.T) {
 		t.Fatalf("want 200, got %d", res.StatusCode)
 	}
 
-	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"domain_id": dom.ID, "result": "ok"}); got != 1 {
-		t.Fatalf("authz_checks_total{domain_id=%q,result=ok} want 1, got %v", dom.ID, got)
+	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"result": "ok"}); got != 1 {
+		t.Fatalf("authz_checks_total{result=ok} want 1, got %v", got)
 	}
-	if got := findCounterWithLabelsOrZero(t, reg, "authz_checks_total", map[string]string{"domain_id": dom.ID, "result": "err"}); got != 0 {
+	if got := findCounterWithLabelsOrZero(t, reg, "authz_checks_total", map[string]string{"result": "err"}); got != 0 {
 		t.Fatalf("authz_checks_total{result=err} want 0, got %v", got)
 	}
 }
@@ -169,7 +169,7 @@ func TestMetrics_authzMasksIncrementsExactlyOnce(t *testing.T) {
 		t.Fatalf("want 200, got %d", res.StatusCode)
 	}
 
-	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"domain_id": dom.ID, "result": "ok"}); got != 1 {
+	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"result": "ok"}); got != 1 {
 		t.Fatalf("authz_checks_total{result=ok} want 1, got %v", got)
 	}
 }
@@ -193,10 +193,10 @@ func TestMetrics_authzCheckValidationErrorIncrementsErr(t *testing.T) {
 		t.Fatalf("want 400, got %d", res.StatusCode)
 	}
 
-	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"domain_id": dom.ID, "result": "err"}); got != 1 {
+	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"result": "err"}); got != 1 {
 		t.Fatalf("authz_checks_total{result=err} want 1, got %v", got)
 	}
-	if got := findCounterWithLabelsOrZero(t, reg, "authz_checks_total", map[string]string{"domain_id": dom.ID, "result": "ok"}); got != 0 {
+	if got := findCounterWithLabelsOrZero(t, reg, "authz_checks_total", map[string]string{"result": "ok"}); got != 0 {
 		t.Fatalf("authz_checks_total{result=ok} want 0, got %v", got)
 	}
 }
@@ -218,7 +218,7 @@ func TestMetrics_authzMasksValidationErrorIncrementsErr(t *testing.T) {
 		t.Fatalf("want 400, got %d", res.StatusCode)
 	}
 
-	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"domain_id": dom.ID, "result": "err"}); got != 1 {
+	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"result": "err"}); got != 1 {
 		t.Fatalf("authz_checks_total{result=err} want 1, got %v", got)
 	}
 }
@@ -251,10 +251,10 @@ func TestMetrics_authzCheckStoreErrorIncrementsErr(t *testing.T) {
 		t.Fatalf("want 500, got %d", res.StatusCode)
 	}
 
-	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"domain_id": domID, "result": "err"}); got != 1 {
+	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"result": "err"}); got != 1 {
 		t.Fatalf("authz_checks_total{result=err} want 1, got %v", got)
 	}
-	if got := findCounterWithLabelsOrZero(t, reg, "authz_checks_total", map[string]string{"domain_id": domID, "result": "ok"}); got != 0 {
+	if got := findCounterWithLabelsOrZero(t, reg, "authz_checks_total", map[string]string{"result": "ok"}); got != 0 {
 		t.Fatalf("authz_checks_total{result=ok} want 0, got %v", got)
 	}
 }
@@ -275,10 +275,10 @@ func TestMetrics_authzMasksStoreErrorIncrementsErr(t *testing.T) {
 		t.Fatalf("want 500, got %d", res.StatusCode)
 	}
 
-	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"domain_id": domID, "result": "err"}); got != 1 {
+	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"result": "err"}); got != 1 {
 		t.Fatalf("authz_checks_total{result=err} want 1, got %v", got)
 	}
-	if got := findCounterWithLabelsOrZero(t, reg, "authz_checks_total", map[string]string{"domain_id": domID, "result": "ok"}); got != 0 {
+	if got := findCounterWithLabelsOrZero(t, reg, "authz_checks_total", map[string]string{"result": "ok"}); got != 0 {
 		t.Fatalf("authz_checks_total{result=ok} want 0, got %v", got)
 	}
 }
