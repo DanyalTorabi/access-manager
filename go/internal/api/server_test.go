@@ -4729,22 +4729,31 @@ func TestAPI_authzCheck_accessBitOutOfRange(t *testing.T) {
 // --- T52: request/response error hardening tests ---
 
 // TestWriteJSON_encodeErrorLogged asserts that a response encoding failure is
-// logged at ERROR level rather than silently swallowed. Because the status
-// header is already committed, the only observable signal is the log entry.
+// logged at ERROR level with method and path so operators can identify the
+// failing endpoint. Because the status header is already committed, the only
+// observable signal is the log entry.
 func TestWriteJSON_encodeErrorLogged(t *testing.T) {
 	var buf bytes.Buffer
 	logger.Init(slog.LevelError, &buf)
 	t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
 
 	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/domains", nil)
 	// A channel is not JSON-serializable and will cause Encode to fail.
-	writeJSON(w, http.StatusOK, map[string]any{"v": make(chan int)})
+	writeJSON(w, r, http.StatusOK, map[string]any{"v": make(chan int)})
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("want status 200 (header already committed), got %d", w.Code)
 	}
-	if !strings.Contains(buf.String(), "response encode failed") {
-		t.Fatalf("expected 'response encode failed' in server log, got: %s", buf.String())
+	logged := buf.String()
+	if !strings.Contains(logged, "response encode failed") {
+		t.Fatalf("expected 'response encode failed' in server log, got: %s", logged)
+	}
+	if !strings.Contains(logged, "GET") {
+		t.Fatalf("expected method=GET in encode-failure log, got: %s", logged)
+	}
+	if !strings.Contains(logged, "/api/v1/domains") {
+		t.Fatalf("expected path=/api/v1/domains in encode-failure log, got: %s", logged)
 	}
 }
 

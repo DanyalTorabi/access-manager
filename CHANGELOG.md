@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **T55 / #88:** `writeJSON` encode-failure log entries now include `method` and `path` fields so operators can identify the failing endpoint. `*http.Request` is threaded through `writeJSON`, `writeErr`, and `writeList`; all handler call sites updated. No behaviour change when encoding succeeds.
+
 ### Added
 
 - **T52 / #80:** API request/response error hardening — `writeJSON` now logs encode failures at ERROR level instead of silently discarding them; `readJSON` rejects trailing JSON tokens after the first value (returns **400** with `"request body must contain exactly one JSON value"`); request body decode failures are logged server-side with a structured `kind` label (`empty_body`, `json_syntax`, `json_type`, `json_unknown_field`, `json_decode`, `body_too_large`, `trailing_data`) without echoing raw user input in client responses or server logs; all client-facing decode error messages are now stable and sanitized. List-handler use of `writeInternalErr` is explicitly documented as intentional.
