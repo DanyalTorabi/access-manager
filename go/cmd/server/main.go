@@ -142,8 +142,12 @@ func setup(cfg config.Config) (*http.Server, *sql.DB, error) {
 		st = pgstore.New(db)
 	case "mysql":
 		st = mysqlstore.New(db)
-	default:
+	case "sqlite", "sqlite3":
 		st = sqlstore.New(db)
+	default:
+		// database.Open already rejected unsupported drivers; this case is unreachable in practice.
+		_ = db.Close()
+		return nil, nil, fmt.Errorf("setup: unrecognized driver %q", cfg.DatabaseDriver)
 	}
 
 	srv := &api.Server{Store: st, APIBearerToken: cfg.APIBearerToken}
