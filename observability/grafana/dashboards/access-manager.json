@@ -77,14 +77,14 @@
       }
     },
     {
-      "title": "Authz Checks Rate by Domain",
+      "title": "Authz Checks Rate by Domain and Result",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum by (domain_id) (rate(authz_checks_total[1m]))",
-          "legendFormat": "{{ domain_id }}",
+          "expr": "sum by (domain_id, result) (rate(authz_checks_total[1m]))",
+          "legendFormat": "{{ domain_id }} / {{ result }}",
           "refId": "A"
         }
       ],
@@ -94,6 +94,42 @@
           "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 }
         },
         "overrides": []
+      }
+    },
+    {
+      "title": "Negative Access Masks Observed",
+      "description": "Cumulative count of negative int64 access-mask rows read from the SQLite store (treated as 0 by maskFromSQL). Should remain 0; non-zero indicates legacy or out-of-band data.",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "store_negative_mask_observed_total",
+          "legendFormat": "negative masks",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
       }
     }
   ],

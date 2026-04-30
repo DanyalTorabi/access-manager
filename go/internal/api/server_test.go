@@ -21,6 +21,7 @@ import (
 	sqlstore "github.com/dtorabi/access-manager/internal/store/sqlite"
 	"github.com/dtorabi/access-manager/internal/testutil"
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func TestHealth(t *testing.T) {
@@ -2588,7 +2589,10 @@ func TestWriteInternalErr_generic(t *testing.T) {
 
 // --- store-error tests using a broken (closed-DB) store ---
 
-func newBrokenTestAPI(t *testing.T) *httptest.Server {
+// newBrokenTestAPIWithRegistry builds a Server backed by a closed DB so any
+// store call returns an error. If reg is non-nil it is wired through Router
+// so callers can assert metrics; otherwise instrumentation is disabled.
+func newBrokenTestAPIWithRegistry(t *testing.T, reg *prometheus.Registry) *httptest.Server {
 	t.Helper()
 	db, err := sqlstore.Open("file:" + filepath.Join(t.TempDir(), "broken.db") + "?_pragma=foreign_keys(1)")
 	if err != nil {
@@ -2601,9 +2605,20 @@ func newBrokenTestAPI(t *testing.T) *httptest.Server {
 	st := sqlstore.New(db)
 	_ = db.Close()
 	srv := &Server{Store: st}
-	ts := httptest.NewServer(srv.Router(nil, nil))
+	var router http.Handler
+	if reg != nil {
+		router = srv.Router(reg, reg)
+	} else {
+		router = srv.Router(nil, nil)
+	}
+	ts := httptest.NewServer(router)
 	t.Cleanup(ts.Close)
 	return ts
+}
+
+func newBrokenTestAPI(t *testing.T) *httptest.Server {
+	t.Helper()
+	return newBrokenTestAPIWithRegistry(t, nil)
 }
 
 func TestAPI_storeErrors(t *testing.T) {
