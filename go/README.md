@@ -29,7 +29,7 @@ Example response: `{"status":"ok"}`
 
 ### Metrics
 
-Prometheus metrics are served at **`/metrics`** (outside bearer auth). The middleware records `http_requests_total`, `http_request_duration_seconds`, `authz_checks_total` (label: `result=ok|err`; one increment per request), and `store_negative_mask_observed_total` (bumped when any store reads a negative access mask). See root [README.md — Observability](../README.md#observability) for Grafana/Prometheus compose setup.
+Prometheus metrics are served at **`/metrics`** (outside bearer auth). The middleware records `http_requests_total`, `http_request_duration_seconds`, `authz_checks_total` (label: `result=ok|err`; one increment per request), and `store_negative_mask_observed_total` (bumped when any of the built-in store implementations reads a negative access mask). See root [README.md — Observability](../README.md#observability) for Grafana/Prometheus compose setup.
 
 ## Docker
 
