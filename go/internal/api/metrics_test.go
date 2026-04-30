@@ -278,6 +278,9 @@ func TestMetrics_authzMasksStoreErrorIncrementsErr(t *testing.T) {
 	if got := findCounterWithLabels(t, reg, "authz_checks_total", map[string]string{"domain_id": domID, "result": "err"}); got != 1 {
 		t.Fatalf("authz_checks_total{result=err} want 1, got %v", got)
 	}
+	if got := findCounterWithLabelsOrZero(t, reg, "authz_checks_total", map[string]string{"domain_id": domID, "result": "ok"}); got != 0 {
+		t.Fatalf("authz_checks_total{result=ok} want 0, got %v", got)
+	}
 }
 
 func findCounter(t *testing.T, reg *prometheus.Registry, name string) float64 {
