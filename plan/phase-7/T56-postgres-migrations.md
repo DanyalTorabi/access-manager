@@ -27,14 +27,14 @@ Create the three PostgreSQL migration files that mirror the SQLite set, translat
 
 ## Steps
 
-1. **Translate `000001_init`**: Replace SQLite-ism `TEXT PRIMARY KEY` with `TEXT PRIMARY KEY` (same, fine), ensure `INTEGER` → `BIGINT` for `bit` column on `access_types`, keep the nine indexes.
+1. **Translate `000001_init`**: Keep `TEXT PRIMARY KEY` for all `id` columns (UUIDs stored as text). Translate `INTEGER` → `BIGINT` for the `bit` column on `access_types`. Add explicit `ON DELETE CASCADE` / `ON DELETE RESTRICT` where needed. Keep all nine indexes.
 2. **Translate `000002_restrict_foreign_keys`**: PostgreSQL allows `ALTER TABLE … ALTER CONSTRAINT` or `DROP CONSTRAINT … ADD CONSTRAINT … ON DELETE RESTRICT`. Use `ALTER TABLE` rather than the SQLite rebuild-and-copy pattern (SQLite cannot `ALTER` FKs, PostgreSQL can).
 3. **Translate `000003_composite_fk_cross_domain`** (ported from T51/#77 PR #83):
    - Add composite `UNIQUE (domain_id, id)` to `users`, `groups`, `permissions` via `ALTER TABLE`.
    - Drop and re-add composite FKs on the three junction tables referencing `(domain_id, user_id/group_id/permission_id)`.
    - Replace `RAISE(ABORT, …)` SQLite trigger with a PostgreSQL `DO $$ BEGIN … IF EXISTS(…) THEN RAISE EXCEPTION '…'; END IF; END $$;` pre-check block.
 4. Write a corresponding `.down.sql` for each migration that reverses the changes cleanly.
-5. Verify migrations apply in order with `psql` against a local Postgres container (or via the test helper in T61).
+5. Verify migrations apply in order with `psql` against a local Postgres container (see T61 for docker-compose service wiring; for T56 a standalone `docker run postgres:15-alpine` is sufficient).
 
 ## Acceptance criteria
 

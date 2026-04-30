@@ -1,10 +1,11 @@
-# PostgreSQL migrations (future)
+# PostgreSQL migrations
 
-Add versioned DDL here when implementing `internal/store/postgres` and wiring `internal/database.Open` for driver `postgres`.
+Versioned DDL for PostgreSQL 15+, mirroring the SQLite migration set.
 
-TODO(T01): Port the SQLite migrations from `../sqlite/`, including
-`000003_composite_fk_cross_domain.up.sql` (T51, #77 / PR #83) — composite
-UNIQUE on `users`/`groups`/`permissions` and composite FKs on the three
-junction tables, with a pre-check that `RAISE EXCEPTION`s on cross-domain
-rows (typically inside a `DO` block). See
-`plan/phase-5/T01-per-dialect-migrations.md`.
+| File | Description |
+|------|-------------|
+| `000001_init.{up,down}.sql` | Initial schema (tables + indexes) |
+| `000002_restrict_foreign_keys.{up,down}.sql` | Switch all FKs to `ON DELETE RESTRICT` (T33) |
+| `000003_composite_fk_cross_domain.{up,down}.sql` | Composite `UNIQUE (id, domain_id)` + composite FKs on junction tables; cross-domain pre-check via `DO $$ RAISE EXCEPTION $$` (T51, #77) |
+
+Implemented in T56 (#91). Store implementation (`internal/store/postgres`) and driver wiring (`internal/database.Open`) are tracked in T58 and T60. Docker Compose service and integration-test targets are in T61 (#96).
