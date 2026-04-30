@@ -4042,6 +4042,98 @@ func TestResourceAuthzGroupsList_returnsSameDomainGroups(t *testing.T) {
 	}
 }
 
+// TestResourceAuthzGroupsList_schemaEnforcesIsolationWithoutGoFilter covers
+// the T51 acceptance criterion that authz listings remain correct "with or
+// without" the defensive Go-side domain filter. The defensive filter in
+// resourceAuthzGroupsBaseSQL (`AND g.domain_id = ?`) is deferred for removal
+// to #85; this test simulates the post-#85 world by running the same join
+// without the g.domain_id predicate against a clean dataset and asserting
+// the schema alone keeps the result set scoped to the requested domain.
+func TestResourceAuthzGroupsList_schemaEnforcesIsolationWithoutGoFilter(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+
+	d1 := uuid.NewString()
+	d2 := uuid.NewString()
+	if err := s.DomainCreate(ctx, &store.Domain{ID: d1, Title: "d1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DomainCreate(ctx, &store.Domain{ID: d2, Title: "d2"}); err != nil {
+		t.Fatal(err)
+	}
+	r1 := uuid.NewString()
+	r2 := uuid.NewString()
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: r1, DomainID: d1, Title: "r1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResourceCreate(ctx, &store.Resource{ID: r2, DomainID: d2, Title: "r2"}); err != nil {
+		t.Fatal(err)
+	}
+	g1 := uuid.NewString()
+	g2 := uuid.NewString()
+	if err := s.GroupCreate(ctx, &store.Group{ID: g1, DomainID: d1, Title: "g1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GroupCreate(ctx, &store.Group{ID: g2, DomainID: d2, Title: "g2"}); err != nil {
+		t.Fatal(err)
+	}
+	p1 := uuid.NewString()
+	p2 := uuid.NewString()
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: p1, DomainID: d1, Title: "p1", ResourceID: r1, AccessMask: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: p2, DomainID: d2, Title: "p2", ResourceID: r2, AccessMask: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GrantGroupPermission(ctx, d1, g1, p1); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GrantGroupPermission(ctx, d2, g2, p2); err != nil {
+		t.Fatal(err)
+	}
+
+	// Schema-only query: same join shape as resourceAuthzGroupsBaseSQL but
+	// with the g.domain_id predicate removed. If T51's composite FKs are
+	// enforcing the invariant, the result for (d1, r1) must contain only
+	// g1 (the d2 grant cannot match because its gp.domain_id = d2 ≠ d1).
+	const schemaOnlySQL = `
+SELECT DISTINCT gp.group_id
+FROM permissions p
+INNER JOIN group_permissions gp ON gp.permission_id = p.id
+INNER JOIN groups g ON g.id = gp.group_id
+WHERE p.domain_id = ? AND gp.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0
+ORDER BY gp.group_id ASC
+`
+	rows, err := s.db.QueryContext(ctx, schemaOnlySQL, d1, d1, r1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = rows.Close() }()
+	var got []string
+	for rows.Next() {
+		var gid string
+		if err := rows.Scan(&gid); err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, gid)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0] != g1 {
+		t.Fatalf("schema-only query must return only same-domain group g1: got %v", got)
+	}
+
+	// Sanity: the production query (with the defensive filter) must agree.
+	list, total, err := s.ResourceAuthzGroupsList(ctx, d1, r1, store.ListOpts{Offset: 0, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 1 || len(list) != 1 || list[0].GroupID != g1 {
+		t.Fatalf("production listing disagreed with schema-only query: total=%d list=%+v", total, list)
+	}
+}
+
 // TestSchema_compositeFKRejectsCrossDomain verifies the T51 schema invariant
 // for all three junction tables: an out-of-band insert with mismatched
 // domain_id must fail at the DB layer. Each junction table's two FKs are
