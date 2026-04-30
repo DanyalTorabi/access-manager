@@ -18,7 +18,7 @@ test:
 
 cover:
 	go clean -testcache
-	go test -race -coverprofile=coverage.out ./...
+	go test -race -tags=integration -coverprofile=coverage.out ./...
 	@go tool cover -func=coverage.out | tail -n 1
 	@echo "coverage.out written; run: go tool cover -html=coverage.out"
 

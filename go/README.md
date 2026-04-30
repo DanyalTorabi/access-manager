@@ -79,13 +79,15 @@ Run **`make`** from the **repository root** (`make test`, `make lint`, …) or f
 |--------|---------|
 | Build binary | `make build` → `bin/server` |
 | Tests (race) | `make test` |
-| Coverage profile | `make cover` → `coverage.out`, prints total statement coverage; HTML: `go tool cover -html=coverage.out` |
+| Coverage profile | `make cover` → `coverage.out`, prints total statement coverage; HTML: `go tool cover -html=coverage.out`. Includes integration tests when `DATABASE_DSN_POSTGRES` / `DATABASE_DSN_MYSQL` are set; those tests skip gracefully when not set. |
 | Coverage by function | `make cover-func` |
 | Run server | `make run` |
 | E2E smoke | From **repo root**: `make e2e` → `go test -race -count=1 -tags=e2e ./e2e/...` (running server; optional **`API_BEARER_TOKEN`**). Optional curl script: **`make e2e-bash`**. See **[test/e2e/README.md](../test/e2e/README.md)**. |
 | Lint | `make lint` |
 | Vuln check | `make vuln` → pinned `go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...` (same pin as CI) |
 | Tidy modules | `make tidy` |
+| Integration (postgres) | `make test-integration-postgres` — requires `DATABASE_DSN_POSTGRES` |
+| Integration (mysql) | `make test-integration-mysql` — requires `DATABASE_DSN_MYSQL` |
 
 Docker (from **repo root** only): `make docker-build`, `make docker-up`, `make docker-logs`, `make docker-down` — see [root README](../README.md#docker).
 
