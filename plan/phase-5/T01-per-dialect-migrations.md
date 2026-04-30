@@ -12,6 +12,19 @@
 
 Extend [internal/database/open.go](../../go/internal/database/open.go) and add **Postgres** and/or **MySQL** drivers, **dialect-specific migrations**, and store implementations that satisfy [internal/store/store.go](../../go/internal/store/store.go).
 
+## Breakdown (Phase 7 sub-tickets)
+
+This umbrella ticket has been broken down into focused sub-tasks in [plan/phase-7/](../phase-7/):
+
+| Sub-ticket | Title | Issue |
+|------------|-------|-------|
+| T56 | Port SQLite migrations to PostgreSQL dialect | [#91](https://github.com/DanyalTorabi/access-manager/issues/91) |
+| T57 | Port SQLite migrations to MySQL/MariaDB dialect | [#92](https://github.com/DanyalTorabi/access-manager/issues/92) |
+| T58 | Implement `internal/store/postgres` (Store interface) | [#93](https://github.com/DanyalTorabi/access-manager/issues/93) |
+| T59 | Implement `internal/store/mysql` (Store interface) | [#94](https://github.com/DanyalTorabi/access-manager/issues/94) |
+| T60 | Wire Postgres & MySQL into `database.Open`; DSN config and README | [#95](https://github.com/DanyalTorabi/access-manager/issues/95) |
+| T61 | Docker Compose services + integration-test targets for Postgres and MySQL | [#96](https://github.com/DanyalTorabi/access-manager/issues/96) |
+
 ## Deliverables
 
 - `migrations/postgres/*.sql`, `migrations/mysql/*.sql` (or tool-based migrations).

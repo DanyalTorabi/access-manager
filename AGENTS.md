@@ -68,6 +68,14 @@ When starting work on a new ticket or task, **create a topic branch** from up-to
 
 By default, **do not** run `git commit`, `git push`, or `gh pr create`. Provide a **proposed commit message** and **PR body** (Summary, Ticket, Checklist per [`.github/pull_request_template.md`](.github/pull_request_template.md)) for the human to paste. Run those git/`gh` commands only when the human **explicitly** asks you to.
 
+### Milestone
+
+Every new issue must be assigned to the **current active milestone**. When creating an issue:
+- Via `gh issue create`: add `--milestone "<title>"` (e.g. `--milestone "26Q2"`).
+- Via GitHub UI: select the milestone from the **Milestone** dropdown before submitting.
+
+**Current milestone:** `26Q2` (April–June 2026, due 2026-06-30). Update this line and the matching line in [CONTRIBUTING.md](CONTRIBUTING.md#milestone) when a new milestone is activated.
+
 ## GitHub
 
 **Humans:** Prefer the **`gh`** CLI for issues, PRs, Actions, and API tasks when scripting. Requires [GitHub CLI](https://cli.github.com/) and `gh auth login`. Maintainer steps: [CONTRIBUTING.md](CONTRIBUTING.md) (**T6**). CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (**T13**); **`gh run list`** / **`gh pr checks`**.
