@@ -1,6 +1,6 @@
 -- T51: Enforce, at the schema level, that the junction tables
 -- (group_members, user_permissions, group_permissions) cannot reference an
--- entity from a different domain. A composite UNIQUE (domain_id, id) on
+-- entity from a different domain. A composite UNIQUE (id, domain_id) on
 -- users/groups/permissions provides the FK target; each junction column
 -- pair references it. Authz list queries can then drop the redundant
 -- defensive g.domain_id / u.domain_id / p.domain_id filters in a
