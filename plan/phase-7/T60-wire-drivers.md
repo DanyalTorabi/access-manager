@@ -19,7 +19,8 @@ Extend `go/internal/database/open.go` to dispatch to `internal/store/postgres` a
 ## Deliverables
 
 - `go/internal/database/open.go` — add `"postgres"` and `"mysql"` cases to the `Open` switch
-- `go/internal/database/open.go` — `MigrateUp` must dispatch to the correct dialect-specific migrator when called
+- `go/internal/database/open.go` — `MigrateUp` signature extended to `MigrateUp(db *sql.DB, migrationsDir, driver string) error` to dispatch to the correct dialect-specific migrator
+- `go/cmd/server/main.go` — update `setup()` to pass driver to `MigrateUp` and select the correct store implementation (postgres/mysql/sqlite) based on `cfg.DatabaseDriver`
 - `go/.env.example` — add commented-out Postgres and MySQL DSN examples
 - `go/config.example.yaml` — add commented DSN options for each driver
 - `go/README.md` — document the supported drivers and sample DSN format
@@ -28,19 +29,18 @@ Extend `go/internal/database/open.go` to dispatch to `internal/store/postgres` a
 ## Steps
 
 1. **Extend `Open`**: Add `"postgres"` and `"mysql"` cases that call `pgstore.Open(dsn)` and `mysqlstore.Open(dsn)` respectively, returning the appropriate `*sql.DB` and migrations directory path (`"migrations/postgres"` / `"migrations/mysql"`).
-2. **`MigrateUp` dispatch**: The current `MigrateUp` calls `sqlstore.MigrateUp`. Either:
-   - Accept the `*sql.DB` and dialect string and route to the correct package's `MigrateUp`, or
-   - Unify migration logic into a single file-based runner that works across dialects (preferred, since all three dialects now share the same runner contract — see T58/T59 for notes on multi-statement MySQL support).
-3. **Error messages**: Extend the "unsupported driver" error message to list all three now-supported drivers.
-4. **Config docs**: Update `go/.env.example` with:
+2. **`MigrateUp` dispatch**: Change `MigrateUp` to `MigrateUp(db *sql.DB, migrationsDir, driver string) error` and route to `sqlstore.MigrateUp`, `pgstore.MigrateUp`, or `mysqlstore.MigrateUp` based on the driver string. Update all callers (`cmd/server/main.go`, `open_test.go`).
+3. **`cmd/server` store wiring**: Update `setup()` to select `pgstore.New(db)`, `mysqlstore.New(db)`, or `sqlstore.New(db)` based on `cfg.DatabaseDriver`, and wire `SetNegativeMaskHook` via a local `maskHookSetter` interface type assertion so all three store types are supported.
+4. **Error messages**: Extend the "unsupported driver" error message to list all three now-supported drivers.
+5. **Config docs**: Update `go/.env.example` with:
    ```
    # DATABASE_DRIVER=postgres
    # DATABASE_DSN=postgres://localhost:5432/access_manager?sslmode=disable
    # DATABASE_DRIVER=mysql
    # DATABASE_DSN=root:@tcp(localhost:3306)/access_manager?parseTime=true
    ```
-5. **README**: Add a "Supported databases" section or update the existing one with driver names and minimum version requirements (PostgreSQL 15+, MySQL 8+ / MariaDB 10.6+).
-6. **Tests**: Add a unit test in `go/internal/database/` that verifies `Open` returns a non-nil error for `"baddriver"` and a different branch test that exercises `Open` with `"sqlite"` still works (existing test should be extended, not replaced).
+6. **README**: Add a "Supported databases" section or update the existing one with driver names and minimum version requirements (PostgreSQL 15+, MySQL 8+ / MariaDB 10.6+).
+7. **Tests**: Update existing `TestMigrateUp_sqlite` to pass the driver argument. Add tests for `Open("postgres", ...)` and `Open("mysql", ...)` returning ping errors (no running DB needed — just verify routing). Extend `TestOpen_unsupportedDriver` to verify the error lists all supported drivers.
 
 ## Acceptance criteria
 
@@ -52,6 +52,7 @@ Extend `go/internal/database/open.go` to dispatch to `internal/store/postgres` a
 ## Files / paths
 
 - **Edit:** `go/internal/database/open.go`
+- **Edit:** `go/cmd/server/main.go`
 - **Edit:** `go/.env.example`, `go/config.example.yaml`, `go/README.md`, `README.md`
 
 ## Out of scope

@@ -18,10 +18,20 @@ import (
 	"github.com/dtorabi/access-manager/internal/config"
 	"github.com/dtorabi/access-manager/internal/database"
 	"github.com/dtorabi/access-manager/internal/logger"
+	"github.com/dtorabi/access-manager/internal/store"
+	mysqlstore "github.com/dtorabi/access-manager/internal/store/mysql"
+	pgstore "github.com/dtorabi/access-manager/internal/store/postgres"
 	sqlstore "github.com/dtorabi/access-manager/internal/store/sqlite"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 )
+
+// maskHookSetter is satisfied by all three concrete store types (sqlite, postgres, mysql).
+// It allows the negative-mask Prometheus hook to be wired without coupling main to any
+// one store implementation.
+type maskHookSetter interface {
+	SetNegativeMaskHook(func())
+}
 
 func main() {
 	logger.Init(slog.LevelInfo, os.Stderr)
@@ -117,7 +127,7 @@ func setup(cfg config.Config) (*http.Server, *sql.DB, error) {
 			migDir = filepath.Join(wd, migDir)
 		}
 	}
-	if err := database.MigrateUp(db, migDir); err != nil {
+	if err := database.MigrateUp(db, migDir, cfg.DatabaseDriver); err != nil {
 		_ = db.Close()
 		return nil, nil, fmt.Errorf("migrate: %w", err)
 	}
@@ -126,7 +136,16 @@ func setup(cfg config.Config) (*http.Server, *sql.DB, error) {
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
 
-	st := sqlstore.New(db)
+	var st store.Store
+	switch cfg.DatabaseDriver {
+	case "postgres":
+		st = pgstore.New(db)
+	case "mysql":
+		st = mysqlstore.New(db)
+	default:
+		st = sqlstore.New(db)
+	}
+
 	srv := &api.Server{Store: st, APIBearerToken: cfg.APIBearerToken}
 
 	httpSrv := &http.Server{
@@ -137,10 +156,13 @@ func setup(cfg config.Config) (*http.Server, *sql.DB, error) {
 		IdleTimeout:       120 * time.Second,
 	}
 
-	// Wire the SQLite store's negative-mask observer to the Prometheus
-	// counter so operators can alert on legacy/out-of-band data. See T50.
+	// Wire the negative-mask observer to the Prometheus counter so operators
+	// can alert on legacy/out-of-band data. All three store implementations
+	// satisfy maskHookSetter. See T50.
 	if c := srv.NegativeMaskCounter(); c != nil {
-		st.SetNegativeMaskHook(c.Inc)
+		if hs, ok := st.(maskHookSetter); ok {
+			hs.SetNegativeMaskHook(c.Inc)
+		}
 	}
 
 	return httpSrv, db, nil

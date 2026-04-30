@@ -1,6 +1,6 @@
 # access-manager (Go)
 
-HTTP service and Go module for **domain-scoped** access control: users, groups, resources, access-type bits, and permissions (`uint64` masks). SQLite is the default store; the design allows other SQL drivers later.
+HTTP service and Go module for **domain-scoped** access control: users, groups, resources, access-type bits, and permissions (`uint64` masks). SQLite is the default store; PostgreSQL and MySQL/MariaDB are also supported.
 
 **Module:** `github.com/dtorabi/access-manager` (this directory is the **module root**).
 
@@ -44,10 +44,10 @@ From the **repository root** (not `go/`): **`make docker-build`**, **`make docke
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `CONFIG_PATH` | _(unset)_ | Path to YAML file; if unset, only defaults + env apply |
-| `DATABASE_DRIVER` | `sqlite` | SQL driver (`sqlite` / `sqlite3` via [internal/database](internal/database/open.go)) |
+| `DATABASE_DRIVER` | `sqlite` | SQL driver (`sqlite` / `sqlite3`, `postgres`, `mysql` — see **Supported databases** below) |
 | `DATABASE_URL` | `file:access.db?_pragma=foreign_keys(1)` | Database DSN |
 | `HTTP_ADDR` | `127.0.0.1:8080` | Listen address (**use loopback in dev**; see [AGENTS.md](../AGENTS.md)) |
-| `MIGRATIONS_DIR` | `migrations/sqlite` | Migration `.up.sql` directory (relative paths are resolved from the **process working directory** — run from `go/` or set an absolute path) |
+| `MIGRATIONS_DIR` | `migrations/sqlite` | Migration `.up.sql` directory — set to `migrations/postgres` or `migrations/mysql` for the matching driver (relative paths are resolved from the **process working directory** — run from `go/` or set an absolute path) |
 | `SHUTDOWN_TIMEOUT_SECONDS` | `30` | Max seconds to wait for graceful shutdown after **SIGINT** / **SIGTERM** |
 | `API_BEARER_TOKEN` | _(empty)_ | If set, all **`/api/v1/*`** routes require `Authorization: Bearer <token>`. **`/health`** stays public. Use a strong random value in production; never commit it. |
 
@@ -58,6 +58,16 @@ Copy [`.env.example`](.env.example) to `.env` for local overrides; do **not** co
 See [config.example.yaml](config.example.yaml). Copy to a path outside VCS (e.g. `config.local.yaml`, gitignored at repo root) and set `CONFIG_PATH` to that path.
 
 Loader: [internal/config](internal/config/config.go).
+
+## Supported databases
+
+| Driver (`DATABASE_DRIVER`) | `MIGRATIONS_DIR` | Minimum version | DSN example |
+|----------------------------|-----------------|-----------------|-------------|
+| `sqlite` / `sqlite3` | `migrations/sqlite` | SQLite 3.35+ (via [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite)) | `file:access.db?_pragma=foreign_keys(1)` |
+| `postgres` | `migrations/postgres` | PostgreSQL 15+ | `postgres://user:password@localhost:5432/access_manager?sslmode=disable` |
+| `mysql` | `migrations/mysql` | MySQL 8+ / MariaDB 10.6+ | `user:password@tcp(localhost:3306)/access_manager?parseTime=true` |
+
+Set `DATABASE_DRIVER` **and** update `MIGRATIONS_DIR` to match. See [`.env.example`](.env.example) and [`config.example.yaml`](config.example.yaml) for commented examples of each driver.
 
 ## Development
 
