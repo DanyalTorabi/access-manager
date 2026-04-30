@@ -4732,6 +4732,10 @@ func TestAPI_authzCheck_accessBitOutOfRange(t *testing.T) {
 // logged at ERROR level with method and path so operators can identify the
 // failing endpoint. Because the status header is already committed, the only
 // observable signal is the log entry.
+//
+// NOTE: This test mutates the package-level logger via logger.Init.
+// t.Parallel() is intentionally omitted until T54 (injectable logger) lands.
+// See TODO(T54) in writeJSON.
 func TestWriteJSON_encodeErrorLogged(t *testing.T) {
 	var buf bytes.Buffer
 	logger.Init(slog.LevelError, &buf)
@@ -4749,11 +4753,11 @@ func TestWriteJSON_encodeErrorLogged(t *testing.T) {
 	if !strings.Contains(logged, "response encode failed") {
 		t.Fatalf("expected 'response encode failed' in server log, got: %s", logged)
 	}
-	if !strings.Contains(logged, "GET") {
-		t.Fatalf("expected method=GET in encode-failure log, got: %s", logged)
+	if !strings.Contains(logged, `"method":"GET"`) {
+		t.Fatalf("expected method=GET key-value in encode-failure log, got: %s", logged)
 	}
-	if !strings.Contains(logged, "/api/v1/domains") {
-		t.Fatalf("expected path=/api/v1/domains in encode-failure log, got: %s", logged)
+	if !strings.Contains(logged, `"path":"/api/v1/domains"`) {
+		t.Fatalf("expected path=/api/v1/domains key-value in encode-failure log, got: %s", logged)
 	}
 }
 
