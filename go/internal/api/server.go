@@ -957,20 +957,20 @@ func (s *Server) revokeGroupPermission(w http.ResponseWriter, r *http.Request) {
 }
 
 // recordAuthz increments AuthzTotal exactly once per request with the
-// outcome label (ok/err). Safe to call from a defer with a pointer to the
-// outcome variable; nil metrics are a no-op so tests without a registry
-// still work.
-func (s *Server) recordAuthz(domainID string, result *string) {
+// outcome label (ok/err). Intended to be called from a deferred closure
+// that captures the outcome variable. Nil metrics are a no-op so tests
+// without a registry still work.
+func (s *Server) recordAuthz(domainID, result string) {
 	if s.metrics == nil {
 		return
 	}
-	s.metrics.AuthzTotal.WithLabelValues(domainID, *result).Inc()
+	s.metrics.AuthzTotal.WithLabelValues(domainID, result).Inc()
 }
 
 func (s *Server) authzCheck(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
 	result := AuthzResultErr
-	defer s.recordAuthz(domainID, &result)
+	defer func() { s.recordAuthz(domainID, result) }()
 
 	q := r.URL.Query()
 	userID := q.Get("user_id")
@@ -1001,7 +1001,7 @@ func (s *Server) authzCheck(w http.ResponseWriter, r *http.Request) {
 func (s *Server) authzMasks(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
 	result := AuthzResultErr
-	defer s.recordAuthz(domainID, &result)
+	defer func() { s.recordAuthz(domainID, result) }()
 
 	q := r.URL.Query()
 	userID := q.Get("user_id")
