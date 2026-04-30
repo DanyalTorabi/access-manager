@@ -7,10 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- **T55 / #88:** `writeJSON` encode-failure log entries now include `method` and `path` fields so operators can identify the failing endpoint. `*http.Request` is threaded through `writeJSON`, `writeErr`, and `writeList`; all handler call sites updated. No behaviour change when encoding succeeds.
-
 ### Added
 
 - **T52 / #80:** API request/response error hardening — `writeJSON` now logs encode failures at ERROR level instead of silently discarding them; `readJSON` rejects trailing JSON tokens after the first value (returns **400** with `"request body must contain exactly one JSON value"`); request body decode failures are logged server-side with a structured `kind` label (`empty_body`, `json_syntax`, `json_type`, `json_unknown_field`, `json_decode`, `body_too_large`, `trailing_data`) without echoing raw user input in client responses or server logs; all client-facing decode error messages are now stable and sanitized. List-handler use of `writeInternalErr` is explicitly documented as intentional.
@@ -52,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **T55 / #88:** `writeJSON` encode-failure log entries now include `method` and `path` fields so operators can identify the failing endpoint. `*http.Request` is threaded through `writeJSON`, `writeErr`, and `writeList`; all handler call sites updated. No behaviour change when encoding succeeds.
 - **T50 / #74:** `authz_checks_total` now carries a `result` label (`ok`/`err`) and is incremented **exactly once per request** in `authzCheck` and `authzMasks` (previously success was double-counted and errors single-counted). Existing alert rules or queries that select `authz_checks_total{...}` without aggregating across `result` must add the new label or wrap with `sum without(result)(...)`. See T53 below for the subsequent label-cardinality fix.
 - **T53 / #81 (breaking):** `authz_checks_total` no longer carries a `domain_id` label. The metric now has exactly one label (`result=ok|err`), bounding cardinality to 2 series regardless of tenant count. The Grafana dashboard panel query is updated accordingly. **Migration:** remove `domain_id` selectors from any alert rules or external dashboards — `authz_checks_total{domain_id="..."}` will return no data after upgrade. Use `authz_checks_total{result="ok"}` / `authz_checks_total{result="err"}` instead. Per-domain debug context remains available via the HTTP request URL path in standard access logs and via `logRequestErr` slog output on error paths.
 - **T40 / #55:** `access-types` list default sort changed from `bit` to `title` for consistency with other entities. Clients relying on bit-order should sort client-side.
