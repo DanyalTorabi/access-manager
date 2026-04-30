@@ -992,7 +992,7 @@ func (s *Server) authzCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	mask, err := s.Store.EffectiveMask(r.Context(), domainID, userID, resourceID)
 	if err != nil {
-		writeInternalErr(w, r, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	allowed := access.HasBit(mask, bit)
@@ -1017,7 +1017,7 @@ func (s *Server) authzMasks(w http.ResponseWriter, r *http.Request) {
 	}
 	masks, err := s.Store.PermissionMasksForUserResource(r.Context(), domainID, userID, resourceID)
 	if err != nil {
-		writeInternalErr(w, r, err)
+		writeStoreErr(w, r, err)
 		return
 	}
 	result = authzResultOK
