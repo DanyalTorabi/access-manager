@@ -29,12 +29,11 @@ Implement a MySQL-backed `store.Store` in `go/internal/store/mysql/`, following 
 2. **Open + migrate**: Port `sqlite/db.go` → `mysql/db.go`. The DSN format is `user:password@tcp(host:port)/dbname?parseTime=true&multiStatements=true`. Set sensible pool parameters. Port the file-based migrator; MySQL supports multi-statement execution if `multiStatements=true` is in the DSN.
 3. **Store implementation**: Port all methods from `sqlite/store.go`. Key translation points:
    - `?` placeholders are the same as SQLite — no change needed.
-   - `INSERT … ON DUPLICATE KEY UPDATE id=id` is a common no-op upsert guard; prefer returning `store.ErrConflict` via error mapping.
    - Error mapping: `mysql.MySQLError` number `1062` → `store.ErrConflict`, number `1451`/`1452` → `store.ErrFKViolation`, `sql.ErrNoRows` → `store.ErrNotFound`.
-   - `LAST_INSERT_ID()` is available but IDs are TEXT (UUIDs), so `LastInsertId` is not used — IDs are generated in Go before insertion (same as SQLite).
+   - IDs are UUIDs generated in Go before insertion — `LastInsertId` is never used (same as SQLite).
    - `sql.NullString` for nullable `parent_group_id`.
    - Cycle detection in `GroupSetParent`: same bounded loop, dialect-agnostic.
-   - `BIGINT UNSIGNED` for the `bit` column — map to `uint64` in Go (same as SQLite `INTEGER` → `uint64`).
+   - `BIGINT UNSIGNED` for the `bit` column — the MySQL driver scans this as `uint64` directly. Store and retrieve `a.Bit` as `uint64` without the `maskToSQL`/`maskFromSQL` intermediate (they were needed for SQLite's signed INTEGER; MySQL's unsigned column holds the full uint64 range). `access_mask` remains `BIGINT` (signed) and continues to use `maskToSQL`/`maskFromSQL`.
 4. **Tests**: Mirror `sqlite/store_test.go` with `newTestStore(t)` that creates a fresh database per run (drop + recreate using a unique name from `t.Name()`). Skip if `DATABASE_DSN_MYSQL` env is not set. Tag with `//go:build integration`.
 5. Enable FK checks explicitly: `SET FOREIGN_KEY_CHECKS=1` in the `Open` connection setup (InnoDB has FKs enabled by default, but be explicit for clarity).
 
