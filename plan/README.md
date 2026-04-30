@@ -14,6 +14,7 @@ This directory holds **executable mini-specs** for umbrella work. Filenames use 
 | 5 | P2 polish and multi-DB | T15, T17, T16, T1, T33, T34, T35, T37, T38, T39, T40 | [phase-5](phase-5/) |
 | 6 | P3 scale, prod, product options | T23, T20, T31, T32, T22, T21, T2, T3, T4, T5, **T41–T55** | [phase-6](phase-6/) |
 | 7 | Multi-DB implementation (T1 sub-tasks) | T56, T57, T58, T59, T60, T61 | [phase-7](phase-7/) |
+| 8 | API evolution, hygiene, release engineering | T62, T63, T64, T65, T66 | [phase-8](phase-8/) |
 
 **Within phase 3**, prefer ticket order **T29 → T14 → T6 → T19 → T13** (`go/` layout first; Docker/compose before CI integration tests that need it).
 
