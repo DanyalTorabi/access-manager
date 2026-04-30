@@ -1116,9 +1116,9 @@ func (s *Store) GroupAuthzResourcesList(ctx context.Context, domainID, groupID s
 	}
 	maskSQL := `SELECT p.resource_id, p.access_mask FROM permissions p ` + // #nosec G202
 		`INNER JOIN group_permissions gp ON gp.permission_id = p.id ` +
-		`WHERE p.domain_id = ? AND gp.domain_id = ? AND gp.group_id = ? AND p.resource_id IN (` + placeholders + `) AND p.access_mask > 0`
-	maskArgs := make([]any, 0, 3+len(resourceIDs))
-	maskArgs = append(maskArgs, domainID, domainID, groupID)
+		`WHERE p.domain_id = ? AND gp.group_id = ? AND p.resource_id IN (` + placeholders + `) AND p.access_mask > 0`
+	maskArgs := make([]any, 0, 2+len(resourceIDs))
+	maskArgs = append(maskArgs, domainID, groupID)
 	for _, rid := range resourceIDs {
 		maskArgs = append(maskArgs, rid)
 	}

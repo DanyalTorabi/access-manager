@@ -4092,19 +4092,20 @@ func TestResourceAuthzGroupsList_schemaEnforcesIsolationWithoutGoFilter(t *testi
 		t.Fatal(err)
 	}
 
-	// Schema-only query: same join shape as resourceAuthzGroupsBaseSQL but
-	// with the g.domain_id predicate removed. If T51's composite FKs are
+	// Schema-only query: matches the post-T51 production SQL shape — no
+	// Go-side domain predicate on gp or g. If the composite FKs are
 	// enforcing the invariant, the result for (d1, r1) must contain only
-	// g1 (the d2 grant cannot match because its gp.domain_id = d2 ≠ d1).
+	// g1 (the d2 grant cannot appear because the schema-backed join keeps
+	// results scoped to the permission's domain).
 	const schemaOnlySQL = `
 SELECT DISTINCT gp.group_id
 FROM permissions p
 INNER JOIN group_permissions gp ON gp.permission_id = p.id
 INNER JOIN groups g ON g.id = gp.group_id
-WHERE p.domain_id = ? AND gp.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0
+WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0
 ORDER BY gp.group_id ASC
 `
-	rows, err := s.db.QueryContext(ctx, schemaOnlySQL, d1, d1, r1)
+	rows, err := s.db.QueryContext(ctx, schemaOnlySQL, d1, r1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -4124,7 +4125,7 @@ ORDER BY gp.group_id ASC
 		t.Fatalf("schema-only query must return only same-domain group g1: got %v", got)
 	}
 
-	// Sanity: the production query (with the defensive filter) must agree.
+	// Sanity: the production query must agree with the schema-only query.
 	list, total, err := s.ResourceAuthzGroupsList(ctx, d1, r1, store.ListOpts{Offset: 0, Limit: 10})
 	if err != nil {
 		t.Fatal(err)
