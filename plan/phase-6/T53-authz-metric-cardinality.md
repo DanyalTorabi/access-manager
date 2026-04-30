@@ -24,8 +24,11 @@ Cardinality budget after this change: **2 series** (`result=ok`, `result=err`).
 - [x] Remove `domain_id` label from `authz_checks_total` definition in `metrics.go`.
 - [x] Remove `domainID` parameter from `recordAuthz` helper in `server.go`.
 - [x] Update all metric test assertions in `metrics_test.go` to match the new shape.
+- [x] Add cardinality guard test asserting exact label set (`result` only).
 - [x] Update Grafana dashboard panel query and legend format.
-- [x] Document the cardinality budget in the `AuthzTotal` field comment.
+- [x] Document the cardinality budget in the `AuthzTotal` field comment (accurate: no false audit-log claim).
+- [x] Update `README.md` and `go/README.md` to reflect the new label set.
+- [x] Add `CHANGELOG.md` entry with migration guidance for operators consuming `domain_id`.
 
 ## Deferred from other PRs
 
