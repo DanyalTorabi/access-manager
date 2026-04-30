@@ -55,7 +55,7 @@ server log so operators can identify which endpoint triggered the error.
 - New test: assert that an unserializable value passed to a handler produces an
   ERROR log entry that includes both `method` and `path` fields.
 
-## Implementation (shipped in PR #88)
+## Implementation (shipped in PR #90)
 
 The **alternative (`*http.Request`) approach** was used because T54 (#76) is
 still open. `*http.Request` was added as the second parameter to `writeJSON`,
