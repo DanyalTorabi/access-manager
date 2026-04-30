@@ -17,7 +17,7 @@ go mod download
 go run ./cmd/server
 ```
 
-The server listens on **`127.0.0.1:8080`** by default. Migrations run on startup against the configured SQLite file. **SIGINT** / **SIGTERM** triggers graceful shutdown (see `SHUTDOWN_TIMEOUT_SECONDS` / `shutdown_timeout_seconds` in config).
+The server listens on **`127.0.0.1:8080`** by default. Migrations run on startup against the configured database. **SIGINT** / **SIGTERM** triggers graceful shutdown (see `SHUTDOWN_TIMEOUT_SECONDS` / `shutdown_timeout_seconds` in config).
 
 ### Health check
 
@@ -29,7 +29,7 @@ Example response: `{"status":"ok"}`
 
 ### Metrics
 
-Prometheus metrics are served at **`/metrics`** (outside bearer auth). The middleware records `http_requests_total`, `http_request_duration_seconds`, `authz_checks_total` (label: `result=ok|err`; one increment per request), and `store_negative_mask_observed_total` (bumped when the SQLite store reads a negative access mask). See root [README.md — Observability](../README.md#observability) for Grafana/Prometheus compose setup.
+Prometheus metrics are served at **`/metrics`** (outside bearer auth). The middleware records `http_requests_total`, `http_request_duration_seconds`, `authz_checks_total` (label: `result=ok|err`; one increment per request), and `store_negative_mask_observed_total` (bumped when any store reads a negative access mask). See root [README.md — Observability](../README.md#observability) for Grafana/Prometheus compose setup.
 
 ## Docker
 
@@ -96,7 +96,7 @@ Equivalent without Make (from **`go/`**): `go test -race ./...`, `go vet ./...`,
 REST routes live under **`/api/v1`** with domain-scoped segments, for example:
 
 - `GET` / `POST /api/v1/domains`; `GET` / `PATCH` / `DELETE /api/v1/domains/{domainID}`
-- Domain-scoped CRUD includes `PATCH` / `DELETE` for users, groups, resources, permissions, and access types (plus `GET` for a single access type). Deletes fail with **400** when SQLite foreign keys block removal.
+- Domain-scoped CRUD includes `PATCH` / `DELETE` for users, groups, resources, permissions, and access types (plus `GET` for a single access type). Deletes fail with **400** when foreign key constraints block removal.
 - `GET /api/v1/domains/{domainID}/authz/check?user_id=&resource_id=&access_bit=`
 
 ### Pagination, filtering, and sorting
@@ -148,8 +148,12 @@ Server output is structured JSON via `internal/logger` (wrapping `log/slog`). Al
 | `internal/access` | Access-mask helpers (library-oriented) |
 | `internal/store` | Store interfaces and types |
 | `internal/store/sqlite` | SQLite implementation |
+| `internal/store/postgres` | PostgreSQL implementation |
+| `internal/store/mysql` | MySQL / MariaDB implementation |
 | `internal/logger` | Structured JSON logger wrapping `log/slog`; audit events |
 | `internal/database` | Driver open + migrations runner |
-| `migrations/sqlite` | SQL migrations |
+| `migrations/sqlite` | SQLite migrations |
+| `migrations/postgres` | PostgreSQL migrations |
+| `migrations/mysql` | MySQL / MariaDB migrations |
 
 See [AGENTS.md](../AGENTS.md) for contributor rules, security, and **library vs HTTP** boundaries.
