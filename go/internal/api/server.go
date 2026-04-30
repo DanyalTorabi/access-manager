@@ -1274,66 +1274,75 @@ func readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	if err := dec.Decode(dst); err != nil {
 		var maxErr *http.MaxBytesError
 		if errors.As(err, &maxErr) {
-			logReadJSONErr(r, "body_too_large", err)
+			logReadJSONErr(r, "body_too_large", "request body too large")
 			writeErr(w, http.StatusRequestEntityTooLarge, errors.New("request body too large"))
 			return false
 		}
-		logReadJSONErr(r, readJSONErrKind(err), err)
-		writeErr(w, http.StatusBadRequest, sanitizeDecodeErr(err))
+		cls := classifyDecodeErr(err)
+		logReadJSONErr(r, cls.kind, cls.logMsg)
+		writeErr(w, http.StatusBadRequest, errors.New(cls.clientMsg))
 		return false
 	}
-	if dec.More() {
-		logReadJSONErr(r, "trailing_data", errors.New("trailing data after first JSON value"))
+	// Decode a second value to verify the stream is exhausted. io.EOF means
+	// the body was cleanly consumed (trailing whitespace is allowed); any other
+	// result — including nil error, meaning a second value decoded successfully
+	// — indicates trailing data and is rejected. Using dec.More() is explicitly
+	// avoided: its contract is scoped to array/object iteration, not top-level
+	// stream exhaustion, and its behaviour outside that scope is undocumented.
+	var extra json.RawMessage
+	if err := dec.Decode(&extra); !errors.Is(err, io.EOF) {
+		logReadJSONErr(r, "trailing_data", "trailing data after first JSON value")
 		writeErr(w, http.StatusBadRequest, errors.New("request body must contain exactly one JSON value"))
 		return false
 	}
 	return true
 }
 
-// readJSONErrKind classifies a JSON decode error for structured server-side
-// logging. Labels: empty_body, json_syntax, json_type, json_decode.
-func readJSONErrKind(err error) string {
-	var synErr *json.SyntaxError
-	var typeErr *json.UnmarshalTypeError
-	switch {
-	case errors.Is(err, io.EOF):
-		return "empty_body"
-	case errors.Is(err, io.ErrUnexpectedEOF), errors.As(err, &synErr):
-		return "json_syntax"
-	case errors.As(err, &typeErr):
-		return "json_type"
-	default:
-		return "json_decode"
-	}
+// decodeClass holds the classification of a JSON decode failure: the
+// structured log kind, a sanitized log message (safe to persist), and the
+// stable client-facing message.
+type decodeClass struct {
+	kind      string
+	logMsg    string // safe to log (no raw user input)
+	clientMsg string
 }
 
-// sanitizeDecodeErr returns a stable, client-safe error message for a JSON body
-// decode failure. Raw user input (characters, field names) is never exposed;
-// the detailed error is logged server-side by logReadJSONErr.
-func sanitizeDecodeErr(err error) error {
+// classifyDecodeErr classifies a JSON decode error into a decodeClass.
+// Kinds:
+//   - empty_body          — io.EOF (no body at all)
+//   - json_syntax         — truncated body or syntax error
+//   - json_type           — wrong value type for a known field
+//   - json_unknown_field  — client sent a field name not in the schema
+//   - json_decode         — other decode errors
+func classifyDecodeErr(err error) decodeClass {
 	var synErr *json.SyntaxError
 	var typeErr *json.UnmarshalTypeError
 	switch {
 	case errors.Is(err, io.EOF):
-		return errors.New("request body must not be empty")
+		return decodeClass{"empty_body", "empty request body", "request body must not be empty"}
 	case errors.Is(err, io.ErrUnexpectedEOF), errors.As(err, &synErr):
-		return errors.New("request body contains malformed JSON")
+		return decodeClass{"json_syntax", "malformed JSON in request body", "request body contains malformed JSON"}
 	case errors.As(err, &typeErr):
-		return errors.New("request body contains an invalid field value")
+		return decodeClass{"json_type", "invalid field value type in request body", "request body contains an invalid field value"}
+	case strings.HasPrefix(err.Error(), "json: unknown field"):
+		// Do not log the raw error string: it contains the attacker-controlled
+		// field name verbatim (e.g. "json: unknown field \"injected\"").
+		return decodeClass{"json_unknown_field", "unknown field in request body", "invalid request body"}
 	default:
-		return errors.New("invalid request body")
+		return decodeClass{"json_decode", "request body decode error", "invalid request body"}
 	}
 }
 
 // logReadJSONErr logs a server-side warning for request body parse failures.
-// The kind label distinguishes: empty_body, json_syntax, json_type, json_decode,
-// body_too_large, trailing_data — without echoing raw user input.
-func logReadJSONErr(r *http.Request, kind string, err error) {
+// The detail parameter must be a pre-sanitized string — never pass err.Error()
+// directly for errors that may contain user-controlled input (e.g. unknown
+// field names from DisallowUnknownFields).
+func logReadJSONErr(r *http.Request, kind, detail string) {
 	logger.Warn("request body decode failed",
 		slog.String("kind", kind),
 		slog.String("method", r.Method),
 		slog.String("path", r.URL.Path),
-		slog.String("err", err.Error()),
+		slog.String("detail", detail),
 	)
 }
 
