@@ -41,10 +41,11 @@ should be enforced at the schema level.
   not yet wired in; tracked under T01 (per-dialect migrations).
 - Once the schema invariant is enforced, the redundant `g.domain_id =
   ?` / `u.domain_id = ?` / `p.domain_id = ?` filters in the authz list
-  queries can be dropped in a follow-up. **Deferred** to issue #85 so all
-  four authz listings change in lockstep. Until then, every authz query
-  that joins through `group_permissions`/`user_permissions` must keep the
-  defensive filter (TODO(#85) markers in the SQL doc comments).
+  queries are dropped in lockstep across all four authz listings
+  (`UserAuthzResourcesList`, `GroupAuthzResourcesList`,
+  `ResourceAuthzUsersList`, `ResourceAuthzGroupsList`) and
+  `PermissionMasksForUserResource`. Done in this PR; isolation is now
+  enforced solely by the composite FKs.
 
 ## Steps
 
@@ -64,23 +65,27 @@ should be enforced at the schema level.
    independently and at least one positive same-domain insert is asserted
    per junction table.
 5. Drop the redundant defensive filters in the authz list queries and update
-   their long-form comments accordingly. **Deferred to #85.**
+   their long-form comments accordingly. Done in this PR.
 
 ## Files / paths
 
 - `go/migrations/sqlite/000003_composite_fk_cross_domain.up.sql` (new migration)
-- `go/internal/store/sqlite/store.go` — eventually drop the redundant
-  `g.domain_id` / `u.domain_id` / `p.domain_id` filters (#85); for now the
-  doc comments carry `TODO(#85): ...` markers and the per-table
-  `UNIQUE (id, domain_id)` rationale.
+- `go/internal/store/sqlite/store.go` — defensive
+  `g.domain_id` / `u.domain_id` / `p.domain_id` filters dropped from the
+  authz list queries; comments now reference the schema invariant and the
+  per-table `UNIQUE (id, domain_id)` rationale.
+- `go/migrations/sqlite/000003_composite_fk_cross_domain.down.sql` —
+  operator-run rollback companion (the in-tree migrator only applies
+  `.up.sql`). Covered by `TestT51_DownMigration_revertsCompositeFKInvariant`.
 
 ## Acceptance criteria
 
 - A direct insert with mismatched `domain_id` fails at the DB layer.
-- Authz listings remain correct on a cleaned dataset, with or without the
-  defensive Go-side filter. The "without" branch is covered by #85's tests
-  once the filters are dropped; in this PR the listings are verified with
-  the filter still in place.
+- Authz listings remain correct on a cleaned dataset without any
+  defensive Go-side `domain_id` filter; the schema-only invariant is
+  asserted by `TestResourceAuthzGroupsList_schemaEnforcesIsolationWithoutGoFilter`
+  and the production listings (which no longer carry the defensive
+  filter) agree.
 
 ## Related
 

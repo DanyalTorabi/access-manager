@@ -3775,7 +3775,7 @@ func TestResourceAuthzUsersList_limitClampedAtMaxLimit(t *testing.T) {
 
 func TestResourceAuthzUsersBaseArgs_orderMatchesPlaceholders(t *testing.T) {
 	got := resourceAuthzUsersBaseArgs("D", "R")
-	want := []any{"D", "D", "R", "D", "D", "D"}
+	want := []any{"D", "D", "R"}
 	if len(got) != len(want) {
 		t.Fatalf("len: want %d, got %d", len(want), len(got))
 	}
@@ -4043,12 +4043,12 @@ func TestResourceAuthzGroupsList_returnsSameDomainGroups(t *testing.T) {
 }
 
 // TestResourceAuthzGroupsList_schemaEnforcesIsolationWithoutGoFilter covers
-// the T51 acceptance criterion that authz listings remain correct "with or
-// without" the defensive Go-side domain filter. The defensive filter in
-// resourceAuthzGroupsBaseSQL (`AND g.domain_id = ?`) is deferred for removal
-// to #85; this test simulates the post-#85 world by running the same join
-// without the g.domain_id predicate against a clean dataset and asserting
-// the schema alone keeps the result set scoped to the requested domain.
+// the T51 acceptance criterion that authz listings remain correct without
+// a defensive Go-side domain filter. The defensive g.domain_id filter has
+// been removed from resourceAuthzGroupsBaseSQL in this PR; this test
+// re-runs the same join shape (without the predicate) against a multi-
+// domain dataset to assert the schema alone keeps the result set scoped
+// to the requested domain.
 func TestResourceAuthzGroupsList_schemaEnforcesIsolationWithoutGoFilter(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)
