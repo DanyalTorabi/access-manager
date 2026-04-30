@@ -4749,15 +4749,26 @@ func TestWriteJSON_encodeErrorLogged(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("want status 200 (header already committed), got %d", w.Code)
 	}
-	logged := buf.String()
-	if !strings.Contains(logged, "response encode failed") {
-		t.Fatalf("expected 'response encode failed' in server log, got: %s", logged)
+
+	logged := strings.TrimSpace(buf.String())
+	if logged == "" {
+		t.Fatal("expected encode-failure log entry, got empty log output")
 	}
-	if !strings.Contains(logged, `"method":"GET"`) {
-		t.Fatalf("expected method=GET key-value in encode-failure log, got: %s", logged)
+
+	lines := strings.Split(logged, "\n")
+	var entry map[string]any
+	if err := json.Unmarshal([]byte(lines[0]), &entry); err != nil {
+		t.Fatalf("unmarshal log entry: %v; raw log: %s", err, logged)
 	}
-	if !strings.Contains(logged, `"path":"/api/v1/domains"`) {
-		t.Fatalf("expected path=/api/v1/domains key-value in encode-failure log, got: %s", logged)
+
+	if got := entry["msg"]; got != "response encode failed" {
+		t.Fatalf(`log field "msg" = %v, want %q; raw log: %s`, got, "response encode failed", logged)
+	}
+	if got := entry["method"]; got != http.MethodGet {
+		t.Fatalf(`log field "method" = %v, want %q; raw log: %s`, got, http.MethodGet, logged)
+	}
+	if got := entry["path"]; got != "/api/v1/domains" {
+		t.Fatalf(`log field "path" = %v, want %q; raw log: %s`, got, "/api/v1/domains", logged)
 	}
 }
 
