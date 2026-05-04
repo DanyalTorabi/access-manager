@@ -1,6 +1,7 @@
 # T19 — local app + SQLite. Host port bound to loopback only (see README).
 # DB is ephemeral (tmpfs) unless you change volumes.
 # T23 — Prometheus + Grafana for observability.
+# T61 — postgres and mysql services for integration tests (make test-integration-postgres/mysql).
 
 services:
   app:
@@ -15,6 +16,33 @@ services:
       MIGRATIONS_DIR: "migrations/sqlite"
     tmpfs:
       - /data:mode=1777,size=64m
+
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_DB: access_test
+      POSTGRES_USER: access
+      POSTGRES_PASSWORD: access
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U access"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mysql:
+    image: mysql:8
+    ports:
+      - "127.0.0.1:3306:3306"
+    environment:
+      MYSQL_DATABASE: access_test
+      MYSQL_ROOT_PASSWORD: access
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-paccess"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   prometheus:
     image: prom/prometheus:v3.4.0

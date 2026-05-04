@@ -1,4 +1,4 @@
-.PHONY: build test integration cover cover-func run tidy lint vuln gosec e2e test-integration-postgres test-integration-mysql
+.PHONY: build test integration cover cover-func cover-integration run tidy lint vuln gosec e2e test-integration-postgres test-integration-mysql
 
 # golang/go#75031: GOTOOLCHAIN=auto can make `go test -cover` fail with "no such tool covdata".
 # Pin the minimum toolchain to the `go` version in go.mod (override: `make test GOTOOLCHAIN=local`).
@@ -7,6 +7,11 @@ export GOTOOLCHAIN := go$(GOMOD_GO_VERSION)+auto
 
 # Override with `make lint GOLANGCI_LINT=golangci-lint` if you have a local v2 binary (faster).
 GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4
+
+# DSNs used by cover-integration and test-integration-* targets when running
+# against Docker Compose services (T61). Override per-env if needed.
+POSTGRES_DSN ?= postgres://access:access@127.0.0.1:5432/access_test?sslmode=disable
+MYSQL_DSN    ?= root:access@tcp(127.0.0.1:3306)/access_test?parseTime=true&multiStatements=true
 
 build:
 	go build -o bin/server ./cmd/server
@@ -18,6 +23,16 @@ test:
 
 cover:
 	go clean -testcache
+	go test -race -tags=integration -coverprofile=coverage.out ./...
+	@go tool cover -func=coverage.out | tail -n 1
+	@echo "coverage.out written; run: go tool cover -html=coverage.out"
+
+# T61 — full coverage including Postgres and MySQL store integration tests.
+# Requires: docker compose up -d postgres mysql (services defined in docker-compose.yml).
+cover-integration:
+	go clean -testcache
+	DATABASE_DSN_POSTGRES="$(POSTGRES_DSN)" \
+	DATABASE_DSN_MYSQL="$(MYSQL_DSN)" \
 	go test -race -tags=integration -coverprofile=coverage.out ./...
 	@go tool cover -func=coverage.out | tail -n 1
 	@echo "coverage.out written; run: go tool cover -html=coverage.out"
@@ -45,11 +60,17 @@ integration:
 	go test -race -count=1 -run '^TestIntegration' ./internal/api/...
 
 # T58 — requires DATABASE_DSN_POSTGRES env to point to a running Postgres 15+ instance.
+# Use default Docker Compose DSN: make test-integration-postgres
+# Or override: DATABASE_DSN_POSTGRES="..." make test-integration-postgres
 test-integration-postgres:
+	DATABASE_DSN_POSTGRES="$(POSTGRES_DSN)" \
 	go test -race -count=1 -tags=integration ./internal/store/postgres/...
 
 # T59 — requires DATABASE_DSN_MYSQL env to point to a running MySQL 8+ instance.
+# Use default Docker Compose DSN: make test-integration-mysql
+# Or override: DATABASE_DSN_MYSQL="..." make test-integration-mysql
 test-integration-mysql:
+	DATABASE_DSN_MYSQL="$(MYSQL_DSN)" \
 	go test -race -count=1 -tags=integration ./internal/store/mysql/...
 
 # T16 — requires a running API (default BASE_URL http://127.0.0.1:8080). Bash twin: ../../test/e2e/bash/run.sh

@@ -72,9 +72,10 @@ Add docker-compose services for Postgres and MySQL, Makefile targets to run inte
 
 ## Acceptance criteria
 
-- `docker-compose up postgres mysql` starts both services and they pass healthchecks.
-- `make test-integration-postgres` passes with a running postgres container.
-- `make test-integration-mysql` passes with a running mysql container.
+- `docker compose up -d postgres mysql` starts both services and they pass healthchecks.
+- `make test-integration-postgres` passes with a running postgres container (defaults to `POSTGRES_DSN` defined in `go/Makefile`).
+- `make test-integration-mysql` passes with a running mysql container (defaults to `MYSQL_DSN` defined in `go/Makefile`).
+- `make cover-integration` runs full coverage including Postgres and MySQL store integration tests.
 - CI passes with the new integration-test job on every push to `main` and on PRs.
 - `make test` (unit only) still passes without any running containers.
 
