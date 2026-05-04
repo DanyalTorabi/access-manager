@@ -14,6 +14,7 @@ import (
 	"github.com/dtorabi/access-manager/internal/store"
 	"github.com/dtorabi/access-manager/internal/testutil"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 // newTestStore creates a new Postgres-backed Store for integration tests.
@@ -34,22 +35,41 @@ func newTestStore(t *testing.T) *Store {
 		schemaName = schemaName[:63]
 	}
 
-	db, err := Open(dsn)
+	// Create the schema using a temporary connection before opening the pool.
+	// This avoids any pool-safety concerns with DDL on a shared connection.
+	bootstrapDB, err := Open(dsn)
 	if err != nil {
-		t.Fatalf("Open: %v", err)
+		t.Fatalf("Open (bootstrap): %v", err)
 	}
-
-	if _, err := db.Exec(fmt.Sprintf(`CREATE SCHEMA IF NOT EXISTS %q`, schemaName)); err != nil {
-		_ = db.Close()
+	if _, err := bootstrapDB.Exec(fmt.Sprintf(`CREATE SCHEMA IF NOT EXISTS %s`, pq.QuoteIdentifier(schemaName))); err != nil {
+		_ = bootstrapDB.Close()
 		t.Fatalf("create schema: %v", err)
 	}
-	if _, err := db.Exec(fmt.Sprintf(`SET search_path TO %q`, schemaName)); err != nil {
-		_ = db.Close()
-		t.Fatalf("set search_path: %v", err)
+	_ = bootstrapDB.Close()
+
+	// Embed search_path in the DSN so every connection in the pool uses the
+	// test schema automatically — SET search_path is session-scoped and not
+	// safe to set after Open() when the pool may have multiple connections.
+	schemaDSN := dsn
+	if strings.Contains(dsn, "?") {
+		schemaDSN = dsn + "&search_path=" + schemaName
+	} else {
+		schemaDSN = dsn + "?search_path=" + schemaName
+	}
+
+	db, err := Open(schemaDSN)
+	if err != nil {
+		// Schema was created; register cleanup via a fresh connection.
+		cleanupDB, cErr := Open(dsn)
+		if cErr == nil {
+			_, _ = cleanupDB.Exec(fmt.Sprintf(`DROP SCHEMA IF EXISTS %s CASCADE`, pq.QuoteIdentifier(schemaName)))
+			_ = cleanupDB.Close()
+		}
+		t.Fatalf("Open (schema DSN): %v", err)
 	}
 
 	t.Cleanup(func() {
-		_, _ = db.Exec(fmt.Sprintf(`DROP SCHEMA IF EXISTS %q CASCADE`, schemaName))
+		_, _ = db.Exec(fmt.Sprintf(`DROP SCHEMA IF EXISTS %s CASCADE`, pq.QuoteIdentifier(schemaName)))
 		_ = db.Close()
 	})
 
