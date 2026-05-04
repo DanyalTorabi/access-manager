@@ -329,6 +329,12 @@ func TestPostgres_UserAuthzResourcesList(t *testing.T) {
 	if list[0].EffectiveMask != 0x1 {
 		t.Fatalf("want mask 0x1, got %#x", list[0].EffectiveMask)
 	}
+
+	// Unknown user returns ErrNotFound.
+	_, _, err = s.UserAuthzResourcesList(ctx, domainID, uuid.NewString(), store.ListOpts{})
+	if !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("unknown user: want ErrNotFound, got %v", err)
+	}
 }
 
 func TestPostgres_EffectiveMask_userPlusGroupOR(t *testing.T) {
@@ -1169,6 +1175,12 @@ func TestPostgres_ResourceAuthzGroupsList(t *testing.T) {
 	}
 	if list[0].GroupID != gid || list[0].Mask != 0x2 {
 		t.Fatalf("got %+v", list[0])
+	}
+
+	// Unknown resource returns ErrNotFound.
+	_, _, err = s.ResourceAuthzGroupsList(ctx, domainID, uuid.NewString(), store.ListOpts{})
+	if !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("unknown resource: want ErrNotFound, got %v", err)
 	}
 }
 
