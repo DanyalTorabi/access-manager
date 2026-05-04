@@ -252,10 +252,12 @@ func TestMySQL_DomainCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if total < 1 {
-		t.Fatalf("want total >= 1, got %d", total)
+	if total != 1 {
+		t.Fatalf("want total=1, got %d", total)
 	}
-	_ = list
+	if len(list) != 1 || list[0].ID != id {
+		t.Fatalf("unexpected list: %+v", list)
+	}
 
 	if err := s.DomainDelete(ctx, id); err != nil {
 		t.Fatal(err)
@@ -1316,7 +1318,12 @@ func TestMySQL_DomainList_search(t *testing.T) {
 	if total != 2 {
 		t.Fatalf("search 'alpha': want 2, got %d", total)
 	}
-	_ = list
+	if len(list) != 2 {
+		t.Fatalf("search 'alpha': want 2 items, got %d", len(list))
+	}
+	if list[0].Title != "alpha" || list[1].Title != "alphabet" {
+		t.Fatalf("want [alpha alphabet], got %+v", list)
+	}
 }
 
 func TestMySQL_DeleteNotFound(t *testing.T) {
