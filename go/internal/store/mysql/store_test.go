@@ -274,8 +274,9 @@ func TestMySQL_AccessType_BigintUnsigned(t *testing.T) {
 	if err := s.DomainCreate(ctx, &store.Domain{ID: domainID, Title: "d"}); err != nil {
 		t.Fatal(err)
 	}
-	// bit is BIGINT UNSIGNED — values up to 2^63-1 are valid (store.ErrInvalidInput
-	// guards the overflow path at the access_mask level, not bit level in MySQL).
+	// bit is BIGINT UNSIGNED — accepts the full uint64 range. This is distinct
+	// from access_mask on permissions, which is bounded at the store layer to
+	// the lower 63 bits (issue #67).
 	atID := uuid.NewString()
 	bit := uint64(1 << 62)
 	if err := s.AccessTypeCreate(ctx, &store.AccessType{ID: atID, DomainID: domainID, Title: "at", Bit: bit}); err != nil {
