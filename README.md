@@ -9,7 +9,7 @@ Educational / product repo for **domain-scoped** access control (users, groups, 
 
 | Path | Purpose |
 |------|---------|
-| **[`go/`](go/)** | Go module `github.com/dtorabi/access-manager`: HTTP service, `internal/*`, SQLite migrations |
+| **[`go/`](go/)** | Go module `github.com/dtorabi/access-manager`: HTTP service, `internal/*`, SQLite/Postgres/MySQL migrations |
 | [`api/`](api/) | OpenAPI 3 spec and Postman collection; see [api/README.md](api/README.md) |
 | [`plan/`](plan/) | Phased implementation plans per ticket |
 | [`PLAN.md`](PLAN.md), [`docs/backend-curriculum.md`](docs/backend-curriculum.md) | Product goals; curriculum ↔ repo map (backlog on GitHub only) |
@@ -41,7 +41,7 @@ Details: **[go/README.md](go/README.md)** (config, env, API overview, `make` tar
 
 ## Docker
 
-Multi-stage image (distroless, non-root, `CGO_ENABLED=0` / `modernc.org/sqlite`) built from repo root; SQLite data uses a **tmpfs** mount (ephemeral) in the default compose file.
+Multi-stage image (distroless, non-root, `CGO_ENABLED=0`) built from repo root. The default compose file uses **SQLite** with a **tmpfs** mount (ephemeral). PostgreSQL and MySQL are also supported — set `DATABASE_DRIVER`, `DATABASE_URL`, and `MIGRATIONS_DIR` accordingly (see [go/README.md — Supported databases](go/README.md#supported-databases)).
 
 From the **repository root**, use **`make`** (same idea as `make test` / `make run`):
 
@@ -88,7 +88,7 @@ Exported metrics:
 - `http_requests_total` — counter (labels: `method`, `route`, `code`)
 - `http_request_duration_seconds` — histogram (labels: `method`, `route`)
 - `authz_checks_total` — counter (label: `result`). `result` is `ok` on success and `err` on any failure path (validation, parse, store error). Incremented exactly once per request.
-- `store_negative_mask_observed_total` — counter, bumped when the SQLite store reads a negative `int64` access mask (treated as `0` by `maskFromSQL`). Non-zero values indicate legacy or out-of-band data; alert and investigate.
+- `store_negative_mask_observed_total` — counter, bumped when any of the built-in store implementations (sqlite, postgres, mysql) reads a negative `int64` access mask (treated as `0` by `maskFromSQL`). Non-zero values indicate legacy or out-of-band data; alert and investigate.
 
 Config files live under **[`observability/`](observability/)**.
 

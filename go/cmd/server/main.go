@@ -18,10 +18,20 @@ import (
 	"github.com/dtorabi/access-manager/internal/config"
 	"github.com/dtorabi/access-manager/internal/database"
 	"github.com/dtorabi/access-manager/internal/logger"
+	"github.com/dtorabi/access-manager/internal/store"
+	mysqlstore "github.com/dtorabi/access-manager/internal/store/mysql"
+	pgstore "github.com/dtorabi/access-manager/internal/store/postgres"
 	sqlstore "github.com/dtorabi/access-manager/internal/store/sqlite"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 )
+
+// maskHookSetter is satisfied by all three concrete store types (sqlite, postgres, mysql).
+// It allows the negative-mask Prometheus hook to be wired without coupling main to any
+// one store implementation.
+type maskHookSetter interface {
+	SetNegativeMaskHook(func())
+}
 
 func main() {
 	logger.Init(slog.LevelInfo, os.Stderr)
@@ -106,18 +116,29 @@ func serve(httpSrv *http.Server, ln net.Listener, timeout time.Duration, stop <-
 func setup(cfg config.Config) (*http.Server, *sql.DB, error) {
 	maybeWarnAPIAuth(cfg)
 
-	db, _, err := database.Open(cfg.DatabaseDriver, cfg.DatabaseURL)
+	db, migDirFromDriver, err := database.Open(cfg.DatabaseDriver, cfg.DatabaseURL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("open database: %w", err)
 	}
 
+	// Use cfg.MigrationsDir as the authoritative source, but auto-correct the common
+	// misconfiguration where DATABASE_DRIVER is changed without updating MIGRATIONS_DIR.
+	// If the migrations dir still has the compile-time sqlite default but the selected
+	// driver is not sqlite, fall back to the driver-canonical path and log a warning.
 	migDir := cfg.MigrationsDir
+	if migDir == "migrations/sqlite" && migDirFromDriver != "migrations/sqlite" {
+		logger.Warn("MIGRATIONS_DIR not updated from default; using driver-canonical path",
+			slog.String("driver", cfg.DatabaseDriver),
+			slog.String("migrations_dir", migDirFromDriver),
+		)
+		migDir = migDirFromDriver
+	}
 	if !filepath.IsAbs(migDir) {
 		if wd, err := os.Getwd(); err == nil {
 			migDir = filepath.Join(wd, migDir)
 		}
 	}
-	if err := database.MigrateUp(db, migDir); err != nil {
+	if err := database.MigrateUp(db, migDir, cfg.DatabaseDriver); err != nil {
 		_ = db.Close()
 		return nil, nil, fmt.Errorf("migrate: %w", err)
 	}
@@ -126,7 +147,20 @@ func setup(cfg config.Config) (*http.Server, *sql.DB, error) {
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
 
-	st := sqlstore.New(db)
+	var st store.Store
+	switch cfg.DatabaseDriver {
+	case "postgres":
+		st = pgstore.New(db)
+	case "mysql":
+		st = mysqlstore.New(db)
+	case "sqlite", "sqlite3":
+		st = sqlstore.New(db)
+	default:
+		// database.Open already rejected unsupported drivers; this case is unreachable in practice.
+		_ = db.Close()
+		return nil, nil, fmt.Errorf("setup: unrecognized driver %q", cfg.DatabaseDriver)
+	}
+
 	srv := &api.Server{Store: st, APIBearerToken: cfg.APIBearerToken}
 
 	httpSrv := &http.Server{
@@ -137,10 +171,15 @@ func setup(cfg config.Config) (*http.Server, *sql.DB, error) {
 		IdleTimeout:       120 * time.Second,
 	}
 
-	// Wire the SQLite store's negative-mask observer to the Prometheus
-	// counter so operators can alert on legacy/out-of-band data. See T50.
+	// Wire the negative-mask observer to the Prometheus counter so operators
+	// can alert on legacy/out-of-band data. All three store implementations
+	// satisfy maskHookSetter. See T50.
 	if c := srv.NegativeMaskCounter(); c != nil {
-		st.SetNegativeMaskHook(c.Inc)
+		if hs, ok := st.(maskHookSetter); ok {
+			hs.SetNegativeMaskHook(c.Inc)
+		} else {
+			logger.Warn("store does not implement SetNegativeMaskHook; store_negative_mask_observed_total will not increment")
+		}
 	}
 
 	return httpSrv, db, nil

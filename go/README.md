@@ -1,6 +1,6 @@
 # access-manager (Go)
 
-HTTP service and Go module for **domain-scoped** access control: users, groups, resources, access-type bits, and permissions (`uint64` masks). SQLite is the default store; the design allows other SQL drivers later.
+HTTP service and Go module for **domain-scoped** access control: users, groups, resources, access-type bits, and permissions (`uint64` masks). SQLite is the default store; PostgreSQL and MySQL/MariaDB are also supported.
 
 **Module:** `github.com/dtorabi/access-manager` (this directory is the **module root**).
 
@@ -17,7 +17,7 @@ go mod download
 go run ./cmd/server
 ```
 
-The server listens on **`127.0.0.1:8080`** by default. Migrations run on startup against the configured SQLite file. **SIGINT** / **SIGTERM** triggers graceful shutdown (see `SHUTDOWN_TIMEOUT_SECONDS` / `shutdown_timeout_seconds` in config).
+The server listens on **`127.0.0.1:8080`** by default. Migrations run on startup against the configured database. **SIGINT** / **SIGTERM** triggers graceful shutdown (see `SHUTDOWN_TIMEOUT_SECONDS` / `shutdown_timeout_seconds` in config).
 
 ### Health check
 
@@ -29,7 +29,7 @@ Example response: `{"status":"ok"}`
 
 ### Metrics
 
-Prometheus metrics are served at **`/metrics`** (outside bearer auth). The middleware records `http_requests_total`, `http_request_duration_seconds`, `authz_checks_total` (label: `result=ok|err`; one increment per request), and `store_negative_mask_observed_total` (bumped when the SQLite store reads a negative access mask). See root [README.md — Observability](../README.md#observability) for Grafana/Prometheus compose setup.
+Prometheus metrics are served at **`/metrics`** (outside bearer auth). The middleware records `http_requests_total`, `http_request_duration_seconds`, `authz_checks_total` (label: `result=ok|err`; one increment per request), and `store_negative_mask_observed_total` (bumped when any of the built-in store implementations reads a negative access mask). See root [README.md — Observability](../README.md#observability) for Grafana/Prometheus compose setup.
 
 ## Docker
 
@@ -44,10 +44,10 @@ From the **repository root** (not `go/`): **`make docker-build`**, **`make docke
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `CONFIG_PATH` | _(unset)_ | Path to YAML file; if unset, only defaults + env apply |
-| `DATABASE_DRIVER` | `sqlite` | SQL driver (`sqlite` / `sqlite3` via [internal/database](internal/database/open.go)) |
+| `DATABASE_DRIVER` | `sqlite` | SQL driver (`sqlite` / `sqlite3`, `postgres`, `mysql` — see **Supported databases** below) |
 | `DATABASE_URL` | `file:access.db?_pragma=foreign_keys(1)` | Database DSN |
 | `HTTP_ADDR` | `127.0.0.1:8080` | Listen address (**use loopback in dev**; see [AGENTS.md](../AGENTS.md)) |
-| `MIGRATIONS_DIR` | `migrations/sqlite` | Migration `.up.sql` directory (relative paths are resolved from the **process working directory** — run from `go/` or set an absolute path) |
+| `MIGRATIONS_DIR` | `migrations/sqlite` | Migration `.up.sql` directory — set to `migrations/postgres` or `migrations/mysql` for the matching driver (relative paths are resolved from the **process working directory** — run from `go/` or set an absolute path) |
 | `SHUTDOWN_TIMEOUT_SECONDS` | `30` | Max seconds to wait for graceful shutdown after **SIGINT** / **SIGTERM** |
 | `API_BEARER_TOKEN` | _(empty)_ | If set, all **`/api/v1/*`** routes require `Authorization: Bearer <token>`. **`/health`** stays public. Use a strong random value in production; never commit it. |
 
@@ -59,6 +59,16 @@ See [config.example.yaml](config.example.yaml). Copy to a path outside VCS (e.g.
 
 Loader: [internal/config](internal/config/config.go).
 
+## Supported databases
+
+| Driver (`DATABASE_DRIVER`) | `MIGRATIONS_DIR` | Minimum version | DSN example |
+|----------------------------|-----------------|-----------------|-------------|
+| `sqlite` / `sqlite3` | `migrations/sqlite` | SQLite 3.35+ (via [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite)) | `file:access.db?_pragma=foreign_keys(1)` |
+| `postgres` | `migrations/postgres` | PostgreSQL 15+ | `postgres://user:password@localhost:5432/access_manager?sslmode=disable` |
+| `mysql` | `migrations/mysql` | MySQL 8+ / MariaDB 10.6+ | `user:password@tcp(localhost:3306)/access_manager?parseTime=true` |
+
+Set `DATABASE_DRIVER` **and** update `MIGRATIONS_DIR` to match. See [`.env.example`](.env.example) and [`config.example.yaml`](config.example.yaml) for commented examples of each driver.
+
 ## Development
 
 Run **`make`** from the **repository root** (`make test`, `make lint`, …) or from this directory with the same targets (see [Makefile](Makefile)).
@@ -69,13 +79,15 @@ Run **`make`** from the **repository root** (`make test`, `make lint`, …) or f
 |--------|---------|
 | Build binary | `make build` → `bin/server` |
 | Tests (race) | `make test` |
-| Coverage profile | `make cover` → `coverage.out`, prints total statement coverage; HTML: `go tool cover -html=coverage.out` |
+| Coverage profile | `make cover` → `coverage.out`, prints total statement coverage; HTML: `go tool cover -html=coverage.out`. Includes integration tests when `DATABASE_DSN_POSTGRES` / `DATABASE_DSN_MYSQL` are set; those tests skip gracefully when not set. |
 | Coverage by function | `make cover-func` |
 | Run server | `make run` |
 | E2E smoke | From **repo root**: `make e2e` → `go test -race -count=1 -tags=e2e ./e2e/...` (running server; optional **`API_BEARER_TOKEN`**). Optional curl script: **`make e2e-bash`**. See **[test/e2e/README.md](../test/e2e/README.md)**. |
 | Lint | `make lint` |
 | Vuln check | `make vuln` → pinned `go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...` (same pin as CI) |
 | Tidy modules | `make tidy` |
+| Integration (postgres) | `make test-integration-postgres` — requires `DATABASE_DSN_POSTGRES` |
+| Integration (mysql) | `make test-integration-mysql` — requires `DATABASE_DSN_MYSQL` |
 
 Docker (from **repo root** only): `make docker-build`, `make docker-up`, `make docker-logs`, `make docker-down` — see [root README](../README.md#docker).
 
@@ -86,7 +98,7 @@ Equivalent without Make (from **`go/`**): `go test -race ./...`, `go vet ./...`,
 REST routes live under **`/api/v1`** with domain-scoped segments, for example:
 
 - `GET` / `POST /api/v1/domains`; `GET` / `PATCH` / `DELETE /api/v1/domains/{domainID}`
-- Domain-scoped CRUD includes `PATCH` / `DELETE` for users, groups, resources, permissions, and access types (plus `GET` for a single access type). Deletes fail with **400** when SQLite foreign keys block removal.
+- Domain-scoped CRUD includes `PATCH` / `DELETE` for users, groups, resources, permissions, and access types (plus `GET` for a single access type). Deletes fail with **400** when foreign key constraints block removal.
 - `GET /api/v1/domains/{domainID}/authz/check?user_id=&resource_id=&access_bit=`
 
 ### Pagination, filtering, and sorting
@@ -138,8 +150,12 @@ Server output is structured JSON via `internal/logger` (wrapping `log/slog`). Al
 | `internal/access` | Access-mask helpers (library-oriented) |
 | `internal/store` | Store interfaces and types |
 | `internal/store/sqlite` | SQLite implementation |
+| `internal/store/postgres` | PostgreSQL implementation |
+| `internal/store/mysql` | MySQL / MariaDB implementation |
 | `internal/logger` | Structured JSON logger wrapping `log/slog`; audit events |
 | `internal/database` | Driver open + migrations runner |
-| `migrations/sqlite` | SQL migrations |
+| `migrations/sqlite` | SQLite migrations |
+| `migrations/postgres` | PostgreSQL migrations |
+| `migrations/mysql` | MySQL / MariaDB migrations |
 
 See [AGENTS.md](../AGENTS.md) for contributor rules, security, and **library vs HTTP** boundaries.

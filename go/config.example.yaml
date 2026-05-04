@@ -12,3 +12,13 @@ shutdown_timeout_seconds: 30
 # Optional: require Authorization: Bearer <token> on /api/v1/*. Env API_BEARER_TOKEN overrides when set.
 # Leave empty for local loopback-only dev; do not commit real secrets.
 # api_bearer_token: ""
+
+# --- PostgreSQL example ---
+# database_driver: postgres
+# database_url: "postgres://user:password@localhost:5432/access_manager?sslmode=disable"
+# migrations_dir: migrations/postgres
+
+# --- MySQL / MariaDB example ---
+# database_driver: mysql
+# database_url: "user:password@tcp(localhost:3306)/access_manager?parseTime=true"
+# migrations_dir: migrations/mysql

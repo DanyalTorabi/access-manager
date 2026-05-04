@@ -98,7 +98,29 @@ func TestSetup_badMigrations(t *testing.T) {
 	}
 }
 
-// Relative MigrationsDir is joined with os.Getwd(); run from module root so migrate finds sqlite files.
+// TestSetup_relativeMigrationsDirNoWarn verifies that using the sqlite default
+// migrations dir with the sqlite driver does NOT emit the driver-mismatch warning.
+func TestSetup_relativeMigrationsDirNoWarn(t *testing.T) {
+	root := testutil.RepoRoot(t)
+	t.Chdir(root)
+	cfg := testCfg(t)
+	cfg.MigrationsDir = "migrations/sqlite" // default value, matches driver
+	out := captureLog(func() {
+		httpSrv, db, err := setup(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = db.Close()
+		if httpSrv == nil {
+			t.Fatal("nil http server")
+		}
+	})
+	if strings.Contains(out, "MIGRATIONS_DIR not updated") {
+		t.Fatalf("unexpected driver-mismatch warning for sqlite driver: %s", out)
+	}
+}
+
+// TestSetup_relativeMigrationsDir: Relative MigrationsDir is joined with os.Getwd(); run from module root so migrate finds sqlite files.
 func TestSetup_relativeMigrationsDir(t *testing.T) {
 	root := testutil.RepoRoot(t)
 	t.Chdir(root)

@@ -2,6 +2,7 @@ package database
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/dtorabi/access-manager/internal/testutil"
@@ -31,10 +32,30 @@ func TestOpen_sqlite3Alias(t *testing.T) {
 	_ = db.Close()
 }
 
+func TestOpen_postgres_pingError(t *testing.T) {
+	_, _, err := Open("postgres", "postgres://invalid:invalid@127.0.0.1:1/nodb?sslmode=disable&connect_timeout=1")
+	if err == nil {
+		t.Fatal("want error for unreachable postgres DSN")
+	}
+}
+
+func TestOpen_mysql_pingError(t *testing.T) {
+	_, _, err := Open("mysql", "invalid:invalid@tcp(127.0.0.1:1)/nodb?parseTime=true&timeout=1s&readTimeout=1s&writeTimeout=1s")
+	if err == nil {
+		t.Fatal("want error for unreachable mysql DSN")
+	}
+}
+
 func TestOpen_unsupportedDriver(t *testing.T) {
 	_, _, err := Open("mongo", "localhost")
 	if err == nil {
 		t.Fatal("want error for unsupported driver")
+	}
+	// Error should list supported drivers.
+	for _, d := range []string{"sqlite", "postgres", "mysql"} {
+		if !strings.Contains(err.Error(), d) {
+			t.Errorf("error %q does not mention supported driver %q", err.Error(), d)
+		}
 	}
 }
 
@@ -53,7 +74,7 @@ func TestMigrateUp_sqlite(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = db.Close() }()
-	if err := MigrateUp(db, testutil.SQLiteMigrationsDir(t)); err != nil {
+	if err := MigrateUp(db, testutil.SQLiteMigrationsDir(t), "sqlite"); err != nil {
 		t.Fatal(err)
 	}
 	var cnt int
@@ -62,5 +83,38 @@ func TestMigrateUp_sqlite(t *testing.T) {
 	}
 	if cnt == 0 {
 		t.Fatal("migrations not applied")
+	}
+}
+
+func TestMigrateUp_sqlite3Alias(t *testing.T) {
+	dsn := "file:" + filepath.Join(t.TempDir(), "test.db") + "?_pragma=foreign_keys(1)"
+	db, _, err := Open("sqlite3", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	if err := MigrateUp(db, testutil.SQLiteMigrationsDir(t), "sqlite3"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMigrateUp_unsupportedDriver(t *testing.T) {
+	dsn := "file:" + filepath.Join(t.TempDir(), "test.db") + "?_pragma=foreign_keys(1)"
+	db, _, err := Open("sqlite", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	err = MigrateUp(db, testutil.SQLiteMigrationsDir(t), "baddriver")
+	if err == nil {
+		t.Fatal("want error for unsupported driver in MigrateUp")
+	}
+	if !strings.Contains(err.Error(), "unsupported driver") {
+		t.Errorf("error %q should mention 'unsupported driver'", err.Error())
+	}
+	for _, d := range []string{"sqlite", "postgres", "mysql"} {
+		if !strings.Contains(err.Error(), d) {
+			t.Errorf("error %q does not mention supported driver %q", err.Error(), d)
+		}
 	}
 }
