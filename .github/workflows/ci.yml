@@ -99,6 +99,68 @@ jobs:
         if: always()
         run: docker compose down --remove-orphans
 
+  integration:
+    name: Integration tests (Postgres + MySQL)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set GOTOOLCHAIN from go.mod
+        working-directory: ${{ github.workspace }}
+        run: |
+          TC=$(sed -n 's/^toolchain //p' go/go.mod | head -1)
+          [ -z "$TC" ] && TC="go$(sed -n 's/^go //p' go/go.mod | head -1)"
+          echo "GOTOOLCHAIN=${TC}" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      - name: Start Postgres and MySQL
+        working-directory: ${{ github.workspace }}
+        run: docker compose up -d postgres mysql
+
+      - name: Wait for Postgres
+        working-directory: ${{ github.workspace }}
+        run: |
+          for i in $(seq 1 30); do
+            if docker compose exec -T postgres pg_isready -U access -d access_test; then
+              echo "Postgres ready"
+              break
+            fi
+            echo "Waiting for Postgres (attempt $i)..."
+            sleep 2
+          done
+          docker compose exec -T postgres pg_isready -U access -d access_test
+
+      - name: Wait for MySQL
+        working-directory: ${{ github.workspace }}
+        run: |
+          for i in $(seq 1 30); do
+            if docker compose exec -T mysql mysqladmin ping -h localhost -paccess --silent; then
+              echo "MySQL ready"
+              break
+            fi
+            echo "Waiting for MySQL (attempt $i)..."
+            sleep 2
+          done
+          docker compose exec -T mysql mysqladmin ping -h localhost -paccess --silent
+
+      - name: Integration tests — Postgres
+        run: make test-integration-postgres
+
+      - name: Integration tests — MySQL
+        run: make test-integration-mysql
+
+      - name: Compose teardown
+        if: always()
+        working-directory: ${{ github.workspace }}
+        run: docker compose down --remove-orphans
+
   publish:
     name: Publish image to GHCR
     runs-on: ubuntu-latest

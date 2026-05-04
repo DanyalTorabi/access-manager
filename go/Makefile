@@ -71,7 +71,7 @@ test-integration-postgres:
 # Or override: DATABASE_DSN_MYSQL="..." make test-integration-mysql
 test-integration-mysql:
 	DATABASE_DSN_MYSQL="$(MYSQL_DSN)" \
-	go test -race -count=1 -tags=integration ./internal/store/mysql/...
+	go test -race -count=1 -tags=integration -parallel=1 ./internal/store/mysql/...
 
 # T16 — requires a running API (default BASE_URL http://127.0.0.1:8080). Bash twin: ../../test/e2e/bash/run.sh
 e2e:
