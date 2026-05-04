@@ -28,14 +28,24 @@ cover:
 	@echo "coverage.out written; run: go tool cover -html=coverage.out"
 
 # T61 — full coverage including Postgres and MySQL store integration tests.
-# Requires: docker compose up -d postgres mysql (services defined in docker-compose.yml).
+# Requires: docker compose up -d --wait postgres mysql (see docker-compose.yml).
+# MySQL tests run with -parallel=1 to prevent concurrent DDL metadata-lock
+# conflicts across per-test databases; their coverage is appended into the
+# same combined profile.
 cover-integration:
 	go clean -testcache
 	DATABASE_DSN_POSTGRES="$(POSTGRES_DSN)" \
 	DATABASE_DSN_MYSQL="$(MYSQL_DSN)" \
-	go test -race -tags=integration -coverprofile=coverage.out ./...
-	@go tool cover -func=coverage.out | tail -n 1
-	@echo "coverage.out written; run: go tool cover -html=coverage.out"
+	go test -race -tags=integration -coverprofile=coverage-integration.out ./...
+	@echo "--- re-running mysql with -parallel=1 for stable coverage ---"
+	DATABASE_DSN_MYSQL="$(MYSQL_DSN)" \
+	go test -race -count=1 -tags=integration -parallel=1 \
+	  -coverprofile=coverage-mysql.out ./internal/store/mysql/...
+	@{ grep '^mode:' coverage-integration.out | head -1; \
+	   grep -v '^mode:' coverage-integration.out; \
+	   grep -v '^mode:' coverage-mysql.out; } > coverage-combined.out
+	@go tool cover -func=coverage-combined.out | tail -n 1
+	@echo "coverage-combined.out written; run: go tool cover -html=coverage-combined.out"
 
 # Per-package function summary (T12); runs tests via dependency on cover.
 cover-func: cover
