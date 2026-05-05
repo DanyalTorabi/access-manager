@@ -29,21 +29,12 @@ cover:
 
 # T61 — full coverage including Postgres and MySQL store integration tests.
 # Requires: docker compose up -d --wait postgres mysql (see docker-compose.yml).
-# MySQL tests run with -parallel=1 to prevent concurrent DDL metadata-lock
-# conflicts across per-test databases; their coverage is appended into the
-# same combined profile.
+# Produces coverage-combined.out covering both unit and integration tests.
 cover-integration:
 	go clean -testcache
 	DATABASE_DSN_POSTGRES="$(POSTGRES_DSN)" \
 	DATABASE_DSN_MYSQL="$(MYSQL_DSN)" \
-	go test -race -tags=integration -coverprofile=coverage-integration.out ./...
-	@echo "--- re-running mysql with -parallel=1 for stable coverage ---"
-	DATABASE_DSN_MYSQL="$(MYSQL_DSN)" \
-	go test -race -count=1 -tags=integration -parallel=1 \
-	  -coverprofile=coverage-mysql.out ./internal/store/mysql/...
-	@{ grep '^mode:' coverage-integration.out | head -1; \
-	   grep -v '^mode:' coverage-integration.out; \
-	   grep -v '^mode:' coverage-mysql.out; } > coverage-combined.out
+	go test -race -tags=integration -coverprofile=coverage-combined.out ./...
 	@go tool cover -func=coverage-combined.out | tail -n 1
 	@echo "coverage-combined.out written; run: go tool cover -html=coverage-combined.out"
 
@@ -81,7 +72,7 @@ test-integration-postgres:
 # Or override: DATABASE_DSN_MYSQL="..." make test-integration-mysql
 test-integration-mysql:
 	DATABASE_DSN_MYSQL="$(MYSQL_DSN)" \
-	go test -race -count=1 -tags=integration -parallel=1 ./internal/store/mysql/...
+	go test -race -count=1 -tags=integration ./internal/store/mysql/...
 
 # T16 — requires a running API (default BASE_URL http://127.0.0.1:8080). Bash twin: ../../test/e2e/bash/run.sh
 e2e:
