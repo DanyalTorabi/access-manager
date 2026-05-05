@@ -39,14 +39,7 @@ jobs:
           cache-dependency-path: go/go.sum
 
       - name: Test
-        run: go test -race -coverprofile=coverage.out ./...
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          files: go/coverage.out
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: true
+        run: go test -race ./...
 
       - name: Vet
         run: go vet ./...
@@ -125,11 +118,15 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: docker compose up -d --wait postgres mysql
 
-      - name: Integration tests — Postgres
-        run: make test-integration-postgres
+      - name: Combined coverage (unit + integration)
+        run: make cover-integration
 
-      - name: Integration tests — MySQL
-        run: make test-integration-mysql
+      - name: Upload combined coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: go/coverage-combined.out
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
 
       - name: Compose teardown
         if: always()
