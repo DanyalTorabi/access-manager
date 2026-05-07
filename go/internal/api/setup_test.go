@@ -80,11 +80,9 @@ func auditLogEntriesWithAction(t *testing.T, buf, action string) []map[string]an
 }
 
 // NOTE: Tests that call logger.Init mutate the package-level logger pointer.
-// This is safe only because no test in this file uses t.Parallel().
+// No test in server_request_test.go uses t.Parallel() because of this.
 // Do NOT add t.Parallel() without first switching to a logger-injectable
 // Server field or an atomic pointer. Tracked on #47 (T36 follow-ups).
-
-// --- writeStoreErr unit tests ---
 
 func dummyRequest() *http.Request {
 	return httptest.NewRequest(http.MethodGet, "/test", nil)
@@ -142,8 +140,6 @@ func mustCreateResource(t *testing.T, ts *httptest.Server, domainID, title strin
 	}
 	return out.ID
 }
-
-// --- duplicate-create 409 tests ---
 
 // listResponse is a generic envelope for paginated list responses in tests.
 type listResponse[T any] struct {
