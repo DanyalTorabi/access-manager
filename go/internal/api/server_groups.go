@@ -13,6 +13,28 @@ import (
 	"github.com/google/uuid"
 )
 
+type groupPatchBody struct {
+	Title         *string         `json:"title"`
+	ParentGroupID json.RawMessage `json:"parent_group_id"`
+}
+
+type parentBody struct {
+	ParentGroupID *string `json:"parent_group_id"`
+}
+
+// parentGroupAuditAttrs adds parent hierarchy fields for group create vs set-parent.
+// When explicitClear is true (PATCH parent), nil ParentGroupID means the parent was cleared.
+// When explicitClear is false (create), nil means the new group is a root (no parent).
+func parentGroupAuditAttrs(parentID *string, explicitClear bool) []slog.Attr {
+	if parentID != nil {
+		return []slog.Attr{slog.String("parent_group_id", *parentID)}
+	}
+	if explicitClear {
+		return []slog.Attr{slog.Bool("parent_cleared", true)}
+	}
+	return []slog.Attr{slog.Bool("parent_root", true)}
+}
+
 func (s *Server) groupCreate(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
 	var b struct {

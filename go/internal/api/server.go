@@ -1,8 +1,6 @@
 package api
 
 import (
-	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strings"
 
@@ -126,46 +124,6 @@ type patchTitleBody struct {
 	Title *string `json:"title"`
 }
 
-type groupPatchBody struct {
-	Title         *string         `json:"title"`
-	ParentGroupID json.RawMessage `json:"parent_group_id"`
-}
-
-type accessTypePatchBody struct {
-	Title *string `json:"title"`
-	Bit   *string `json:"bit"`
-}
-
-type permissionPatchBody struct {
-	Title      *string `json:"title"`
-	ResourceID *string `json:"resource_id"`
-	AccessMask *string `json:"access_mask"`
-}
-
-type permissionBody struct {
-	Title      string `json:"title"`
-	ResourceID string `json:"resource_id"`
-	AccessMask string `json:"access_mask"` // decimal or 0x hex
-}
-
-type accessTypeBody struct {
-	Title string `json:"title"`
-	Bit   string `json:"bit"` // decimal or 0x hex
-}
-
-type parentBody struct {
-	ParentGroupID *string `json:"parent_group_id"`
-}
-
-// parentGroupAuditAttrs adds parent hierarchy fields for group create vs set-parent.
-// When explicitClear is true (PATCH parent), nil ParentGroupID means the parent was cleared.
-// When explicitClear is false (create), nil means the new group is a root (no parent).
-func parentGroupAuditAttrs(parentID *string, explicitClear bool) []slog.Attr {
-	if parentID != nil {
-		return []slog.Attr{slog.String("parent_group_id", *parentID)}
-	}
-	if explicitClear {
-		return []slog.Attr{slog.Bool("parent_cleared", true)}
-	}
-	return []slog.Attr{slog.Bool("parent_root", true)}
-}
+// parentGroupAuditAttrs, groupPatchBody, parentBody are in server_groups.go.
+// accessTypeBody, accessTypePatchBody are in server_access_types.go.
+// permissionBody, permissionPatchBody are in server_permissions.go.
