@@ -83,10 +83,6 @@ func auditLogEntriesWithAction(t *testing.T, buf, action string) []map[string]an
 // Do NOT add t.Parallel() without first switching to a logger-injectable
 // Server field or an atomic pointer. Tracked on #47 (T36 follow-ups).
 
-func dummyRequest() *http.Request {
-	return httptest.NewRequest(http.MethodGet, "/test", nil)
-}
-
 // newBrokenTestAPIWithRegistry builds a Server backed by a closed DB so any
 // store call returns an error. If reg is non-nil it is wired through Router
 // so callers can assert metrics; otherwise instrumentation is disabled.

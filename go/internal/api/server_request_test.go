@@ -18,6 +18,10 @@ import (
 	"github.com/google/uuid"
 )
 
+func dummyRequest() *http.Request {
+	return httptest.NewRequest(http.MethodGet, "/test", nil)
+}
+
 func TestWriteStoreErr_allCases(t *testing.T) {
 	var buf bytes.Buffer
 	logger.Init(slog.LevelInfo, &buf)
