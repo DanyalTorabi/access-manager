@@ -11,6 +11,18 @@ import (
 	"github.com/google/uuid"
 )
 
+type permissionBody struct {
+	Title      string `json:"title"`
+	ResourceID string `json:"resource_id"`
+	AccessMask string `json:"access_mask"` // decimal or 0x hex
+}
+
+type permissionPatchBody struct {
+	Title      *string `json:"title"`
+	ResourceID *string `json:"resource_id"`
+	AccessMask *string `json:"access_mask"`
+}
+
 func (s *Server) permissionCreate(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
 	var b permissionBody

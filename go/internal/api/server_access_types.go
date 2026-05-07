@@ -11,6 +11,16 @@ import (
 	"github.com/google/uuid"
 )
 
+type accessTypeBody struct {
+	Title string `json:"title"`
+	Bit   string `json:"bit"` // decimal or 0x hex
+}
+
+type accessTypePatchBody struct {
+	Title *string `json:"title"`
+	Bit   *string `json:"bit"`
+}
+
 func (s *Server) accessTypeCreate(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
 	var b accessTypeBody
