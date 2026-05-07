@@ -11,7 +11,6 @@ import (
 	"github.com/dtorabi/access-manager/internal/store"
 )
 
-
 func TestAPI_accessTypeCreateList_invalidBit(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	var dom store.Domain
@@ -55,7 +54,6 @@ func TestAPI_accessTypeCreateList_invalidBit(t *testing.T) {
 	}
 }
 
-
 func TestAPI_accessTypeCreate_unknownField(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	var dom store.Domain
@@ -72,7 +70,6 @@ func TestAPI_accessTypeCreate_unknownField(t *testing.T) {
 		t.Fatalf("want 400, got %d: %s", res.StatusCode, b)
 	}
 }
-
 
 func TestAPI_accessTypeList_empty(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -116,7 +113,6 @@ func TestAPI_accessTypeCreate_duplicateBit(t *testing.T) {
 	}
 }
 
-
 func TestAPI_accessTypeList_defaultSortByTitle(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	domainID := mustCreateDomain(t, ts)
@@ -151,7 +147,6 @@ func TestAPI_accessTypeList_defaultSortByTitle(t *testing.T) {
 	}
 }
 
-
 func TestAPI_accessTypeList_search(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	domID := mustCreateDomain(t, ts)
@@ -177,7 +172,6 @@ func TestAPI_accessTypeList_search(t *testing.T) {
 		t.Fatalf("want 2, got total=%d len=%d", env.Meta.Total, len(env.Data))
 	}
 }
-
 
 func TestAPI_accessTypeList_sortDesc(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -212,7 +206,6 @@ func TestAPI_accessTypeList_sortDesc(t *testing.T) {
 	}
 }
 
-
 func TestAPI_accessTypeList_invalidSort(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	domainID := mustCreateDomain(t, ts)
@@ -225,7 +218,6 @@ func TestAPI_accessTypeList_invalidSort(t *testing.T) {
 		t.Fatalf("want 400, got %d", res.StatusCode)
 	}
 }
-
 
 func TestAPI_accessTypeList_invalidOrder(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -245,7 +237,6 @@ func TestAPI_accessTypeList_invalidOrder(t *testing.T) {
 // store.InvalidInputError detail must be returned to the client even when
 // wrapped by an outer fmt.Errorf("%w", err). This is the regression that T48
 // fixed.
-
 
 func TestAPI_accessTypePatch_invalidBit(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -270,7 +261,6 @@ func TestAPI_accessTypePatch_invalidBit(t *testing.T) {
 		t.Fatalf("want 400 for invalid bit, got %d", res.StatusCode)
 	}
 }
-
 
 func TestAPI_accessTypePatch_bitOnly(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -302,11 +292,6 @@ func TestAPI_accessTypePatch_bitOnly(t *testing.T) {
 		t.Fatalf("bit: want 4, got %d", got.Bit)
 	}
 }
-
-// TestAPI_accessMask_rejectsBit63 documents the temporary 63-bit limit on
-// access masks (issue #67 / T46). Bit 63 (1<<63) would overflow signed-64
-// storage in SQLite, so the API rejects it with 400 on access-type and
-// permission create/patch. Values <= MaxInt64 are accepted.
 
 // TestAPI_accessMask_rejectsBit63 documents the temporary 63-bit limit on
 // access masks (issue #67 / T46). Bit 63 (1<<63) would overflow signed-64
@@ -409,4 +394,3 @@ func TestAPI_accessMask_rejectsBit63(t *testing.T) {
 		}
 	})
 }
-

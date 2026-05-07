@@ -30,8 +30,6 @@ func newTestStore(t *testing.T) (store.Store, func()) {
 }
 
 // newTestAPI returns an HTTP test server backed by a real SQLite store and migrations.
-
-// newTestAPI returns an HTTP test server backed by a real SQLite store and migrations.
 func newTestAPI(t *testing.T) (*httptest.Server, store.Store) {
 	t.Helper()
 	st, cleanup := newTestStore(t)
@@ -45,14 +43,10 @@ func newTestAPI(t *testing.T) (*httptest.Server, store.Store) {
 }
 
 // mustPostJSON201 is a convenience wrapper for mustPostJSON with http.StatusCreated.
-
-// mustPostJSON201 is a convenience wrapper for mustPostJSON with http.StatusCreated.
 func mustPostJSON201(t *testing.T, url, body string) []byte {
 	t.Helper()
 	return mustPostJSON(t, url, body, http.StatusCreated)
 }
-
-// auditLogEntries returns each newline-delimited JSON object from buf that has audit=true.
 
 // auditLogEntries returns each newline-delimited JSON object from buf that has audit=true.
 func auditLogEntries(t *testing.T, buf string) []map[string]any {
@@ -73,7 +67,6 @@ func auditLogEntries(t *testing.T, buf string) []map[string]any {
 	}
 	return out
 }
-
 
 func auditLogEntriesWithAction(t *testing.T, buf, action string) []map[string]any {
 	t.Helper()
@@ -124,7 +117,6 @@ func newBrokenTestAPIWithRegistry(t *testing.T, reg *prometheus.Registry) *httpt
 	return ts
 }
 
-
 func newBrokenTestAPI(t *testing.T) *httptest.Server {
 	t.Helper()
 	return newBrokenTestAPIWithRegistry(t, nil)
@@ -140,7 +132,6 @@ func mustCreateDomain(t *testing.T, ts *httptest.Server) string {
 	}
 	return out.ID
 }
-
 
 func mustCreateResource(t *testing.T, ts *httptest.Server, domainID, title string) string {
 	t.Helper()

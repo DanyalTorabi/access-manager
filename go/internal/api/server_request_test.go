@@ -18,7 +18,6 @@ import (
 	"github.com/google/uuid"
 )
 
-
 func TestWriteStoreErr_allCases(t *testing.T) {
 	var buf bytes.Buffer
 	logger.Init(slog.LevelInfo, &buf)
@@ -61,7 +60,6 @@ func TestWriteStoreErr_allCases(t *testing.T) {
 	}
 }
 
-
 func TestWriteStoreErr_noSQLLeak(t *testing.T) {
 	var buf bytes.Buffer
 	logger.Init(slog.LevelInfo, &buf)
@@ -85,7 +83,6 @@ func TestWriteStoreErr_noSQLLeak(t *testing.T) {
 		t.Fatal("full SQL error not logged server-side")
 	}
 }
-
 
 func TestWriteInternalErr_generic(t *testing.T) {
 	var buf bytes.Buffer
@@ -112,11 +109,6 @@ func TestWriteInternalErr_generic(t *testing.T) {
 		t.Fatal("full error not logged")
 	}
 }
-
-// TestWriteInternalErr_misuse asserts that passing a structured store sentinel
-// (e.g. ErrNotFound) to writeInternalErr logs an ERROR-level misuse alert while
-// still returning a generic 500 to the client — making the wrong call site
-// immediately visible in production.
 
 // TestWriteInternalErr_misuse asserts that passing a structured store sentinel
 // (e.g. ErrNotFound) to writeInternalErr logs an ERROR-level misuse alert while
@@ -161,10 +153,6 @@ func TestWriteInternalErr_misuse(t *testing.T) {
 // --- store-error tests using a broken (closed-DB) store ---
 
 // newBrokenTestAPIWithRegistry builds a Server backed by a closed DB so any
-// store call returns an error. If reg is non-nil it is wired through Router
-// so callers can assert metrics; otherwise instrumentation is disabled.
-
-
 func TestAPI_storeErrors(t *testing.T) {
 	ts := newBrokenTestAPI(t)
 	domID := uuid.NewString()
@@ -251,7 +239,6 @@ func TestAPI_storeErrors(t *testing.T) {
 	}
 }
 
-
 func TestAPI_patchEmptyBody(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	var dom store.Domain
@@ -278,7 +265,6 @@ func TestAPI_patchEmptyBody(t *testing.T) {
 }
 
 // --- pagination tests ---
-
 
 func TestAPI_patchEmptyBody_allEntities(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -336,7 +322,6 @@ func TestAPI_patchEmptyBody_allEntities(t *testing.T) {
 	}
 }
 
-
 func TestAPI_pagination_invalidOffset(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	tests := []struct {
@@ -362,7 +347,6 @@ func TestAPI_pagination_invalidOffset(t *testing.T) {
 	}
 }
 
-
 func TestAPI_pagination_limitClamping(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"d"}`)
@@ -383,7 +367,6 @@ func TestAPI_pagination_limitClamping(t *testing.T) {
 		t.Fatalf("limit should be clamped to 100, got %d", env.Meta.Limit)
 	}
 }
-
 
 func TestAPI_pagination_offsetPastEnd(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -408,7 +391,6 @@ func TestAPI_pagination_offsetPastEnd(t *testing.T) {
 		t.Fatalf("data: want empty, got %d", len(env.Data))
 	}
 }
-
 
 func TestAPI_pagination_invalidOffset_otherEndpoints(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -439,7 +421,6 @@ func TestAPI_pagination_invalidOffset_otherEndpoints(t *testing.T) {
 		})
 	}
 }
-
 
 func TestAPI_scopedList_pagination(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -499,7 +480,6 @@ func TestAPI_scopedList_pagination(t *testing.T) {
 	}
 }
 
-
 func TestAPI_parseListOpts(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -556,7 +536,6 @@ func TestAPI_parseListOpts(t *testing.T) {
 	}
 }
 
-
 func TestAPI_parseSortOrder(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -600,7 +579,6 @@ func TestAPI_parseSortOrder(t *testing.T) {
 	}
 }
 
-
 func TestAPI_readJSON_tooLargeBody(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	bigBody := `{"title":"` + strings.Repeat("x", 2*1024*1024) + `"}`
@@ -640,11 +618,8 @@ func TestPublicInvalidInputMsg_typedExtraction(t *testing.T) {
 		})
 	}
 }
-// --- T47: parseUint64Validated and stable numeric parse errors ---
 
-// TestParseUint64Validated covers the validated parse helper directly: every
-// rejection path returns a stable sentinel error and never embeds the raw
-// strconv message or the user input.
+// --- T47: parseUint64Validated and stable numeric parse errors ---
 
 // TestParseUint64Validated covers the validated parse helper directly: every
 // rejection path returns a stable sentinel error and never embeds the raw
@@ -709,11 +684,6 @@ func TestParseUint64Validated(t *testing.T) {
 		})
 	}
 }
-
-// TestAPI_numericParseErrors_stableMessages asserts that the API surfaces the
-// stable "invalid numeric value" message (not strconv text) for malformed
-// numeric input on every handler that parses bit / access_mask. Status code
-// is asserted before the body is read.
 
 // TestAPI_numericParseErrors_stableMessages asserts that the API surfaces the
 // stable "invalid numeric value" message (not strconv text) for malformed
@@ -803,9 +773,6 @@ func TestAPI_numericParseErrors_stableMessages(t *testing.T) {
 	})
 }
 
-// TestAPI_authzCheck_accessBitOutOfRange asserts authzCheck rejects a bit
-// value above the signed-63 limit before reaching the store.
-
 // TestWriteJSON_encodeErrorLogged asserts that a response encoding failure is
 // logged at ERROR level with method and path so operators can identify the
 // failing endpoint. Because the status header is already committed, the only
@@ -852,9 +819,6 @@ func TestWriteJSON_encodeErrorLogged(t *testing.T) {
 
 // TestReadJSON_trailingDataRejected asserts that sending two JSON objects in a
 // single request body returns 400 with a stable, client-safe message.
-
-// TestReadJSON_trailingDataRejected asserts that sending two JSON objects in a
-// single request body returns 400 with a stable, client-safe message.
 func TestReadJSON_trailingDataRejected(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	// Second JSON object after the first — trailing data.
@@ -877,9 +841,6 @@ func TestReadJSON_trailingDataRejected(t *testing.T) {
 		t.Fatalf(`body["error"] = %q, want %q`, got, wantMsg)
 	}
 }
-
-// TestReadJSON_failureKindsLogged asserts that readJSON logs the correct
-// structured kind label for each class of decode failure.
 
 // TestReadJSON_failureKindsLogged asserts that readJSON logs the correct
 // structured kind label for each class of decode failure.
@@ -951,9 +912,6 @@ func TestReadJSON_failureKindsLogged(t *testing.T) {
 
 // TestReadJSON_bodyTooLargeKindLogged asserts that a body exceeding the 1 MiB
 // limit returns 413 and logs kind=body_too_large.
-
-// TestReadJSON_bodyTooLargeKindLogged asserts that a body exceeding the 1 MiB
-// limit returns 413 and logs kind=body_too_large.
 func TestReadJSON_bodyTooLargeKindLogged(t *testing.T) {
 	var buf bytes.Buffer
 	logger.Init(slog.LevelWarn, &buf)
@@ -994,10 +952,6 @@ func TestReadJSON_bodyTooLargeKindLogged(t *testing.T) {
 		t.Fatalf("want kind=body_too_large in log, got %q\nlog: %s", foundKind, logBuf)
 	}
 }
-
-// TestReadJSON_clientMessagesDoNotLeakRawInput asserts that the client-visible
-// error messages for decode failures are stable and never include raw user input
-// (e.g. invalid characters, field names from the request body).
 
 // TestReadJSON_clientMessagesDoNotLeakRawInput asserts that the client-visible
 // error messages for decode failures are stable and never include raw user input
