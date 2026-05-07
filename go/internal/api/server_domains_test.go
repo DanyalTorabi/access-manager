@@ -54,7 +54,6 @@ func TestAPI_auditLog_domainCreate(t *testing.T) {
 	}
 }
 
-
 func TestAPI_domainCreateAndList(t *testing.T) {
 	ts, _ := newTestAPI(t)
 
@@ -96,7 +95,6 @@ func TestAPI_domainCreateAndList(t *testing.T) {
 	}
 }
 
-
 func TestAPI_domainCreate_invalidJSON(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(`{"title":`))
@@ -110,7 +108,6 @@ func TestAPI_domainCreate_invalidJSON(t *testing.T) {
 	}
 }
 
-
 func TestAPI_domainCreate_unknownField(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(`{"title":"x","extra":1}`))
@@ -123,7 +120,6 @@ func TestAPI_domainCreate_unknownField(t *testing.T) {
 		t.Fatalf("want 400 unknown field, got %d: %s", res.StatusCode, body)
 	}
 }
-
 
 func TestAPI_domainCreate_storeErrorClassified(t *testing.T) {
 	ts := newBrokenTestAPI(t)
@@ -163,7 +159,6 @@ func TestAPI_domainList_empty(t *testing.T) {
 		t.Fatalf("meta.total: want 0, got %d", env.Meta.Total)
 	}
 }
-
 
 func TestAPI_domainGetPatchDelete(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -219,7 +214,6 @@ func TestAPI_domainGetPatchDelete(t *testing.T) {
 	}
 }
 
-
 func TestAPI_domainDelete_blockedByUser(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	var dom store.Domain
@@ -244,10 +238,9 @@ func TestAPI_domainDelete_blockedByUser(t *testing.T) {
 	}
 }
 
-
 func TestAPI_domainPatch_malformedJSON(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	dom := mustCreateDomain(t, ts)
+	dom := seedDomain(t, ts, "test-domain")
 	req, _ := http.NewRequest(http.MethodPatch, ts.URL+"/api/v1/domains/"+dom,
 		strings.NewReader(`{broken`))
 	req.Header.Set("Content-Type", "application/json")
@@ -295,7 +288,6 @@ func TestAPI_domainList_pagination(t *testing.T) {
 	}
 }
 
-
 func TestAPI_domainList_defaultPagination(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"one"}`)
@@ -319,7 +311,6 @@ func TestAPI_domainList_defaultPagination(t *testing.T) {
 		t.Fatalf("total=%d len=%d", env.Meta.Total, len(env.Data))
 	}
 }
-
 
 func TestAPI_domainList_search(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -345,7 +336,6 @@ func TestAPI_domainList_search(t *testing.T) {
 	}
 }
 
-
 func TestAPI_domainList_searchNoMatch(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"Alpha"}`)
@@ -367,7 +357,6 @@ func TestAPI_domainList_searchNoMatch(t *testing.T) {
 	}
 }
 
-
 func TestAPI_domainList_searchEmptyIgnored(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"one"}`)
@@ -388,7 +377,6 @@ func TestAPI_domainList_searchEmptyIgnored(t *testing.T) {
 		t.Fatalf("empty search should return all, got total=%d", env.Meta.Total)
 	}
 }
-
 
 func TestAPI_domainList_searchWithPagination(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -418,7 +406,6 @@ func TestAPI_domainList_searchWithPagination(t *testing.T) {
 	}
 }
 
-
 func TestAPI_domainList_searchEscapesWildcards(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"100% done"}`)
@@ -442,7 +429,6 @@ func TestAPI_domainList_searchEscapesWildcards(t *testing.T) {
 		t.Fatalf("search for literal %%: want 1 result, got total=%d len=%d", env.Meta.Total, len(env.Data))
 	}
 }
-
 
 func TestAPI_domainList_searchType(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -494,7 +480,6 @@ func TestAPI_domainList_searchType(t *testing.T) {
 	}
 }
 
-
 func TestAPI_domainList_sortMeta(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"one"}`)
@@ -518,7 +503,6 @@ func TestAPI_domainList_sortMeta(t *testing.T) {
 		t.Fatalf("meta.order: want asc, got %q", env.Meta.Order)
 	}
 }
-
 
 func TestAPI_domainList_sortDesc(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -550,7 +534,6 @@ func TestAPI_domainList_sortDesc(t *testing.T) {
 	}
 }
 
-
 func TestAPI_domainList_invalidSort(t *testing.T) {
 	ts, _ := newTestAPI(t)
 
@@ -564,7 +547,6 @@ func TestAPI_domainList_invalidSort(t *testing.T) {
 	}
 }
 
-
 func TestAPI_domainList_invalidOrder(t *testing.T) {
 	ts, _ := newTestAPI(t)
 
@@ -577,4 +559,3 @@ func TestAPI_domainList_invalidOrder(t *testing.T) {
 		t.Fatalf("want 400, got %d", res.StatusCode)
 	}
 }
-

@@ -268,7 +268,7 @@ func TestAPI_patchEmptyBody(t *testing.T) {
 
 func TestAPI_patchEmptyBody_allEntities(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	dom := mustCreateDomain(t, ts)
+	dom := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + dom
 
 	rBody := mustPostJSON201(t, base+"/resources", `{"title":"r"}`)
@@ -394,7 +394,7 @@ func TestAPI_pagination_offsetPastEnd(t *testing.T) {
 
 func TestAPI_pagination_invalidOffset_otherEndpoints(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	dom := mustCreateDomain(t, ts)
+	dom := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + dom
 
 	endpoints := []struct {
@@ -424,7 +424,7 @@ func TestAPI_pagination_invalidOffset_otherEndpoints(t *testing.T) {
 
 func TestAPI_scopedList_pagination(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	dom := mustCreateDomain(t, ts)
+	dom := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + dom
 
 	for i := 0; i < 5; i++ {
@@ -691,7 +691,7 @@ func TestParseUint64Validated(t *testing.T) {
 // is asserted before the body is read.
 func TestAPI_numericParseErrors_stableMessages(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	dom := mustCreateDomain(t, ts)
+	dom := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + dom
 	rBody := mustPostJSON201(t, base+"/resources", `{"title":"r"}`)
 	var resrc store.Resource

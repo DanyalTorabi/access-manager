@@ -73,7 +73,7 @@ func TestAPI_accessTypeCreate_unknownField(t *testing.T) {
 
 func TestAPI_accessTypeList_empty(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	domID := mustCreateDomain(t, ts)
+	domID := seedDomain(t, ts, "test-domain")
 	res, err := http.Get(ts.URL + "/api/v1/domains/" + domID + "/access-types")
 	if err != nil {
 		t.Fatal(err)
@@ -115,7 +115,7 @@ func TestAPI_accessTypeCreate_duplicateBit(t *testing.T) {
 
 func TestAPI_accessTypeList_defaultSortByTitle(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	domainID := mustCreateDomain(t, ts)
+	domainID := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + domainID
 
 	mustPostJSON201(t, base+"/access-types", `{"title":"Zebra","bit":"0x1"}`)
@@ -149,7 +149,7 @@ func TestAPI_accessTypeList_defaultSortByTitle(t *testing.T) {
 
 func TestAPI_accessTypeList_search(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	domID := mustCreateDomain(t, ts)
+	domID := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + domID
 	for i, title := range []string{"read", "write", "readonly"} {
 		mustPostJSON201(t, base+"/access-types", fmt.Sprintf(`{"title":%q,"bit":"%d"}`, title, 1<<i))
@@ -175,7 +175,7 @@ func TestAPI_accessTypeList_search(t *testing.T) {
 
 func TestAPI_accessTypeList_sortDesc(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	domainID := mustCreateDomain(t, ts)
+	domainID := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + domainID
 
 	mustPostJSON201(t, base+"/access-types", `{"title":"Alpha","bit":"0x1"}`)
@@ -208,7 +208,7 @@ func TestAPI_accessTypeList_sortDesc(t *testing.T) {
 
 func TestAPI_accessTypeList_invalidSort(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	domainID := mustCreateDomain(t, ts)
+	domainID := seedDomain(t, ts, "test-domain")
 	res, err := http.Get(ts.URL + "/api/v1/domains/" + domainID + "/access-types?sort=bad")
 	if err != nil {
 		t.Fatal(err)
@@ -221,7 +221,7 @@ func TestAPI_accessTypeList_invalidSort(t *testing.T) {
 
 func TestAPI_accessTypeList_invalidOrder(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	domainID := mustCreateDomain(t, ts)
+	domainID := seedDomain(t, ts, "test-domain")
 	res, err := http.Get(ts.URL + "/api/v1/domains/" + domainID + "/access-types?order=bad")
 	if err != nil {
 		t.Fatal(err)
@@ -240,7 +240,7 @@ func TestAPI_accessTypeList_invalidOrder(t *testing.T) {
 
 func TestAPI_accessTypePatch_invalidBit(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	dom := mustCreateDomain(t, ts)
+	dom := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + dom
 	atBody := mustPostJSON201(t, base+"/access-types", `{"title":"read","bit":"0x1"}`)
 	var at store.AccessType
@@ -264,7 +264,7 @@ func TestAPI_accessTypePatch_invalidBit(t *testing.T) {
 
 func TestAPI_accessTypePatch_bitOnly(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	dom := mustCreateDomain(t, ts)
+	dom := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + dom
 	atBody := mustPostJSON201(t, base+"/access-types", `{"title":"read","bit":"0x1"}`)
 	var at store.AccessType
@@ -299,7 +299,7 @@ func TestAPI_accessTypePatch_bitOnly(t *testing.T) {
 // permission create/patch. Values <= MaxInt64 are accepted.
 func TestAPI_accessMask_rejectsBit63(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	dom := mustCreateDomain(t, ts)
+	dom := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + dom
 	rBody := mustPostJSON201(t, base+"/resources", `{"title":"r"}`)
 	var resrc store.Resource

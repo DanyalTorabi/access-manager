@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -118,27 +117,6 @@ func newBrokenTestAPIWithRegistry(t *testing.T, reg *prometheus.Registry) *httpt
 func newBrokenTestAPI(t *testing.T) *httptest.Server {
 	t.Helper()
 	return newBrokenTestAPIWithRegistry(t, nil)
-}
-
-// mustCreateDomain is a test helper that creates a domain and returns its ID.
-func mustCreateDomain(t *testing.T, ts *httptest.Server) string {
-	t.Helper()
-	b := mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"test-domain"}`)
-	var out struct{ ID string }
-	if err := json.Unmarshal(b, &out); err != nil {
-		t.Fatal(err)
-	}
-	return out.ID
-}
-
-func mustCreateResource(t *testing.T, ts *httptest.Server, domainID, title string) string {
-	t.Helper()
-	b := mustPostJSON201(t, ts.URL+"/api/v1/domains/"+domainID+"/resources", fmt.Sprintf(`{"title":%q}`, title))
-	var out struct{ ID string }
-	if err := json.Unmarshal(b, &out); err != nil {
-		t.Fatal(err)
-	}
-	return out.ID
 }
 
 // listResponse is a generic envelope for paginated list responses in tests.

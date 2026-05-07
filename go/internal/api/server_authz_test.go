@@ -18,7 +18,6 @@ import (
 	"github.com/google/uuid"
 )
 
-
 func TestAPI_authzCheck_validation(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	domainID := uuid.NewString()
@@ -32,7 +31,6 @@ func TestAPI_authzCheck_validation(t *testing.T) {
 		t.Fatalf("want 400 missing access_bit, got %d", res.StatusCode)
 	}
 }
-
 
 func TestAPI_authzCheck_viaGroup_integration(t *testing.T) {
 	ts, st := newTestAPI(t)
@@ -88,7 +86,6 @@ func TestAPI_authzCheck_viaGroup_integration(t *testing.T) {
 	}
 }
 
-
 func TestAPI_authzCheck_invalidAccessBit(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	did := uuid.NewString()
@@ -103,7 +100,6 @@ func TestAPI_authzCheck_invalidAccessBit(t *testing.T) {
 		t.Fatalf("want 400 invalid access_bit, got %d: %s", res.StatusCode, body)
 	}
 }
-
 
 func TestAPI_authzCheck_deniedWithoutGrants(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -153,7 +149,6 @@ func TestAPI_authzCheck_deniedWithoutGrants(t *testing.T) {
 	}
 }
 
-
 func TestAPI_authzMasks_validation(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	did := uuid.NewString()
@@ -166,7 +161,6 @@ func TestAPI_authzMasks_validation(t *testing.T) {
 		t.Fatalf("want 400 missing resource_id, got %d", res.StatusCode)
 	}
 }
-
 
 func TestAPI_userAuthzResources_integration(t *testing.T) {
 	ts, st := newTestAPI(t)
@@ -299,7 +293,6 @@ func TestAPI_userAuthzResources_integration(t *testing.T) {
 	}
 }
 
-
 func TestAPI_userAuthzResources_unsupportedQueryParams(t *testing.T) {
 	ts, st := newTestAPI(t)
 	ctx := context.Background()
@@ -347,7 +340,6 @@ func TestAPI_userAuthzResources_unsupportedQueryParams(t *testing.T) {
 	}
 }
 
-
 func TestAPI_userAuthzResources_notFound(t *testing.T) {
 	ts, st := newTestAPI(t)
 	ctx := context.Background()
@@ -378,7 +370,6 @@ func TestAPI_userAuthzResources_notFound(t *testing.T) {
 		t.Fatalf("unknown user: want 404, got %d", resUnknownUser.StatusCode)
 	}
 }
-
 
 func TestAPI_groupAuthzResources_integration(t *testing.T) {
 	ts, st := newTestAPI(t)
@@ -487,7 +478,6 @@ func TestAPI_groupAuthzResources_integration(t *testing.T) {
 	}
 }
 
-
 func TestAPI_groupAuthzResources_unsupportedQueryParams(t *testing.T) {
 	ts, st := newTestAPI(t)
 	ctx := context.Background()
@@ -516,7 +506,6 @@ func TestAPI_groupAuthzResources_unsupportedQueryParams(t *testing.T) {
 		t.Fatalf("unexpected error message: %q", out["error"])
 	}
 }
-
 
 func TestAPI_groupAuthzResources_notFound(t *testing.T) {
 	ts, st := newTestAPI(t)
@@ -548,7 +537,6 @@ func TestAPI_groupAuthzResources_notFound(t *testing.T) {
 		t.Fatalf("unknown group: want 404, got %d", resUnknownGroup.StatusCode)
 	}
 }
-
 
 func TestAPI_resourceAuthzUsers_integration(t *testing.T) {
 	ts, st := newTestAPI(t)
@@ -693,7 +681,6 @@ func TestAPI_resourceAuthzUsers_integration(t *testing.T) {
 	}
 }
 
-
 func TestAPI_resourceAuthzUsers_unsupportedQueryParams(t *testing.T) {
 	ts, st := newTestAPI(t)
 	ctx := context.Background()
@@ -722,7 +709,6 @@ func TestAPI_resourceAuthzUsers_unsupportedQueryParams(t *testing.T) {
 		t.Fatalf("unexpected error message: %q", out["error"])
 	}
 }
-
 
 func TestAPI_resourceAuthzUsers_notFound(t *testing.T) {
 	ts, st := newTestAPI(t)
@@ -754,7 +740,6 @@ func TestAPI_resourceAuthzUsers_notFound(t *testing.T) {
 		t.Fatalf("unknown resource: want 404, got %d", resUnknownResource.StatusCode)
 	}
 }
-
 
 func TestAPI_resourceAuthzGroups_integration(t *testing.T) {
 	ts, st := newTestAPI(t)
@@ -864,7 +849,6 @@ func TestAPI_resourceAuthzGroups_integration(t *testing.T) {
 	}
 }
 
-
 func TestAPI_resourceAuthzGroups_unsupportedQueryParams(t *testing.T) {
 	ts, st := newTestAPI(t)
 	ctx := context.Background()
@@ -893,7 +877,6 @@ func TestAPI_resourceAuthzGroups_unsupportedQueryParams(t *testing.T) {
 		t.Fatalf("unexpected error message: %q", out["error"])
 	}
 }
-
 
 func TestAPI_resourceAuthzGroups_notFound(t *testing.T) {
 	ts, st := newTestAPI(t)
@@ -926,7 +909,6 @@ func TestAPI_resourceAuthzGroups_notFound(t *testing.T) {
 	}
 }
 
-
 func TestAPI_health_publicWhenAPIUsesBearer(t *testing.T) {
 	db, err := sqlstore.Open("file:" + filepath.Join(t.TempDir(), "api.db") + "?_pragma=foreign_keys(1)")
 	if err != nil {
@@ -951,7 +933,6 @@ func TestAPI_health_publicWhenAPIUsesBearer(t *testing.T) {
 		t.Fatalf("health should stay public, got %d", res.StatusCode)
 	}
 }
-
 
 func TestAPI_membershipPostDelete_notFound(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -1013,7 +994,6 @@ func TestAPI_membershipPostDelete_notFound(t *testing.T) {
 	}
 }
 
-
 func TestAPI_addUserToGroup_unknownUser(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	var dom store.Domain
@@ -1040,7 +1020,6 @@ func TestAPI_addUserToGroup_unknownUser(t *testing.T) {
 		t.Fatalf("want 400, got %d: %s", res.StatusCode, b)
 	}
 }
-
 
 func TestAPI_userPermissionGrantRevoke_notFound(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -1107,7 +1086,6 @@ func TestAPI_userPermissionGrantRevoke_notFound(t *testing.T) {
 	}
 }
 
-
 func TestAPI_grantUserPermission_unknownPermission(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	var dom store.Domain
@@ -1134,7 +1112,6 @@ func TestAPI_grantUserPermission_unknownPermission(t *testing.T) {
 		t.Fatalf("want 400, got %d: %s", res.StatusCode, b)
 	}
 }
-
 
 func TestAPI_groupPermissionGrantRevoke_notFound(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -1201,7 +1178,6 @@ func TestAPI_groupPermissionGrantRevoke_notFound(t *testing.T) {
 	}
 }
 
-
 func TestAPI_grantGroupPermission_unknownPermission(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	var dom store.Domain
@@ -1228,7 +1204,6 @@ func TestAPI_grantGroupPermission_unknownPermission(t *testing.T) {
 		t.Fatalf("want 400, got %d: %s", res.StatusCode, b)
 	}
 }
-
 
 func TestAPI_addUserToGroup_duplicate(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -1271,7 +1246,6 @@ func TestAPI_addUserToGroup_duplicate(t *testing.T) {
 		t.Fatalf("duplicate add: want 409, got %d", res2.StatusCode)
 	}
 }
-
 
 func TestAPI_grantUserPermission_duplicate(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -1320,7 +1294,6 @@ func TestAPI_grantUserPermission_duplicate(t *testing.T) {
 	}
 }
 
-
 func TestAPI_grantGroupPermission_duplicate(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	var dom store.Domain
@@ -1367,7 +1340,6 @@ func TestAPI_grantGroupPermission_duplicate(t *testing.T) {
 		t.Fatalf("duplicate grant: want 409, got %d", res2.StatusCode)
 	}
 }
-
 
 func TestAPI_authzMasks_happyPath(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -1446,7 +1418,6 @@ func TestAPI_authzMasks_happyPath(t *testing.T) {
 	}
 }
 
-
 func TestAPI_authzMasks_emptyWithoutGrants(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	var dom store.Domain
@@ -1489,7 +1460,7 @@ func TestAPI_authzMasks_emptyWithoutGrants(t *testing.T) {
 // value above the signed-63 limit before reaching the store.
 func TestAPI_authzCheck_accessBitOutOfRange(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	dom := mustCreateDomain(t, ts)
+	dom := seedDomain(t, ts, "test-domain")
 	url := fmt.Sprintf("%s/api/v1/domains/%s/authz/check?user_id=u&resource_id=r&access_bit=0x8000000000000000", ts.URL, dom)
 	res, err := http.Get(url)
 	if err != nil {

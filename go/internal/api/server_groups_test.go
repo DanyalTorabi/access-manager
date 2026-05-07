@@ -16,7 +16,6 @@ import (
 	"github.com/google/uuid"
 )
 
-
 func TestAPI_auditLog_groupCreate_parentFields(t *testing.T) {
 	var buf bytes.Buffer
 	logger.Init(slog.LevelInfo, &buf)
@@ -54,7 +53,6 @@ func TestAPI_auditLog_groupCreate_parentFields(t *testing.T) {
 		t.Fatalf("want parent_group_id=%q, got %v", parent.ID, childLine["parent_group_id"])
 	}
 }
-
 
 func TestAPI_groupCreateListGet_notFound(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -133,7 +131,6 @@ func TestAPI_groupCreateListGet_notFound(t *testing.T) {
 	}
 }
 
-
 func TestAPI_groupCreate_invalidJSON(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	var dom store.Domain
@@ -151,7 +148,6 @@ func TestAPI_groupCreate_invalidJSON(t *testing.T) {
 	}
 }
 
-
 func TestAPI_groupCreate_unknownField(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	var dom store.Domain
@@ -168,7 +164,6 @@ func TestAPI_groupCreate_unknownField(t *testing.T) {
 		t.Fatalf("want 400, got %d: %s", res.StatusCode, b)
 	}
 }
-
 
 func TestAPI_groupSetParent_toParentAndClear(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -252,7 +247,6 @@ func TestAPI_groupSetParent_toParentAndClear(t *testing.T) {
 	}
 }
 
-
 func TestAPI_groupSetParent_selfParent(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	var dom store.Domain
@@ -281,7 +275,6 @@ func TestAPI_groupSetParent_selfParent(t *testing.T) {
 		t.Fatalf("want 400 self-parent, got %d: %s", res.StatusCode, b)
 	}
 }
-
 
 func TestAPI_groupSetParent_cycle(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -319,7 +312,6 @@ func TestAPI_groupSetParent_cycle(t *testing.T) {
 	}
 }
 
-
 func TestAPI_groupSetParent_invalidJSON(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	var dom store.Domain
@@ -347,7 +339,6 @@ func TestAPI_groupSetParent_invalidJSON(t *testing.T) {
 		t.Fatalf("want 400, got %d: %s", res.StatusCode, b)
 	}
 }
-
 
 func TestAPI_groupSetParent_unknownGroup(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -378,7 +369,6 @@ func TestAPI_groupSetParent_unknownGroup(t *testing.T) {
 	}
 }
 
-
 func TestAPI_groupSetParent_unknownParent(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	var dom store.Domain
@@ -408,10 +398,9 @@ func TestAPI_groupSetParent_unknownParent(t *testing.T) {
 	}
 }
 
-
 func TestAPI_groupList_empty(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	domID := mustCreateDomain(t, ts)
+	domID := seedDomain(t, ts, "test-domain")
 	res, err := http.Get(ts.URL + "/api/v1/domains/" + domID + "/groups")
 	if err != nil {
 		t.Fatal(err)
@@ -428,7 +417,6 @@ func TestAPI_groupList_empty(t *testing.T) {
 		t.Fatalf("want empty list, got %d items", len(env.Data))
 	}
 }
-
 
 func TestAPI_groupPatchDelete(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -481,10 +469,9 @@ func TestAPI_groupPatchDelete(t *testing.T) {
 	}
 }
 
-
 func TestAPI_groupList_search(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	domID := mustCreateDomain(t, ts)
+	domID := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + domID
 	for _, title := range []string{"Admins", "Editors", "Admin-sub"} {
 		mustPostJSON201(t, base+"/groups", fmt.Sprintf(`{"title":%q}`, title))
@@ -508,10 +495,9 @@ func TestAPI_groupList_search(t *testing.T) {
 	}
 }
 
-
 func TestAPI_groupList_filterByParentGroupID(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	domID := mustCreateDomain(t, ts)
+	domID := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + domID
 
 	var parent store.Group
@@ -540,10 +526,9 @@ func TestAPI_groupList_filterByParentGroupID(t *testing.T) {
 	}
 }
 
-
 func TestAPI_groupList_sortDesc(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	domainID := mustCreateDomain(t, ts)
+	domainID := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + domainID
 
 	for _, title := range []string{"Admins", "Editors", "Viewers"} {
@@ -574,10 +559,9 @@ func TestAPI_groupList_sortDesc(t *testing.T) {
 	}
 }
 
-
 func TestAPI_groupList_invalidSort(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	domainID := mustCreateDomain(t, ts)
+	domainID := seedDomain(t, ts, "test-domain")
 	res, err := http.Get(ts.URL + "/api/v1/domains/" + domainID + "/groups?sort=bad")
 	if err != nil {
 		t.Fatal(err)
@@ -588,10 +572,9 @@ func TestAPI_groupList_invalidSort(t *testing.T) {
 	}
 }
 
-
 func TestAPI_groupList_invalidOrder(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	domainID := mustCreateDomain(t, ts)
+	domainID := seedDomain(t, ts, "test-domain")
 	res, err := http.Get(ts.URL + "/api/v1/domains/" + domainID + "/groups?order=bad")
 	if err != nil {
 		t.Fatal(err)
@@ -602,10 +585,9 @@ func TestAPI_groupList_invalidOrder(t *testing.T) {
 	}
 }
 
-
 func TestAPI_groupPatch_parentGroupIDInvalid(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	dom := mustCreateDomain(t, ts)
+	dom := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + dom
 	gBody := mustPostJSON201(t, base+"/groups", `{"title":"g"}`)
 	var grp store.Group
@@ -627,10 +609,9 @@ func TestAPI_groupPatch_parentGroupIDInvalid(t *testing.T) {
 	}
 }
 
-
 func TestAPI_groupPatch_clearParent(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	dom := mustCreateDomain(t, ts)
+	dom := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + dom
 	g1Body := mustPostJSON201(t, base+"/groups", `{"title":"g1"}`)
 	g2Body := mustPostJSON201(t, base+"/groups", `{"title":"g2"}`)
@@ -675,4 +656,3 @@ func TestAPI_groupPatch_clearParent(t *testing.T) {
 		t.Fatalf("parent should be nil, got %v", got.ParentGroupID)
 	}
 }
-

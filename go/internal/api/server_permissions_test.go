@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 )
 
-
 func TestAPI_permissionCreate_invalidMask(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	var dom store.Domain
@@ -42,7 +41,6 @@ func TestAPI_permissionCreate_invalidMask(t *testing.T) {
 		t.Fatalf("want 400 invalid mask, got %d: %s", res3.StatusCode, b)
 	}
 }
-
 
 func TestAPI_permissionListGet_notFound(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -123,10 +121,9 @@ func TestAPI_permissionListGet_notFound(t *testing.T) {
 	}
 }
 
-
 func TestAPI_permissionList_empty(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	domID := mustCreateDomain(t, ts)
+	domID := seedDomain(t, ts, "test-domain")
 	res, err := http.Get(ts.URL + "/api/v1/domains/" + domID + "/permissions")
 	if err != nil {
 		t.Fatal(err)
@@ -144,10 +141,9 @@ func TestAPI_permissionList_empty(t *testing.T) {
 	}
 }
 
-
 func TestAPI_permissionList_search(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	domID := mustCreateDomain(t, ts)
+	domID := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + domID
 
 	var r store.Resource
@@ -176,10 +172,9 @@ func TestAPI_permissionList_search(t *testing.T) {
 	}
 }
 
-
 func TestAPI_permissionList_filterByResourceID(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	domID := mustCreateDomain(t, ts)
+	domID := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + domID
 
 	var r1, r2 store.Resource
@@ -211,13 +206,12 @@ func TestAPI_permissionList_filterByResourceID(t *testing.T) {
 	}
 }
 
-
 func TestAPI_permissionList_sortByResourceID(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	domainID := mustCreateDomain(t, ts)
+	domainID := seedDomain(t, ts, "test-domain")
 
-	resA := mustCreateResource(t, ts, domainID, "Resource A")
-	resB := mustCreateResource(t, ts, domainID, "Resource B")
+	resA := seedResource(t, ts, domainID, "Resource A")
+	resB := seedResource(t, ts, domainID, "Resource B")
 
 	mustPostJSON201(t, ts.URL+"/api/v1/domains/"+domainID+"/permissions",
 		fmt.Sprintf(`{"title":"perm-b","resource_id":%q,"access_mask":"1"}`, resB))
@@ -248,10 +242,9 @@ func TestAPI_permissionList_sortByResourceID(t *testing.T) {
 	}
 }
 
-
 func TestAPI_permissionList_invalidSort(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	domainID := mustCreateDomain(t, ts)
+	domainID := seedDomain(t, ts, "test-domain")
 
 	res, err := http.Get(ts.URL + "/api/v1/domains/" + domainID + "/permissions?sort=access_mask")
 	if err != nil {
@@ -263,10 +256,9 @@ func TestAPI_permissionList_invalidSort(t *testing.T) {
 	}
 }
 
-
 func TestAPI_permissionPatch_invalidMask(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	dom := mustCreateDomain(t, ts)
+	dom := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + dom
 	rBody := mustPostJSON201(t, base+"/resources", `{"title":"r"}`)
 	var resrc store.Resource
@@ -293,10 +285,9 @@ func TestAPI_permissionPatch_invalidMask(t *testing.T) {
 	}
 }
 
-
 func TestAPI_permissionPatch_maskAndResource(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	dom := mustCreateDomain(t, ts)
+	dom := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + dom
 	r1Body := mustPostJSON201(t, base+"/resources", `{"title":"r1"}`)
 	var r1 store.Resource
@@ -334,7 +325,6 @@ func TestAPI_permissionPatch_maskAndResource(t *testing.T) {
 		t.Fatalf("got mask=%#x resource=%s", got.AccessMask, got.ResourceID)
 	}
 }
-
 
 func TestAPI_userResourcePermissionPatchDelete(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -452,4 +442,3 @@ func TestAPI_userResourcePermissionPatchDelete(t *testing.T) {
 		t.Fatalf("user delete: %d", res.StatusCode)
 	}
 }
-

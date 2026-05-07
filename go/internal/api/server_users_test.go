@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 )
 
-
 func TestAPI_userGet_notFound(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	domainID := uuid.NewString()
@@ -24,7 +23,6 @@ func TestAPI_userGet_notFound(t *testing.T) {
 		t.Fatalf("want 404, got %d", res.StatusCode)
 	}
 }
-
 
 func TestAPI_userList_empty(t *testing.T) {
 	ts, _ := newTestAPI(t)
@@ -56,10 +54,9 @@ func TestAPI_userList_empty(t *testing.T) {
 	}
 }
 
-
 func TestAPI_userList_search(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	domID := mustCreateDomain(t, ts)
+	domID := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + domID
 	for _, title := range []string{"Alice", "Bob", "Alicia"} {
 		mustPostJSON201(t, base+"/users", fmt.Sprintf(`{"title":%q}`, title))
@@ -83,10 +80,9 @@ func TestAPI_userList_search(t *testing.T) {
 	}
 }
 
-
 func TestAPI_userList_sortDesc(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	domainID := mustCreateDomain(t, ts)
+	domainID := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + domainID
 
 	for _, title := range []string{"Alice", "Bob", "Charlie"} {
@@ -117,10 +113,9 @@ func TestAPI_userList_sortDesc(t *testing.T) {
 	}
 }
 
-
 func TestAPI_userList_invalidSort(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	domainID := mustCreateDomain(t, ts)
+	domainID := seedDomain(t, ts, "test-domain")
 	res, err := http.Get(ts.URL + "/api/v1/domains/" + domainID + "/users?sort=bad")
 	if err != nil {
 		t.Fatal(err)
@@ -131,10 +126,9 @@ func TestAPI_userList_invalidSort(t *testing.T) {
 	}
 }
 
-
 func TestAPI_userList_invalidOrder(t *testing.T) {
 	ts, _ := newTestAPI(t)
-	domainID := mustCreateDomain(t, ts)
+	domainID := seedDomain(t, ts, "test-domain")
 	res, err := http.Get(ts.URL + "/api/v1/domains/" + domainID + "/users?order=bad")
 	if err != nil {
 		t.Fatal(err)
@@ -144,4 +138,3 @@ func TestAPI_userList_invalidOrder(t *testing.T) {
 		t.Fatalf("want 400, got %d", res.StatusCode)
 	}
 }
-
