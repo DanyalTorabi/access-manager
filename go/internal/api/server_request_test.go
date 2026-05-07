@@ -243,31 +243,6 @@ func TestAPI_storeErrors(t *testing.T) {
 	}
 }
 
-func TestAPI_patchEmptyBody(t *testing.T) {
-	ts, _ := newTestAPI(t)
-	var dom store.Domain
-	if err := json.Unmarshal(mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"d"}`), &dom); err != nil {
-		t.Fatal(err)
-	}
-	base := ts.URL + "/api/v1/domains/" + dom.ID
-	uBody := mustPostJSON201(t, base+"/users", `{"title":"u"}`)
-	var u store.User
-	if err := json.Unmarshal(uBody, &u); err != nil {
-		t.Fatal(err)
-	}
-
-	req, _ := http.NewRequest(http.MethodPatch, base+"/users/"+u.ID, strings.NewReader(`{}`))
-	req.Header.Set("Content-Type", "application/json")
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = res.Body.Close()
-	if res.StatusCode != http.StatusBadRequest {
-		t.Fatalf("empty patch want 400, got %d", res.StatusCode)
-	}
-}
-
 // --- pagination tests ---
 
 func TestAPI_patchEmptyBody_allEntities(t *testing.T) {
