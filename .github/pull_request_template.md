@@ -1,3 +1,5 @@
+<!-- Title format: [TXX] short description — where TXX is the ticket (e.g. [T65] split long api files). -->
+
 ## Summary
 
 <!-- What changed and why (one short paragraph). -->
