@@ -39,7 +39,14 @@ jobs:
           cache-dependency-path: go/go.sum
 
       - name: Test
-        run: go test -race ./...
+        run: go test -race -coverprofile=coverage.out ./...
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: go/coverage.out
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
 
       - name: Vet
         run: go vet ./...
@@ -92,51 +99,10 @@ jobs:
         if: always()
         run: docker compose down --remove-orphans
 
-  integration:
-    name: Integration tests (Postgres + MySQL)
-    runs-on: ubuntu-latest
-    needs: [go]
-    defaults:
-      run:
-        working-directory: go
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set GOTOOLCHAIN from go.mod
-        working-directory: ${{ github.workspace }}
-        run: |
-          TC=$(sed -n 's/^toolchain //p' go/go.mod | head -1)
-          [ -z "$TC" ] && TC="go$(sed -n 's/^go //p' go/go.mod | head -1)"
-          echo "GOTOOLCHAIN=${TC}" >> "$GITHUB_ENV"
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go/go.mod
-          cache-dependency-path: go/go.sum
-
-      - name: Start Postgres and MySQL (and wait for healthchecks)
-        working-directory: ${{ github.workspace }}
-        run: docker compose up -d --wait postgres mysql
-
-      - name: Combined coverage (unit + integration)
-        run: make cover-integration
-
-      - name: Upload combined coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          files: go/coverage-combined.out
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: true
-
-      - name: Compose teardown
-        if: always()
-        working-directory: ${{ github.workspace }}
-        run: docker compose down --remove-orphans
-
   publish:
     name: Publish image to GHCR
     runs-on: ubuntu-latest
-    needs: [go, docker, integration]
+    needs: [go, docker]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read

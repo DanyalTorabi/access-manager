@@ -88,7 +88,6 @@ Run **`make`** from the **repository root** (`make test`, `make lint`, …) or f
 | Tidy modules | `make tidy` |
 | Integration (postgres) | `make test-integration-postgres` — requires `DATABASE_DSN_POSTGRES` |
 | Integration (mysql) | `make test-integration-mysql` — requires `DATABASE_DSN_MYSQL` |
-| Combined coverage | `make cover-integration` — requires both DSNs + running services (`docker compose up -d --wait postgres mysql`). Produces `coverage-combined.out` (unit + integration). HTML: `go tool cover -html=coverage-combined.out`. This is what CI reports to Codecov. |
 
 Docker (from **repo root** only): `make docker-build`, `make docker-up`, `make docker-logs`, `make docker-down` — see [root README](../README.md#docker).
 
