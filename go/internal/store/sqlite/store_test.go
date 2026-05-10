@@ -2,10 +2,10 @@ package sqlite
 
 import (
 	"context"
-	"testing"
 	"errors"
 	"path/filepath"
 	"strings"
+	"testing"
 
 	"github.com/dtorabi/access-manager/internal/store"
 	"github.com/dtorabi/access-manager/internal/testutil"
@@ -21,7 +21,6 @@ func TestWrapConstraintError_plainErrorUnchanged(t *testing.T) {
 		t.Fatal("plain error should not be classified as FK/conflict")
 	}
 }
-
 
 func TestStore_closedDB_methods(t *testing.T) {
 	ctx := context.Background()
@@ -282,7 +281,6 @@ func TestStore_closedDB_methods(t *testing.T) {
 	})
 }
 
-
 func TestSanitizeListOpts(t *testing.T) {
 	tests := []struct {
 		name string
@@ -305,7 +303,6 @@ func TestSanitizeListOpts(t *testing.T) {
 		})
 	}
 }
-
 
 func TestSortColumns(t *testing.T) {
 	t.Run("no overrides", func(t *testing.T) {
@@ -335,7 +332,6 @@ func TestSortColumns(t *testing.T) {
 		}
 	})
 }
-
 
 func TestOrderByClause(t *testing.T) {
 	allowed := map[string]string{"title": "title", "resource_id": "resource_id"}
@@ -373,7 +369,6 @@ func TestOrderByClause(t *testing.T) {
 		}
 	})
 }
-
 
 func TestList_queryContextError(t *testing.T) {
 	ctx := context.Background()
@@ -463,4 +458,3 @@ func TestList_queryContextError(t *testing.T) {
 		}
 	})
 }
-
