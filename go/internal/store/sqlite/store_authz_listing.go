@@ -7,99 +7,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dtorabi/access-manager/internal/access"
 	"github.com/dtorabi/access-manager/internal/store"
 )
-
-func (s *Store) AddUserToGroup(ctx context.Context, domainID, userID, groupID string) error {
-	_, err := s.db.ExecContext(ctx, `INSERT INTO group_members (domain_id, user_id, group_id) VALUES (?, ?, ?)`,
-		domainID, userID, groupID)
-	return wrapConstraintError(err)
-}
-
-func (s *Store) RemoveUserFromGroup(ctx context.Context, domainID, userID, groupID string) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM group_members WHERE domain_id = ? AND user_id = ? AND group_id = ?`,
-		domainID, userID, groupID)
-	if err != nil {
-		return wrapConstraintError(err)
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return store.ErrNotFound
-	}
-	return nil
-}
-
-func (s *Store) GrantUserPermission(ctx context.Context, domainID, userID, permissionID string) error {
-	_, err := s.db.ExecContext(ctx, `INSERT INTO user_permissions (domain_id, user_id, permission_id) VALUES (?, ?, ?)`,
-		domainID, userID, permissionID)
-	return wrapConstraintError(err)
-}
-
-func (s *Store) RevokeUserPermission(ctx context.Context, domainID, userID, permissionID string) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM user_permissions WHERE domain_id = ? AND user_id = ? AND permission_id = ?`,
-		domainID, userID, permissionID)
-	if err != nil {
-		return wrapConstraintError(err)
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return store.ErrNotFound
-	}
-	return nil
-}
-
-func (s *Store) GrantGroupPermission(ctx context.Context, domainID, groupID, permissionID string) error {
-	_, err := s.db.ExecContext(ctx, `INSERT INTO group_permissions (domain_id, group_id, permission_id) VALUES (?, ?, ?)`,
-		domainID, groupID, permissionID)
-	return wrapConstraintError(err)
-}
-
-func (s *Store) RevokeGroupPermission(ctx context.Context, domainID, groupID, permissionID string) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM group_permissions WHERE domain_id = ? AND group_id = ? AND permission_id = ?`,
-		domainID, groupID, permissionID)
-	if err != nil {
-		return wrapConstraintError(err)
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return store.ErrNotFound
-	}
-	return nil
-}
-
-// userEffectivePermissionPredicateSQL filters permissions p down to those
-// effectively held by a given user (direct grant OR via group membership).
-// T51 composite FKs guarantee that user_permissions / group_permissions /
-// group_members rows cannot reference cross-domain parents, so no
-// defensive domain_id filter is needed in the sub-EXISTS clauses.
-const userEffectivePermissionPredicateSQL = `
-AND (
-	EXISTS (
-		SELECT 1 FROM user_permissions up
-		WHERE up.permission_id = p.id AND up.user_id = ?
-	)
-	OR EXISTS (
-		SELECT 1 FROM group_permissions gp
-		INNER JOIN group_members gm ON gm.group_id = gp.group_id AND gm.user_id = ?
-		WHERE gp.permission_id = p.id
-	)
-)
-`
-
-const effectiveMaskSQL = `
-SELECT p.access_mask FROM permissions p
-WHERE p.domain_id = ? AND p.resource_id = ?
-` + userEffectivePermissionPredicateSQL
 
 // userAuthzResourcesBaseSQL selects resources where the user has a non-
 // zero effective mask via direct grants OR group membership. T51 composite
@@ -626,32 +535,4 @@ func scanUserMasks(ctx context.Context, s *Store, query string, args []any, into
 		into[uid] |= s.maskFromSQL(m)
 	}
 	return rows.Err()
-}
-
-func (s *Store) PermissionMasksForUserResource(ctx context.Context, domainID, userID, resourceID string) ([]uint64, error) {
-	args := make([]any, 0, 2+2)
-	args = append(args, domainID, resourceID)
-	args = append(args, userEffectivePermissionArgs(userID)...)
-	rows, err := s.db.QueryContext(ctx, effectiveMaskSQL, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-	var masks []uint64
-	for rows.Next() {
-		var m int64
-		if err := rows.Scan(&m); err != nil {
-			return nil, err
-		}
-		masks = append(masks, s.maskFromSQL(m))
-	}
-	return masks, rows.Err()
-}
-
-func (s *Store) EffectiveMask(ctx context.Context, domainID, userID, resourceID string) (uint64, error) {
-	masks, err := s.PermissionMasksForUserResource(ctx, domainID, userID, resourceID)
-	if err != nil {
-		return 0, err
-	}
-	return access.CombineMasks(masks), nil
 }
