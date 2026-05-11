@@ -2,12 +2,14 @@ package api
 
 import (
 	"net/http"
-	"strings"
 )
 
 const (
 	corsAllowMethods = "GET, POST, PATCH, DELETE, OPTIONS"
-	corsAllowHeaders = "Content-Type, Authorization"
+	// corsAllowHeaders lists the non-safelisted request headers the API accepts.
+	// Accept is included for convenience; Authorization triggers preflights for non-safelisted access.
+	// TODO(T67): make corsAllowHeaders and corsMaxAge configurable via Server field if operator needs change.
+	corsAllowHeaders = "Accept, Content-Type, Authorization"
 	corsMaxAge       = "300"
 )
 
@@ -16,36 +18,56 @@ const (
 //
 // Behaviour:
 //   - Requests without an Origin header pass through unchanged (non-browser traffic).
-//   - When origins contains "*", any origin is allowed and the actual request Origin is
-//     reflected in Access-Control-Allow-Origin (never the literal "*") so that
-//     Access-Control-Allow-Credentials: true is accepted by browsers.
-//   - When origins is an explicit list, only exact-match origins are allowed.
-//   - OPTIONS preflight requests from allowed origins receive a 204 response with full
-//     preflight headers and do not reach the inner handler.
-//   - Disallowed origins pass through to the handler without any CORS headers.
+//   - When origins contains "*", any request Origin is reflected in Access-Control-Allow-Origin.
+//     Access-Control-Allow-Credentials is NOT set for wildcard-admitted origins; browsers treat
+//     it as standard Allow-Origin:* (no credential forwarding). This avoids the OWASP anti-pattern
+//     of reflecting arbitrary origins with credentials enabled.
+//   - When origins is an explicit list, only exact-match origins (case-sensitive, per RFC 6454 §6.1)
+//     are allowed and Access-Control-Allow-Credentials: true is set, enabling credentialed requests.
+//   - Vary: Origin is set unconditionally for all responses reaching this middleware, preventing
+//     cache-poisoning on intermediate proxies even when the origin is absent or not allowed.
+//   - CORS preflight (OPTIONS + Access-Control-Request-Method header per Fetch §3.2.3) from
+//     allowed origins receives a 204 response with full preflight headers and bypasses the handler.
+//   - Disallowed origins pass through to the handler without CORS headers.
 //   - An empty origins slice disables all CORS header injection.
+//
+// Note: this middleware wraps all routes including /health and /metrics. Those endpoints have no
+// auth, so Access-Control-Allow-Credentials: true applies only when explicit origins are listed.
+// Wildcard mode does not set Allow-Credentials, limiting cross-origin exposure on public endpoints.
+// Per-route CORS opt-out is deferred; see plan/phase-8/T67-cors-whitelist.md.
 func CORSMiddleware(origins []string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Vary: Origin must be set unconditionally so caching proxies know the response
+			// varies by Origin even when no CORS headers are added (Fetch spec recommendation).
+			w.Header().Add("Vary", "Origin")
+
 			origin := r.Header.Get("Origin")
 			if origin == "" {
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			if !isOriginAllowed(origin, origins) {
+			allowed, matchedWildcard := checkOriginAllowed(origin, origins)
+			if !allowed {
 				next.ServeHTTP(w, r)
 				return
 			}
 
 			h := w.Header()
-			// Reflect the actual Origin instead of echoing "*"; required when
-			// Access-Control-Allow-Credentials is true (browsers reject Origin: *).
+			// Always reflect the actual Origin header (never the literal "*").
+			// This is required for credentials support and avoids ambiguity in caches.
 			h.Set("Access-Control-Allow-Origin", origin)
-			h.Set("Access-Control-Allow-Credentials", "true")
-			h.Add("Vary", "Origin")
+			// Only set Allow-Credentials for explicit (non-wildcard) origin matches.
+			// Wildcard-admitted origins behave like standard Allow-Origin:* (no credentials),
+			// avoiding the OWASP wildcard+credentials anti-pattern.
+			if !matchedWildcard {
+				h.Set("Access-Control-Allow-Credentials", "true")
+			}
 
-			if r.Method == http.MethodOptions {
+			// Guard preflight: OPTIONS + Access-Control-Request-Method header (Fetch §3.2.3).
+			// A bare OPTIONS request without this header is a regular request — let it through.
+			if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
 				h.Set("Access-Control-Allow-Methods", corsAllowMethods)
 				h.Set("Access-Control-Allow-Headers", corsAllowHeaders)
 				h.Set("Access-Control-Max-Age", corsMaxAge)
@@ -58,15 +80,17 @@ func CORSMiddleware(origins []string) func(http.Handler) http.Handler {
 	}
 }
 
-// isOriginAllowed reports whether the given origin is permitted by the configured list.
-func isOriginAllowed(origin string, allowed []string) bool {
+// checkOriginAllowed reports whether origin is permitted and whether it matched via a wildcard entry.
+// Origin comparisons are case-sensitive (RFC 6454 §6.1); browsers always send lowercase scheme+host.
+func checkOriginAllowed(origin string, allowed []string) (ok bool, matchedWildcard bool) {
 	for _, a := range allowed {
 		if a == "*" {
-			return true
+			return true, true
 		}
-		if strings.EqualFold(a, origin) {
-			return true
+		if a == origin {
+			return true, false
 		}
 	}
-	return false
+	return false, false
 }
+
