@@ -50,6 +50,7 @@ From the **repository root** (not `go/`): **`make docker-build`**, **`make docke
 | `MIGRATIONS_DIR` | `migrations/sqlite` | Migration `.up.sql` directory — set to `migrations/postgres` or `migrations/mysql` for the matching driver (relative paths are resolved from the **process working directory** — run from `go/` or set an absolute path) |
 | `SHUTDOWN_TIMEOUT_SECONDS` | `30` | Max seconds to wait for graceful shutdown after **SIGINT** / **SIGTERM** |
 | `API_BEARER_TOKEN` | _(empty)_ | If set, all **`/api/v1/*`** routes require `Authorization: Bearer <token>`. **`/health`** stays public. Use a strong random value in production; never commit it. |
+| `CORS_ALLOWED_ORIGINS` | `*` | Comma-separated list of browser origins allowed via `Access-Control-Allow-Origin`. `*` reflects any request `Origin` header (required for credentials support). Set to an explicit list (e.g. `https://app.example.com`) in production. A startup warning is logged when `*` is used on a non-loopback address. |
 
 Copy [`.env.example`](.env.example) to `.env` for local overrides; do **not** commit real secrets.
 

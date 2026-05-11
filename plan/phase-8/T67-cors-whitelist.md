@@ -1,47 +1,82 @@
-## Plan: Add CORS Whitelisting and Development Defaults
+# T67 — CORS Middleware with Origin Whitelist and Credentials Support
 
-To address the CORS issue in the local development environment, we will implement a mechanism to whitelist origins. For development, the server will allow all origins by default.
+**GitHub issue:** [#114](https://github.com/DanyalTorabi/access-manager/issues/114)
+**Branch:** `danyal/feature/t67-cors-whitelist`
 
-**Steps**
-1. **Configuration Update**
-   - Add a new configuration option for `CORS_ALLOWED_ORIGINS` in the configuration file (e.g., `config.example.yaml`).
-   - Document the new option in the `README.md` under the configuration section.
+## Summary
 
-2. **Development Defaults**
-   - Set the default behavior in the development environment to allow all origins.
-   - Ensure this behavior is overridden in production by the `CORS_ALLOWED_ORIGINS` configuration.
+Add a CORS middleware to the access-manager HTTP server so browser-based clients
+can make authenticated cross-origin requests.
 
-3. **Middleware Implementation**
-   - Implement a CORS middleware in `internal/api` to handle the `Access-Control-Allow-Origin` header.
-   - Use the `CORS_ALLOWED_ORIGINS` configuration to determine the allowed origins.
-   - For development, set the middleware to allow all origins.
+Behaviour:
+- **Config-driven:** `CORS_ALLOWED_ORIGINS` env var (or `cors_allowed_origins` YAML key) accepts
+  a comma-separated list of origins. Default: `*` (allow any origin).
+- **Wildcard safety:** when `*` is configured, the middleware reflects the actual `Origin`
+  request header instead of echoing `*`. This is required because browsers reject
+  `Access-Control-Allow-Origin: *` when `Access-Control-Allow-Credentials: true`.
+- **Credentials support:** `Access-Control-Allow-Credentials: true` and `Vary: Origin` are set
+  on every allowed-origin response.
+- **OPTIONS preflight:** short-circuited with `204 No Content` and all preflight headers
+  (`Access-Control-Allow-Methods`, `Access-Control-Allow-Headers`, `Access-Control-Max-Age`).
+  The middleware sits **before** `BearerAuth` so preflights are never rejected by auth.
+- **Startup warning:** logged when `*` is configured on a non-loopback bind address,
+  mirroring the existing `API_BEARER_TOKEN` warning.
 
-4. **Testing**
-   - Add unit tests for the middleware to verify:
-     - Correct handling of allowed origins.
-     - Default behavior in development.
-     - Rejection of disallowed origins in production.
-   - Add integration tests to ensure the middleware works with the server setup.
+## Deliverables
 
-5. **Plan File Creation**
-   - Create a new plan file under `plan/phase-1/` (e.g., `T45-cors-whitelisting.md`) with the above details.
-   - Reference the GitHub issue number in the plan file.
+| File | Change |
+|------|--------|
+| `go/internal/config/config.go` | Add `CORSAllowedOrigins []string` field; parse comma-separated YAML/env; default `["*"]` |
+| `go/internal/config/warn.go` | Add `CORSStartupWarning(c Config) string` |
+| `go/internal/config/warn_test.go` | Add `TestCORSStartupWarning` table-driven test |
+| `go/internal/api/cors.go` | New: `CORSMiddleware(origins []string)` middleware |
+| `go/internal/api/cors_test.go` | New: 8 unit tests + server-integration test |
+| `go/internal/api/server.go` | Add `CORSAllowedOrigins []string` field; apply `CORSMiddleware` first in `Router()` |
+| `go/cmd/server/main.go` | Pass `cfg.CORSAllowedOrigins` to `Server`; call `maybeWarnCORS` at startup |
+| `go/config.example.yaml` | Document `cors_allowed_origins` option |
+| `go/README.md` | Document `CORS_ALLOWED_ORIGINS` in configuration table |
+| `CHANGELOG.md` | Unreleased entry |
 
-**Relevant files**
-- `go/internal/api/middleware.go` — Add the CORS middleware.
-- `go/config.example.yaml` — Add the `CORS_ALLOWED_ORIGINS` option.
-- `go/README.md` — Document the new configuration.
-- `plan/phase-1/T45-cors-whitelisting.md` — Save the plan file.
+## Configuration reference
 
-**Verification**
-1. Run the server locally and verify that all origins are allowed in development.
-2. Deploy to a staging environment and verify that only whitelisted origins are allowed.
-3. Run the test suite to ensure all tests pass.
+| Env var | YAML key | Default | Notes |
+|---------|----------|---------|-------|
+| `CORS_ALLOWED_ORIGINS` | `cors_allowed_origins` | `*` | Comma-separated origin list. `*` = allow any (reflects actual Origin header). Empty string falls back to default. |
 
-**Decisions**
-- Development will allow all origins by default.
-- Production will strictly enforce the `CORS_ALLOWED_ORIGINS` configuration.
+## Technical decisions
 
-**Further Considerations**
-1. Should we log a warning if `CORS_ALLOWED_ORIGINS` is not set in production?
-2. Should we provide a default set of origins for production if none are specified?
+- **Default `*`:** wildcard is the most convenient default for local dev;
+  the startup warning informs operators when this is potentially unsafe.
+- **Never echo literal `*`:** browsers reject `Access-Control-Allow-Origin: *` with
+  `Access-Control-Allow-Credentials: true`; always reflect the request Origin.
+- **Outermost middleware:** CORS precedes `BearerAuth` so `OPTIONS` preflights from
+  browsers succeed without a Bearer token.
+- **Explicit empty slice disables CORS** (in tests / programmatic use); empty env string
+  retains the default `*`.
+
+## Out of scope
+
+- `Access-Control-Expose-Headers` (no custom headers exposed yet)
+- Per-route CORS configuration
+- Support for `Access-Control-Allow-Credentials: false` opt-out
+
+## Verification
+
+```bash
+# All origins allowed (default):
+curl -v -H "Origin: http://localhost:3000" http://127.0.0.1:8080/health
+# → Access-Control-Allow-Origin: http://localhost:3000
+# → Access-Control-Allow-Credentials: true
+
+# Preflight:
+curl -v -X OPTIONS \
+  -H "Origin: http://localhost:3000" \
+  -H "Access-Control-Request-Method: POST" \
+  http://127.0.0.1:8080/api/v1/domains
+# → HTTP/1.1 204 No Content
+# → Access-Control-Allow-Methods: GET, POST, PATCH, DELETE, OPTIONS
+
+# Explicit origin list (env override):
+CORS_ALLOWED_ORIGINS="https://app.example.com" ./bin/server
+# → request from http://evil.com gets no CORS headers
+```
