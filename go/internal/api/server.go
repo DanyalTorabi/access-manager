@@ -16,6 +16,9 @@ type Server struct {
 	// APIBearerToken, if non-empty, requires Authorization: Bearer <token> on /api/v1/*.
 	// /health stays public. Empty means no auth on API (local dev / loopback only — document in README).
 	APIBearerToken string
+	// CORSAllowedOrigins lists origins permitted via Access-Control-Allow-Origin.
+	// ["*"] allows any origin (default). Empty slice disables CORS headers entirely.
+	CORSAllowedOrigins []string
 
 	metrics *Metrics
 }
@@ -36,6 +39,12 @@ func (s *Server) NegativeMaskCounter() prometheus.Counter {
 // disable instrumentation (e.g. in tests that don't care about metrics).
 func (s *Server) Router(reg prometheus.Registerer, gather prometheus.Gatherer) chi.Router {
 	r := chi.NewRouter()
+
+	// CORS is the outermost middleware so that OPTIONS preflight requests are
+	// answered before Bearer auth, metrics, or handler logic runs.
+	if len(s.CORSAllowedOrigins) > 0 {
+		r.Use(CORSMiddleware(s.CORSAllowedOrigins))
+	}
 
 	if reg != nil {
 		s.metrics = NewMetrics(reg)
