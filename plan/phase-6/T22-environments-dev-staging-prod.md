@@ -22,6 +22,10 @@ Define **promotion** and **configuration** per environment: secrets injection, D
 1. List envs and owners (who deploys what).
 2. Map T26 config keys to K8s Secrets / GitHub Environments.
 3. Document rollback: previous image tag + migration backward policy (if any).
+4. Add a mechanism to explicitly disable CORS via environment variable (e.g. sentinel value `"none"` → empty
+   origin slice) so operators fronting the service with a CORS-managing reverse proxy can cleanly opt out
+   without relying on whitespace/comma hacks. Document the sentinel in README and `config.example.yaml`.
+   See T67 (#114) for the current CORS implementation; disabling CORS via env is deliberately deferred here.
 
 ## Files / paths
 
