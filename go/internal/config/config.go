@@ -17,40 +17,46 @@ const (
 	envDatabaseURL       = "DATABASE_URL"
 	envHTTPAddr          = "HTTP_ADDR"
 	envMigrationsDir      = "MIGRATIONS_DIR"
-	envShutdownTimeoutSec = "SHUTDOWN_TIMEOUT_SECONDS"
-	envAPIBearerToken     = "API_BEARER_TOKEN" // #nosec G101: environment variable name, not a hardcoded secret
+	envShutdownTimeoutSec  = "SHUTDOWN_TIMEOUT_SECONDS"
+	envAPIBearerToken      = "API_BEARER_TOKEN" // #nosec G101: environment variable name, not a hardcoded secret
+	envCORSAllowedOrigins  = "CORS_ALLOWED_ORIGINS"
 )
 
 // fileShape matches config.example.yaml (snake_case keys).
 type fileShape struct {
-	DatabaseDriver          string `yaml:"database_driver"`
-	DatabaseURL             string `yaml:"database_url"`
-	HTTPAddr                string `yaml:"http_addr"`
-	MigrationsDir           string `yaml:"migrations_dir"`
-	ShutdownTimeoutSeconds  *int   `yaml:"shutdown_timeout_seconds"`
-	APIBearerToken          string `yaml:"api_bearer_token"`
+	DatabaseDriver         string `yaml:"database_driver"`
+	DatabaseURL            string `yaml:"database_url"`
+	HTTPAddr               string `yaml:"http_addr"`
+	MigrationsDir          string `yaml:"migrations_dir"`
+	ShutdownTimeoutSeconds *int   `yaml:"shutdown_timeout_seconds"`
+	APIBearerToken         string `yaml:"api_bearer_token"`
+	CORSAllowedOrigins     string `yaml:"cors_allowed_origins"`
 }
 
 // Config is resolved runtime configuration after defaults, optional file, and env overrides.
 type Config struct {
-	DatabaseDriver   string
-	DatabaseURL      string
-	HTTPAddr         string
-	MigrationsDir    string
-	ShutdownTimeout  time.Duration
+	DatabaseDriver  string
+	DatabaseURL     string
+	HTTPAddr        string
+	MigrationsDir   string
+	ShutdownTimeout time.Duration
 	// APIBearerToken protects /api/v1/* when non-empty (Bearer scheme). Optional; see README.
 	APIBearerToken string
+	// CORSAllowedOrigins lists origins permitted in the Access-Control-Allow-Origin response header.
+	// ["*"] (default) allows any origin. Empty slice disables CORS headers entirely.
+	CORSAllowedOrigins []string
 }
 
 // Load builds configuration: defaults → optional YAML file (CONFIG_PATH) → environment overrides.
 // Env always wins when set to a non-empty value. If CONFIG_PATH is unset, file is skipped (env-only / defaults).
 func Load() (Config, error) {
 	c := Config{
-		DatabaseDriver:  "sqlite",
-		DatabaseURL:     "file:access.db?_pragma=foreign_keys(1)",
-		HTTPAddr:        "127.0.0.1:8080",
-		MigrationsDir:   "migrations/sqlite",
-		ShutdownTimeout: 30 * time.Second,
+		DatabaseDriver:     "sqlite",
+		DatabaseURL:        "file:access.db?_pragma=foreign_keys(1)",
+		HTTPAddr:           "127.0.0.1:8080",
+		MigrationsDir:      "migrations/sqlite",
+		ShutdownTimeout:    30 * time.Second,
+		CORSAllowedOrigins: []string{"*"},
 	}
 
 	path := strings.TrimSpace(os.Getenv(envConfigPath))
@@ -85,6 +91,9 @@ func Load() (Config, error) {
 		if trimmed := strings.TrimSpace(f.APIBearerToken); trimmed != "" {
 			c.APIBearerToken = trimmed
 		}
+		if trimmed := strings.TrimSpace(f.CORSAllowedOrigins); trimmed != "" {
+			c.CORSAllowedOrigins = parseCORSOrigins(trimmed)
+		}
 	}
 
 	if v := os.Getenv(envDatabaseDriver); v != "" {
@@ -109,11 +118,27 @@ func Load() (Config, error) {
 	if v := strings.TrimSpace(os.Getenv(envAPIBearerToken)); v != "" {
 		c.APIBearerToken = v
 	}
+	if v := strings.TrimSpace(os.Getenv(envCORSAllowedOrigins)); v != "" {
+		c.CORSAllowedOrigins = parseCORSOrigins(v)
+	}
 
 	if err := validate(c); err != nil {
 		return Config{}, err
 	}
 	return c, nil
+}
+
+// parseCORSOrigins splits a comma-separated origin string and trims each entry.
+// It returns a non-empty slice; individual empty entries are dropped.
+func parseCORSOrigins(s string) []string {
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 func validate(c Config) error {
