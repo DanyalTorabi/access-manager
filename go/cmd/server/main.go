@@ -115,6 +115,7 @@ func serve(httpSrv *http.Server, ln net.Listener, timeout time.Duration, stop <-
 // setup wires config → DB → migrations → HTTP server and returns the server and DB handle.
 func setup(cfg config.Config) (*http.Server, *sql.DB, error) {
 	maybeWarnAPIAuth(cfg)
+	maybeWarnCORS(cfg)
 
 	db, migDirFromDriver, err := database.Open(cfg.DatabaseDriver, cfg.DatabaseURL)
 	if err != nil {
@@ -161,7 +162,7 @@ func setup(cfg config.Config) (*http.Server, *sql.DB, error) {
 		return nil, nil, fmt.Errorf("setup: unrecognized driver %q", cfg.DatabaseDriver)
 	}
 
-	srv := &api.Server{Store: st, APIBearerToken: cfg.APIBearerToken}
+	srv := &api.Server{Store: st, APIBearerToken: cfg.APIBearerToken, CORSAllowedOrigins: cfg.CORSAllowedOrigins}
 
 	httpSrv := &http.Server{
 		Handler:           srv.Router(reg, reg),
@@ -188,6 +189,13 @@ func setup(cfg config.Config) (*http.Server, *sql.DB, error) {
 // maybeWarnAPIAuth logs once if the API may be reachable beyond loopback without Bearer protection.
 func maybeWarnAPIAuth(cfg config.Config) {
 	if msg := config.APIAuthStartupWarning(cfg); msg != "" {
+		logger.Warn(msg)
+	}
+}
+
+// maybeWarnCORS logs once if CORS is configured with a wildcard origin on a non-loopback address.
+func maybeWarnCORS(cfg config.Config) {
+	if msg := config.CORSStartupWarning(cfg); msg != "" {
 		logger.Warn(msg)
 	}
 }
