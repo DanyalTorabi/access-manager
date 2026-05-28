@@ -153,9 +153,9 @@ func TestConcurrent_writeContention(t *testing.T) {
 	ids := make([]string, n)
 	var mu sync.Mutex
 
-	runConcurrent(t, n, func(_ context.Context, i int) error {
+	runConcurrent(t, n, func(ctx context.Context, i int) error {
 		title := fmt.Sprintf("concurrent-user-%d", i)
-		b, err := doRequestErr(http.MethodPost,
+		b, err := doRequestErrCtx(ctx, http.MethodPost,
 			domainBase(ts, domID)+"/users",
 			fmt.Sprintf(`{"title":%q}`, title),
 			http.StatusCreated,
