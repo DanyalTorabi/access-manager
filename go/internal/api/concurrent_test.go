@@ -186,6 +186,54 @@ func TestConcurrent_writeContention(t *testing.T) {
 	}
 }
 
+// TestConcurrent_duplicateMembershipConflict races N goroutines to add the
+// same user to the same group. group_members has PRIMARY KEY (user_id, group_id),
+// so exactly one goroutine must succeed (204 NoContent); the rest must receive
+// 409 Conflict (ErrConflict → store.ErrConflict). This exercises the
+// duplicate-handling path in the membership handler under concurrency.
+func TestConcurrent_duplicateMembershipConflict(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping concurrent duplicate-membership test in -short mode")
+	}
+	ts, _ := newTestAPI(t)
+	domID := seedDomain(t, ts, "concurrent-conflict")
+	uid := seedUser(t, ts, domID, "conflict-user")
+	gid := seedGroup(t, ts, domID, "conflict-group")
+
+	const n = 20
+	var succeeded, conflicts int64
+
+	runConcurrent(t, n, func(ctx context.Context, _ int) error {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+			domainBase(ts, domID)+"/users/"+uid+"/groups/"+gid, nil)
+		if err != nil {
+			return fmt.Errorf("build request: %w", err)
+		}
+		resp, err := testClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("POST membership: %w", err)
+		}
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+		switch resp.StatusCode {
+		case http.StatusNoContent:
+			atomic.AddInt64(&succeeded, 1)
+		case http.StatusConflict:
+			atomic.AddInt64(&conflicts, 1)
+		default:
+			return fmt.Errorf("POST membership: unexpected status %d", resp.StatusCode)
+		}
+		return nil
+	})
+
+	if got := atomic.LoadInt64(&succeeded); got != 1 {
+		t.Errorf("expected exactly 1 membership creation to succeed, got %d", got)
+	}
+	if got := atomic.LoadInt64(&conflicts); got != n-1 {
+		t.Errorf("expected %d conflict responses, got %d", n-1, got)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // 3. Mixed read/write: list reads concurrent with group-membership mutations
 // ---------------------------------------------------------------------------
