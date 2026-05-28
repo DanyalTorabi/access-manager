@@ -211,69 +211,50 @@ func TestConcurrent_mixedReadWrite(t *testing.T) {
 		uids[i] = seedUser(t, ts, domID, fmt.Sprintf("mixed-u-%d", i))
 	}
 
-	listURL := domainBase(ts, domID) + "/users"
 	base := domainBase(ts, domID)
+	listURL := base + "/users"
 
-	var wg sync.WaitGroup
-	errs := make(chan error, nWriters+nReaders)
-	ctx := t.Context()
-
-	// Writers: add then remove membership for each pre-seeded user.
-	for i := 0; i < nWriters; i++ {
-		wg.Add(1)
-		uid := uids[i]
-		go func() {
-			defer wg.Done()
+	// i < nWriters → writer: add then remove one membership.
+	// i >= nWriters → reader: list users 5 times.
+	runConcurrent(t, nWriters+nReaders, func(ctx context.Context, i int) error {
+		if i < nWriters {
+			uid := uids[i]
+			if _, err := doRequestErrCtx(ctx, http.MethodPost,
+				base+"/users/"+uid+"/groups/"+groupID,
+				"", http.StatusNoContent); err != nil {
+				return fmt.Errorf("add membership %s: %w", uid, err)
+			}
 			if ctx.Err() != nil {
-				return
+				return ctx.Err()
 			}
-			if _, err := doRequestErr(http.MethodPost,
+			if _, err := doRequestErrCtx(ctx, http.MethodDelete,
 				base+"/users/"+uid+"/groups/"+groupID,
 				"", http.StatusNoContent); err != nil {
-				errs <- fmt.Errorf("add membership %s: %w", uid, err)
-				return
+				return fmt.Errorf("remove membership %s: %w", uid, err)
 			}
-			if _, err := doRequestErr(http.MethodDelete,
-				base+"/users/"+uid+"/groups/"+groupID,
-				"", http.StatusNoContent); err != nil {
-				errs <- fmt.Errorf("remove membership %s: %w", uid, err)
+			return nil
+		}
+		// Reader: list users 5 times.
+		for k := 0; k < 5; k++ {
+			if ctx.Err() != nil {
+				return ctx.Err()
 			}
-		}()
-	}
-
-	// Readers: list users 5 times each.
-	for i := 0; i < nReaders; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for k := 0; k < 5; k++ {
-				if ctx.Err() != nil {
-					return
-				}
-				req, err := http.NewRequestWithContext(ctx, http.MethodGet, listURL, nil)
-				if err != nil {
-					errs <- fmt.Errorf("build list request: %w", err)
-					return
-				}
-				resp, err := testClient.Do(req)
-				if err != nil {
-					errs <- fmt.Errorf("list users iter %d: %w", k, err)
-					return
-				}
-				_ = resp.Body.Close()
-				if resp.StatusCode != http.StatusOK {
-					errs <- fmt.Errorf("list users iter %d: want 200, got %d", k, resp.StatusCode)
-					return
-				}
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, listURL, nil)
+			if err != nil {
+				return fmt.Errorf("build list request iter %d: %w", k, err)
 			}
-		}()
-	}
-
-	wg.Wait()
-	close(errs)
-	for err := range errs {
-		t.Error(err)
-	}
+			resp, err := testClient.Do(req)
+			if err != nil {
+				return fmt.Errorf("list users iter %d: %w", k, err)
+			}
+			_, _ = io.Copy(io.Discard, resp.Body)
+			_ = resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return fmt.Errorf("list users iter %d: want 200, got %d", k, resp.StatusCode)
+			}
+		}
+		return nil
+	})
 }
 
 // ---------------------------------------------------------------------------
