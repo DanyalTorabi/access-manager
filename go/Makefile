@@ -1,4 +1,4 @@
-.PHONY: build test integration cover cover-func cover-integration run tidy lint vuln gosec e2e test-integration-postgres test-integration-mysql
+.PHONY: build test integration cover cover-func cover-integration run tidy lint vuln gosec e2e test-integration-postgres test-integration-mysql test-concurrent
 
 # golang/go#75031: GOTOOLCHAIN=auto can make `go test -cover` fail with "no such tool covdata".
 # Pin the minimum toolchain to the `go` version in go.mod (override: `make test GOTOOLCHAIN=local`).
@@ -77,3 +77,8 @@ test-integration-mysql:
 # T16 — requires a running API (default BASE_URL http://127.0.0.1:8080). Bash twin: ../../test/e2e/bash/run.sh
 e2e:
 	go test -tags=e2e -race -count=1 ./e2e/...
+
+# T63 — concurrent in-process HTTP tests; -count=3 reruns to flush flaky races.
+# Skipped automatically by `go test -short`; run explicitly here without -short.
+test-concurrent:
+	go test -race -count=3 -run '^TestConcurrent_' ./internal/api/...
