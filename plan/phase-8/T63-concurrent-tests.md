@@ -14,37 +14,37 @@ Add tests that hammer the API server with concurrent in-process HTTP requests to
 
 ## Background
 
-Today's tests are mostly sequential. The `-race` flag is on, but races only fire when goroutines actually overlap. Without concurrent test traffic we cannot prove that the server is goroutine-safe under realistic load patterns.
+Today's tests include sequential and a few concurrent scenarios in `integration_test.go`, but these do not cover all concurrency patterns needed to validate the server under realistic load. The `-race` flag is on, but races only fire when goroutines actually overlap. The new tests in `concurrent_test.go` add targeted, higher-load scenarios that the existing integration tests do not cover.
 
 ## Deliverables
 
-- `go/internal/api/concurrent_test.go` — concurrent table-driven tests using `httptest.Server` + `errgroup` / `sync.WaitGroup`.
-- A small helper `runConcurrent(t, n int, fn func(i int) error)` that:
-  - Launches `n` goroutines.
+- `go/internal/api/concurrent_test.go` — concurrent tests using `httptest.NewServer` + `sync.WaitGroup` + buffered-channel error collection.
+- A small helper `runConcurrent(t *testing.T, n int, fn func(ctx context.Context, i int) error)` that:
+  - Launches `n` goroutines each receiving the test context (`t.Context()`, Go 1.21+).
   - Collects errors via a buffered channel (per the project's "goroutines must send a result" rule).
-  - Asserts no error and uses `t.Fatal` from the *test goroutine* (not the spawned ones — they `t.Errorf` or push errors to the channel).
+  - Reports all errors via `t.Errorf` from the *test goroutine* (spawned goroutines must never call `t.Fatal`/`t.Error` directly), then calls `t.FailNow` if any errors were found.
 - Coverage of at least these scenarios:
-  - **Read-mostly mixed**: 50 goroutines × 100 iterations each calling `GET /authz/check` against a pre-seeded domain.
-  - **Write contention**: N goroutines creating distinct users in the same domain in parallel — confirms unique IDs are not collided and `ErrConflict` is correctly returned for true duplicates.
-  - **Mixed read/write**: half goroutines reading lists while half mutate group memberships; assert no 500s and no race detector hits.
-  - **Cycle-detection thrash**: parallel `groupSetParent` calls trying to introduce a cycle — at most one should succeed; others must return 400.
-  - **Metrics correctness**: after the run, `authz_checks_total{result="ok"}` equals exactly the number of successful authz calls (verifies the T50 single-increment invariant under concurrency).
+  - **Read-mostly**: 50 goroutines × 20 iterations each calling `GET /authz/check` against a pre-seeded domain — verifies no races in read-path handlers.
+  - **Write contention**: 30 goroutines each creating a distinctly-titled user in the same domain — confirms all IDs are unique (no UUID collision) and all requests succeed.
+  - **Mixed read/write**: 10 writer goroutines adding/removing group memberships concurrently with 10 reader goroutines listing users — asserts no 500s and no race-detector hits.
+  - **Cycle-detection thrash**: 20 goroutines racing to set `g1.parent=g2` and `g2.parent=g1` concurrently — at most one direction can be committed; others must return 400 (cycle detected) and never 500.
+  - **Metrics correctness**: 40 goroutines each calling `authz/check` once against a metrics-enabled server; after all finish, `authz_checks_total{result="ok"}` must equal exactly 40 — verifies the T50 single-increment invariant under concurrency.
 
 ## Steps
 
-1. Add `go/internal/api/concurrent_test.go` with the helper and the scenarios above. Use `httptest.NewServer(s.Handler())` (or whatever the existing test setup uses) so the in-memory server runs on a real socket — that exercises the chi router and HTTP stack, not just handler functions.
-2. Make tests skippable with `-short` (`if testing.Short() { t.Skip(...) }`) so unit-only CI runs (`go test -short`) stay fast; the default CI run keeps them.
-3. Add a `make test-concurrent` Makefile target for explicitly running just these tests with `-race -count=3` (rerun a few times to flush flaky races).
-4. Confirm the existing `make test` already runs these (no opt-in tag); they should be part of the baseline because race-detector value comes from running them often.
-5. Document the helper and the failure modes in `go/internal/api/concurrent_test.go` doc comment.
+1. Add `go/internal/api/concurrent_test.go` with the helper and the scenarios above. Use `httptest.NewServer(srv.Router(nil, nil))` (matching existing `newTestAPI`/`newTestAPIWithMetrics` helpers) so all tests exercise the real chi router and HTTP stack.
+2. Guard every test with `if testing.Short() { t.Skip(...) }` so `go test -short` (fast unit-only CI pass) skips them; the default `make test` and `make test-concurrent` runs keep them enabled.
+3. Add a `make test-concurrent` Makefile target running just the `TestConcurrent_*` tests with `-race -count=3` to repeatedly flush flaky races.
+4. Existing `make test` already includes these tests (no build tag required); race-detector value comes from running them often.
+5. Document the `runConcurrent` helper and failure modes in the file's package-level doc comment.
 
 ## Acceptance criteria
 
-- New tests pass with `-race -count=1` and again with `-count=5` locally (no flaky races).
-- Tests do not use `time.Sleep` to wait for goroutines; they use `sync.WaitGroup` / channels with a deadline.
-- All goroutines either finish before the test returns or are cancelled via `t.Context()` (Go 1.24+).
+- New tests pass with `-race -count=1` and again with `-count=3` locally (no flaky races).
+- Tests do not use `time.Sleep` to wait for goroutines; they use `sync.WaitGroup` / channels.
+- All goroutines are cancelled via `t.Context()` when the test times out.
 - `make test` passes.
-- If a race is found, fix it (or open a follow-up ticket and reference it from a `// TODO(T<NN>): ...` comment).
+- If a race is found during development, fix it in the same PR (or open a follow-up ticket and reference from a `// TODO(T<NN>): ...` comment).
 
 ## Files / paths
 
@@ -54,14 +54,15 @@ Today's tests are mostly sequential. The `-race` flag is on, but races only fire
 
 ## Dependencies
 
-- **T11 / #22** — integration tests already provide `newTestAPI(t)` helpers we can reuse.
-- **T50 / #74** — single-increment invariant on `authz_checks_total` (one of the scenarios verifies this under concurrency).
+- **T11 / #22** — integration tests provide `newTestAPI(t)` / `newTestAPIWithMetrics(t)` helpers reused here.
+- **T50 / #74** — single-increment invariant on `authz_checks_total` verified under concurrency.
 
 ## Out of scope
 
-- Stress / soak / k6 load testing — covered by **T5 / #16** (see updated plan with the Stress subsection).
-- Concurrent E2E tests against a real (non-in-memory) server — can be a future addition.
+- Stress / soak / k6 load testing — covered by **T5 / #16**.
+- Concurrent E2E tests against a real (non-in-memory) server — future addition.
 
 ## Risk notes
 
-- SQLite in WAL mode allows concurrent readers but serialises writers. If write-contention scenarios start hitting `SQLITE_BUSY`, the store layer should retry with backoff or the test should expect a small fraction of `409`/`503` results. Track any retry logic added in a separate follow-up rather than smuggling it into this ticket.
+- SQLite uses `SetMaxOpenConns(1)` which serialises all DB operations through a single connection. Concurrent HTTP requests will queue at the `database/sql` pool level rather than hitting SQLite directly; `SQLITE_BUSY` is therefore not expected. If it does appear, add retry-with-backoff to the store layer in a separate ticket.
+- Goroutine counts are intentionally moderate (20–50) to keep `-count=3` runs fast while still exercising overlapping requests.
