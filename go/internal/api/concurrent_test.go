@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -69,7 +70,9 @@ func runConcurrent(t *testing.T, n int, fn func(ctx context.Context, i int) erro
 // TestConcurrent_readMostlyAuthzCheck launches 50 goroutines each issuing 20
 // GET /authz/check requests against a pre-seeded domain. The intent is to
 // expose data races in the read-path handlers, the store, and shared state
-// (e.g. the logger singleton) when the -race detector is active.
+// (e.g. the logger singleton) when the -race detector is active. Each
+// iteration also decodes the response body and asserts allowed==true so that
+// a regression returning HTTP 200 with {"allowed":false} is caught.
 func TestConcurrent_readMostlyAuthzCheck(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping concurrent read-mostly test in -short mode")
@@ -90,6 +93,10 @@ func TestConcurrent_readMostlyAuthzCheck(t *testing.T) {
 		fmt.Sprintf("/authz/check?user_id=%s&resource_id=%s&access_bit=0x1", userID, resID)
 
 	const goroutines = 50
+	// NOTE: itersEach is 20 (the original plan suggested 100). 50×20 = 1,000
+	// requests still provides substantial goroutine overlap for the race
+	// detector while keeping -count=3 runs fast. Revisit if the run time
+	// budget allows higher counts.
 	const itersEach = 20
 
 	runConcurrent(t, goroutines, func(ctx context.Context, _ int) error {
@@ -105,9 +112,22 @@ func TestConcurrent_readMostlyAuthzCheck(t *testing.T) {
 			if err != nil {
 				return fmt.Errorf("GET authz/check iter %d: %w", iter, err)
 			}
+			b, readErr := io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
+			if readErr != nil {
+				return fmt.Errorf("GET authz/check iter %d: read body: %w", iter, readErr)
+			}
 			if resp.StatusCode != http.StatusOK {
-				return fmt.Errorf("GET authz/check iter %d: want 200, got %d", iter, resp.StatusCode)
+				return fmt.Errorf("GET authz/check iter %d: want 200, got %d: %s", iter, resp.StatusCode, b)
+			}
+			var out struct {
+				Allowed bool `json:"allowed"`
+			}
+			if err := json.Unmarshal(b, &out); err != nil {
+				return fmt.Errorf("authz/check iter %d: unmarshal: %w", iter, err)
+			}
+			if !out.Allowed {
+				return fmt.Errorf("authz/check iter %d: want allowed=true, got false", iter)
 			}
 		}
 		return nil
