@@ -362,6 +362,7 @@ func TestConcurrent_metricsInvariant(t *testing.T) {
 		if err != nil {
 			return fmt.Errorf("authz/check: %w", err)
 		}
+		_, _ = io.Copy(io.Discard, resp.Body)
 		_ = resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			return fmt.Errorf("authz/check: want 200, got %d", resp.StatusCode)
