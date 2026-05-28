@@ -76,3 +76,79 @@ func TestAPIAuthStartupWarning(t *testing.T) {
 		})
 	}
 }
+func TestCORSStartupWarning(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name    string
+		origins []string
+		addr    string
+		want    string // empty = no warning; substring to match otherwise
+	}{
+		{
+			name:    "wildcard on loopback — no warning",
+			origins: []string{"*"},
+			addr:    "127.0.0.1:8080",
+			want:    "",
+		},
+		{
+			name:    "wildcard on localhost — no warning",
+			origins: []string{"*"},
+			addr:    "localhost:8080",
+			want:    "",
+		},
+		{
+			name:    "wildcard on all interfaces — warns",
+			origins: []string{"*"},
+			addr:    "0.0.0.0:8080",
+			want:    "wildcard",
+		},
+		{
+			name:    "wildcard on port-only addr — warns",
+			origins: []string{"*"},
+			addr:    ":8080",
+			want:    "wildcard",
+		},
+		{
+			name:    "wildcard on private IP — warns",
+			origins: []string{"*"},
+			addr:    "10.0.0.1:8080",
+			want:    "wildcard",
+		},
+		{
+			name:    "explicit list on any addr — no warning",
+			origins: []string{"https://app.example.com"},
+			addr:    "0.0.0.0:8080",
+			want:    "",
+		},
+		{
+			name:    "empty origins — no warning",
+			origins: []string{},
+			addr:    "0.0.0.0:8080",
+			want:    "",
+		},
+		{
+			name:    "unparseable addr — no warning",
+			origins: []string{"*"},
+			addr:    "not-a-hostport",
+			want:    "",
+		},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			cfg := Config{HTTPAddr: tc.addr, CORSAllowedOrigins: tc.origins}
+			got := CORSStartupWarning(cfg)
+			switch tc.want {
+			case "":
+				if got != "" {
+					t.Fatalf("expected no warning, got %q", got)
+				}
+			default:
+				if !strings.Contains(got, tc.want) {
+					t.Fatalf("expected warning containing %q, got %q", tc.want, got)
+				}
+			}
+		})
+	}
+}

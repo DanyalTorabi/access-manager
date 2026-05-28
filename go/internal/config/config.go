@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -17,40 +18,75 @@ const (
 	envDatabaseURL       = "DATABASE_URL"
 	envHTTPAddr          = "HTTP_ADDR"
 	envMigrationsDir      = "MIGRATIONS_DIR"
-	envShutdownTimeoutSec = "SHUTDOWN_TIMEOUT_SECONDS"
-	envAPIBearerToken     = "API_BEARER_TOKEN" // #nosec G101: environment variable name, not a hardcoded secret
+	envShutdownTimeoutSec  = "SHUTDOWN_TIMEOUT_SECONDS"
+	envAPIBearerToken      = "API_BEARER_TOKEN" // #nosec G101: environment variable name, not a hardcoded secret
+	envCORSAllowedOrigins  = "CORS_ALLOWED_ORIGINS"
 )
+
+// corsOriginList is a custom YAML type that accepts both a scalar comma-separated string
+// and a proper YAML sequence, so operators can write either:
+//
+//	cors_allowed_origins: "https://a.com,https://b.com"   # comma-string (same as env var)
+//	cors_allowed_origins:
+//	  - https://a.com                                     # native YAML list
+//	  - https://b.com
+type corsOriginList []string
+
+func (c *corsOriginList) UnmarshalYAML(value *yaml.Node) error {
+	switch value.Kind {
+	case yaml.SequenceNode:
+		var s []string
+		if err := value.Decode(&s); err != nil {
+			return err
+		}
+		*c = s
+	case yaml.ScalarNode:
+		var s string
+		if err := value.Decode(&s); err != nil {
+			return err
+		}
+		*c = parseCORSOrigins(s)
+	default:
+		return fmt.Errorf("cors_allowed_origins: expected string or sequence, got %s", value.Tag)
+	}
+	return nil
+}
 
 // fileShape matches config.example.yaml (snake_case keys).
 type fileShape struct {
-	DatabaseDriver          string `yaml:"database_driver"`
-	DatabaseURL             string `yaml:"database_url"`
-	HTTPAddr                string `yaml:"http_addr"`
-	MigrationsDir           string `yaml:"migrations_dir"`
-	ShutdownTimeoutSeconds  *int   `yaml:"shutdown_timeout_seconds"`
-	APIBearerToken          string `yaml:"api_bearer_token"`
+	DatabaseDriver         string         `yaml:"database_driver"`
+	DatabaseURL            string         `yaml:"database_url"`
+	HTTPAddr               string         `yaml:"http_addr"`
+	MigrationsDir          string         `yaml:"migrations_dir"`
+	ShutdownTimeoutSeconds *int           `yaml:"shutdown_timeout_seconds"`
+	APIBearerToken         string         `yaml:"api_bearer_token"`
+	CORSAllowedOrigins     corsOriginList `yaml:"cors_allowed_origins"`
 }
 
 // Config is resolved runtime configuration after defaults, optional file, and env overrides.
 type Config struct {
-	DatabaseDriver   string
-	DatabaseURL      string
-	HTTPAddr         string
-	MigrationsDir    string
-	ShutdownTimeout  time.Duration
+	DatabaseDriver  string
+	DatabaseURL     string
+	HTTPAddr        string
+	MigrationsDir   string
+	ShutdownTimeout time.Duration
 	// APIBearerToken protects /api/v1/* when non-empty (Bearer scheme). Optional; see README.
 	APIBearerToken string
+	// CORSAllowedOrigins lists origins permitted in the Access-Control-Allow-Origin response header.
+	// ["*"] (default) allows any origin. Empty slice disables CORS headers entirely.
+	CORSAllowedOrigins []string
 }
 
 // Load builds configuration: defaults → optional YAML file (CONFIG_PATH) → environment overrides.
 // Env always wins when set to a non-empty value. If CONFIG_PATH is unset, file is skipped (env-only / defaults).
 func Load() (Config, error) {
 	c := Config{
-		DatabaseDriver:  "sqlite",
-		DatabaseURL:     "file:access.db?_pragma=foreign_keys(1)",
-		HTTPAddr:        "127.0.0.1:8080",
-		MigrationsDir:   "migrations/sqlite",
-		ShutdownTimeout: 30 * time.Second,
+		DatabaseDriver:     "sqlite",
+		DatabaseURL:        "file:access.db?_pragma=foreign_keys(1)",
+		HTTPAddr:           "127.0.0.1:8080",
+		MigrationsDir:      "migrations/sqlite",
+		ShutdownTimeout:    30 * time.Second,
+		CORSAllowedOrigins: []string{"*"},
 	}
 
 	path := strings.TrimSpace(os.Getenv(envConfigPath))
@@ -85,6 +121,9 @@ func Load() (Config, error) {
 		if trimmed := strings.TrimSpace(f.APIBearerToken); trimmed != "" {
 			c.APIBearerToken = trimmed
 		}
+		if len(f.CORSAllowedOrigins) > 0 {
+			c.CORSAllowedOrigins = []string(f.CORSAllowedOrigins)
+		}
 	}
 
 	if v := os.Getenv(envDatabaseDriver); v != "" {
@@ -109,11 +148,31 @@ func Load() (Config, error) {
 	if v := strings.TrimSpace(os.Getenv(envAPIBearerToken)); v != "" {
 		c.APIBearerToken = v
 	}
+	if v := strings.TrimSpace(os.Getenv(envCORSAllowedOrigins)); v != "" {
+		parsed := parseCORSOrigins(v)
+		if len(parsed) == 0 {
+			return Config{}, fmt.Errorf("config: %s is set but contains no valid origin entries", envCORSAllowedOrigins)
+		}
+		c.CORSAllowedOrigins = parsed
+	}
 
 	if err := validate(c); err != nil {
 		return Config{}, err
 	}
 	return c, nil
+}
+
+// parseCORSOrigins splits a comma-separated origin string and trims each entry.
+// It returns a non-empty slice; individual empty entries are dropped.
+func parseCORSOrigins(s string) []string {
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 func validate(c Config) error {
@@ -131,6 +190,15 @@ func validate(c Config) error {
 	}
 	if c.ShutdownTimeout <= 0 {
 		return errors.New("config: shutdown timeout must be positive")
+	}
+	for _, origin := range c.CORSAllowedOrigins {
+		if origin == "*" {
+			continue
+		}
+		u, err := url.Parse(origin)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
+			return fmt.Errorf("config: cors_allowed_origins: %q is not a valid origin (expected scheme://host[:port])", origin)
+		}
 	}
 	return nil
 }

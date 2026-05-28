@@ -170,7 +170,7 @@ func (s *Store) DomainList(ctx context.Context, opts store.ListOpts) ([]store.Do
 	where := ""
 	var args []any
 	if opts.Search != "" {
-		where = ` WHERE title LIKE ? ESCAPE '\\'`
+		where = ` WHERE title LIKE ? ESCAPE '\'`
 		args = append(args, likePattern(opts.Search, opts.SearchType))
 	}
 
@@ -248,7 +248,7 @@ func (s *Store) UserList(ctx context.Context, domainID string, opts store.ListOp
 	where := "WHERE domain_id = ?"
 	args := []any{domainID}
 	if opts.Search != "" {
-		where += ` AND title LIKE ? ESCAPE '\\'`
+		where += ` AND title LIKE ? ESCAPE '\'`
 		args = append(args, likePattern(opts.Search, opts.SearchType))
 	}
 
@@ -336,7 +336,7 @@ func (s *Store) GroupList(ctx context.Context, domainID string, opts store.Group
 	where := "WHERE domain_id = ?"
 	args := []any{domainID}
 	if opts.Search != "" {
-		where += ` AND title LIKE ? ESCAPE '\\'`
+		where += ` AND title LIKE ? ESCAPE '\'`
 		args = append(args, likePattern(opts.Search, opts.SearchType))
 	}
 	if opts.ParentGroupID != nil {
@@ -504,7 +504,7 @@ func (s *Store) ResourceList(ctx context.Context, domainID string, opts store.Li
 	where := "WHERE domain_id = ?"
 	args := []any{domainID}
 	if opts.Search != "" {
-		where += ` AND title LIKE ? ESCAPE '\\'`
+		where += ` AND title LIKE ? ESCAPE '\'`
 		args = append(args, likePattern(opts.Search, opts.SearchType))
 	}
 
@@ -586,7 +586,7 @@ func (s *Store) AccessTypeList(ctx context.Context, domainID string, opts store.
 	where := "WHERE domain_id = ?"
 	args := []any{domainID}
 	if opts.Search != "" {
-		where += ` AND title LIKE ? ESCAPE '\\'`
+		where += ` AND title LIKE ? ESCAPE '\'`
 		args = append(args, likePattern(opts.Search, opts.SearchType))
 	}
 
@@ -694,7 +694,7 @@ func (s *Store) PermissionList(ctx context.Context, domainID string, opts store.
 	where := "WHERE domain_id = ?"
 	args := []any{domainID}
 	if opts.Search != "" {
-		where += ` AND title LIKE ? ESCAPE '\\'`
+		where += ` AND title LIKE ? ESCAPE '\'`
 		args = append(args, likePattern(opts.Search, opts.SearchType))
 	}
 	if opts.ResourceID != nil {
