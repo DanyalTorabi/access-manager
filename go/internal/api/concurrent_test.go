@@ -263,9 +263,11 @@ func TestConcurrent_mixedReadWrite(t *testing.T) {
 
 // TestConcurrent_cycleDetectionThrash races 20 goroutines — half setting
 // g1.parent=g2 and half setting g2.parent=g1 — to exercise the cycle-
-// detection path under write contention. SQLite serialises the transactions,
-// so the first-committed direction wins; subsequent calls that would introduce
-// a cycle receive 400. A 500 from any goroutine is a test failure.
+// detection path under write contention.
+//
+// Once one direction is committed, goroutines re-setting the same direction
+// each succeed (204). Goroutines that would create a cycle return 400. Expect
+// a mix of 204s and 400s; exactly zero 500s are allowed.
 func TestConcurrent_cycleDetectionThrash(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping concurrent cycle-detection test in -short mode")
@@ -278,52 +280,43 @@ func TestConcurrent_cycleDetectionThrash(t *testing.T) {
 	base := domainBase(ts, domID)
 	const n = 20
 
-	var wg sync.WaitGroup
-	errs := make(chan error, n)
-	ctx := t.Context()
+	var succeeded int64
 
-	for i := 0; i < n; i++ {
-		wg.Add(1)
-		j := i
-		go func() {
-			defer wg.Done()
-			if ctx.Err() != nil {
-				return
-			}
-			// Alternate: even → g1.parent=g2, odd → g2.parent=g1.
-			var childID, parentID string
-			if j%2 == 0 {
-				childID, parentID = g1, g2
-			} else {
-				childID, parentID = g2, g1
-			}
-			url := fmt.Sprintf("%s/groups/%s/parent", base, childID)
-			body := fmt.Sprintf(`{"parent_group_id":%q}`, parentID)
-			req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url,
-				strings.NewReader(body))
-			if err != nil {
-				errs <- fmt.Errorf("build patch request: %w", err)
-				return
-			}
-			req.Header.Set("Content-Type", "application/json")
-			resp, err := testClient.Do(req)
-			if err != nil {
-				errs <- fmt.Errorf("PATCH groups/%s/parent: %w", childID, err)
-				return
-			}
-			_ = resp.Body.Close()
-			// 204 = parent set; 400 = cycle detected — both are valid outcomes.
-			// 500 is never acceptable.
-			if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusBadRequest {
-				errs <- fmt.Errorf("PATCH groups/%s/parent: unexpected status %d", childID, resp.StatusCode)
-			}
-		}()
-	}
+	runConcurrent(t, n, func(ctx context.Context, j int) error {
+		// Alternate: even → g1.parent=g2, odd → g2.parent=g1.
+		var childID, parentID string
+		if j%2 == 0 {
+			childID, parentID = g1, g2
+		} else {
+			childID, parentID = g2, g1
+		}
+		url := fmt.Sprintf("%s/groups/%s/parent", base, childID)
+		body := fmt.Sprintf(`{"parent_group_id":%q}`, parentID)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url,
+			strings.NewReader(body))
+		if err != nil {
+			return fmt.Errorf("build patch request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := testClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("PATCH groups/%s/parent: %w", childID, err)
+		}
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+		switch resp.StatusCode {
+		case http.StatusNoContent:
+			atomic.AddInt64(&succeeded, 1)
+		case http.StatusBadRequest:
+			// cycle detected — expected after the winning direction is committed
+		default:
+			return fmt.Errorf("PATCH groups/%s/parent: unexpected status %d", childID, resp.StatusCode)
+		}
+		return nil
+	})
 
-	wg.Wait()
-	close(errs)
-	for err := range errs {
-		t.Error(err)
+	if atomic.LoadInt64(&succeeded) == 0 {
+		t.Error("cycleDetectionThrash: expected at least one 204, all returned 400")
 	}
 
 	// Sanity: both groups must still be reachable (no group was corrupted).
