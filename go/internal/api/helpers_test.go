@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -165,11 +166,18 @@ func revokeUserPerm(t *testing.T, ts *httptest.Server, domainID, userID, permID 
 // response body and an error instead of calling t.Fatal (which is unsafe from
 // non-test goroutines).
 func doRequestErr(method, url, body string, wantStatus int) ([]byte, error) {
+	return doRequestErrCtx(context.Background(), method, url, body, wantStatus)
+}
+
+// doRequestErrCtx is like doRequestErr but propagates ctx so in-flight HTTP
+// calls can be cancelled when the test context expires (e.g. on test timeout
+// or interrupt). Use this in goroutines spawned by concurrent tests.
+func doRequestErrCtx(ctx context.Context, method, url, body string, wantStatus int) ([]byte, error) {
 	var bodyReader io.Reader
 	if body != "" {
 		bodyReader = strings.NewReader(body)
 	}
-	req, err := http.NewRequest(method, url, bodyReader)
+	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("%s %s: build request: %w", method, url, err)
 	}
