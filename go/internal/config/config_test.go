@@ -523,3 +523,120 @@ cors_allowed_origins: "None"
 		t.Fatalf("expected empty CORSAllowedOrigins for YAML sentinel 'None', got %v", c.CORSAllowedOrigins)
 	}
 }
+
+func TestLoad_corsSentinelDisableEnvWhitespace(t *testing.T) {
+	clearEnv(t)
+	t.Setenv(envCORSAllowedOrigins, "  none  ")
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error with whitespace-padded sentinel: %v", err)
+	}
+	if len(c.CORSAllowedOrigins) != 0 {
+		t.Fatalf("expected empty CORSAllowedOrigins for '  none  ', got %v", c.CORSAllowedOrigins)
+	}
+}
+
+func TestLoad_corsSentinelDisableYAMLWhitespace(t *testing.T) {
+	clearEnv(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cfg.yaml")
+	content := `
+database_driver: sqlite
+database_url: "file::memory:"
+http_addr: "127.0.0.1:8080"
+migrations_dir: migrations/sqlite
+cors_allowed_origins: "  none  "
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(envConfigPath, path)
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error with whitespace-padded YAML sentinel: %v", err)
+	}
+	if len(c.CORSAllowedOrigins) != 0 {
+		t.Fatalf("expected empty CORSAllowedOrigins for YAML '  none  ', got %v", c.CORSAllowedOrigins)
+	}
+}
+
+// Cross-layer sentinel precedence tests.
+
+func TestLoad_corsSentinelEnvOverridesYAMLOrigins(t *testing.T) {
+	// YAML sets explicit origins; env var 'none' wins → CORS disabled.
+	clearEnv(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cfg.yaml")
+	content := `
+database_driver: sqlite
+database_url: "file::memory:"
+http_addr: "127.0.0.1:8080"
+migrations_dir: migrations/sqlite
+cors_allowed_origins: "https://app.example.com"
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(envConfigPath, path)
+	t.Setenv(envCORSAllowedOrigins, "none")
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(c.CORSAllowedOrigins) != 0 {
+		t.Fatalf("env sentinel 'none' should override YAML origins; got %v", c.CORSAllowedOrigins)
+	}
+}
+
+func TestLoad_corsExplicitEnvOverridesYAMLSentinel(t *testing.T) {
+	// YAML sets sentinel 'none'; env var sets real origins → env wins, CORS enabled.
+	clearEnv(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cfg.yaml")
+	content := `
+database_driver: sqlite
+database_url: "file::memory:"
+http_addr: "127.0.0.1:8080"
+migrations_dir: migrations/sqlite
+cors_allowed_origins: "none"
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(envConfigPath, path)
+	t.Setenv(envCORSAllowedOrigins, "https://app.example.com")
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(c.CORSAllowedOrigins) != 1 || c.CORSAllowedOrigins[0] != "https://app.example.com" {
+		t.Fatalf("env origins should override YAML sentinel; got %v", c.CORSAllowedOrigins)
+	}
+}
+
+func TestLoad_corsYAMLSequenceNoneFailsValidation(t *testing.T) {
+	// A YAML sequence containing a single "none" element is NOT a sentinel.
+	// It should reach validate() and be rejected as an invalid origin URL.
+	clearEnv(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cfg.yaml")
+	content := `
+database_driver: sqlite
+database_url: "file::memory:"
+http_addr: "127.0.0.1:8080"
+migrations_dir: migrations/sqlite
+cors_allowed_origins:
+  - none
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(envConfigPath, path)
+	_, err := Load()
+	if err == nil {
+		t.Fatal("want validation error for YAML sequence [none] — it is not a valid origin URL")
+	}
+	if !strings.Contains(err.Error(), "cors_allowed_origins") {
+		t.Fatalf("error should mention cors_allowed_origins, got: %v", err)
+	}
+}
