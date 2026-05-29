@@ -1,0 +1,58 @@
+# compose.prod.yml — production-oriented standalone compose file for access-manager.
+#
+# STANDALONE — use directly, NOT as an overlay on docker-compose.yml:
+#   docker compose -f compose.prod.yml up -d
+#
+# Docker Compose environment: blocks are explicit allowlists; variables present
+# in the host shell are NOT automatically inherited unless listed here with
+# either KEY: "${KEY}" syntax or a bare KEY: null entry. This file uses
+# ${VAR:?message} which fails loudly if VAR is unset or empty.
+#
+# REQUIRED env vars (export before running, or place in a gitignored .env file):
+#   DEPLOY_SHA       — CI image SHA tag, e.g. sha-abc1234 (from GHCR publish job)
+#   DATABASE_URL     — postgres DSN
+#   API_BEARER_TOKEN — strong random token for /api/v1/* protection
+#
+# See docs/environments.md for the full environment tier matrix and rollback guide.
+
+services:
+  app:
+    # Fails with a clear message if DEPLOY_SHA is not set.
+    # Find the SHA on the GHCR package page or in the CI publish job output.
+    image: ghcr.io/danyaltorabi/access-manager:${DEPLOY_SHA:?Set DEPLOY_SHA to the CI image SHA (e.g. sha-abc1234)}
+
+    volumes:
+      - app-data:/data
+
+    environment:
+      # Bind on all interfaces; place a TLS-terminating reverse proxy in front.
+      HTTP_ADDR: "0.0.0.0:8080"
+
+      # Postgres is recommended for production.
+      DATABASE_DRIVER: "postgres"
+      DATABASE_URL: "${DATABASE_URL:?DATABASE_URL must be set (postgres DSN)}"
+      MIGRATIONS_DIR: "migrations/postgres"
+
+      # Protect all /api/v1/* routes. Required when HTTP_ADDR is 0.0.0.0.
+      API_BEARER_TOKEN: "${API_BEARER_TOKEN:?API_BEARER_TOKEN must be set}"
+
+      # Disable in-process CORS headers when a reverse proxy manages CORS.
+      CORS_ALLOWED_ORIGINS: "none"
+
+      # Allow more time for graceful shutdown under load.
+      SHUTDOWN_TIMEOUT_SECONDS: "60"
+
+    # No ports: block — container is accessible only via Docker network.
+    # The reverse proxy should connect to the container by service name or IP.
+    # Add a ports: entry only if you need direct host access.
+
+    restart: unless-stopped
+
+    # Minimal resource hints (adjust to your host).
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+volumes:
+  app-data:

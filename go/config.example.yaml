@@ -16,6 +16,7 @@ shutdown_timeout_seconds: 30
 # Optional: comma-separated list of allowed CORS origins. Env CORS_ALLOWED_ORIGINS overrides when set.
 # Default (*) reflects the actual request Origin header so credentials work in browsers.
 # Use an explicit list (e.g. https://app.example.com) before exposing the service beyond loopback.
+# Set to "none" to disable CORS response headers entirely (e.g. when a reverse proxy manages CORS).
 # cors_allowed_origins: "*"
 
 # --- PostgreSQL example ---
