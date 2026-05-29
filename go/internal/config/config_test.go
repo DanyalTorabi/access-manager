@@ -449,3 +449,77 @@ func TestValidate_invalidCORSOriginNoScheme(t *testing.T) {
 		t.Fatalf("error should mention cors_allowed_origins, got: %v", err)
 	}
 }
+
+// CORS sentinel "none" tests — T22 (#33)
+
+func TestLoad_corsSentinelDisableEnv(t *testing.T) {
+	clearEnv(t)
+	t.Setenv(envCORSAllowedOrigins, "none")
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error with sentinel 'none': %v", err)
+	}
+	if len(c.CORSAllowedOrigins) != 0 {
+		t.Fatalf("expected empty CORSAllowedOrigins for sentinel 'none', got %v", c.CORSAllowedOrigins)
+	}
+}
+
+func TestLoad_corsSentinelDisableEnvCaseInsensitive(t *testing.T) {
+	clearEnv(t)
+	t.Setenv(envCORSAllowedOrigins, "NONE")
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error with sentinel 'NONE': %v", err)
+	}
+	if len(c.CORSAllowedOrigins) != 0 {
+		t.Fatalf("expected empty CORSAllowedOrigins for sentinel 'NONE', got %v", c.CORSAllowedOrigins)
+	}
+}
+
+func TestLoad_corsSentinelDisableYAML(t *testing.T) {
+	clearEnv(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cfg.yaml")
+	content := `
+database_driver: sqlite
+database_url: "file::memory:"
+http_addr: "127.0.0.1:8080"
+migrations_dir: migrations/sqlite
+cors_allowed_origins: "none"
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(envConfigPath, path)
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error with YAML sentinel 'none': %v", err)
+	}
+	if len(c.CORSAllowedOrigins) != 0 {
+		t.Fatalf("expected empty CORSAllowedOrigins for YAML sentinel 'none', got %v", c.CORSAllowedOrigins)
+	}
+}
+
+func TestLoad_corsSentinelDisableYAMLCaseInsensitive(t *testing.T) {
+	clearEnv(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cfg.yaml")
+	content := `
+database_driver: sqlite
+database_url: "file::memory:"
+http_addr: "127.0.0.1:8080"
+migrations_dir: migrations/sqlite
+cors_allowed_origins: "None"
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(envConfigPath, path)
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error with YAML sentinel 'None': %v", err)
+	}
+	if len(c.CORSAllowedOrigins) != 0 {
+		t.Fatalf("expected empty CORSAllowedOrigins for YAML sentinel 'None', got %v", c.CORSAllowedOrigins)
+	}
+}

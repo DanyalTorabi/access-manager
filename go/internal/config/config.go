@@ -21,6 +21,12 @@ const (
 	envShutdownTimeoutSec  = "SHUTDOWN_TIMEOUT_SECONDS"
 	envAPIBearerToken      = "API_BEARER_TOKEN" // #nosec G101: environment variable name, not a hardcoded secret
 	envCORSAllowedOrigins  = "CORS_ALLOWED_ORIGINS"
+
+	// corsSentinelDisable is a sentinel value that disables all CORS response headers.
+	// Set CORS_ALLOWED_ORIGINS=none (or cors_allowed_origins: "none" in YAML) when a
+	// reverse proxy manages CORS and in-process headers should be suppressed entirely.
+	// The sentinel is case-insensitive; the resulting CORSAllowedOrigins slice is empty.
+	corsSentinelDisable = "none"
 )
 
 // corsOriginList is a custom YAML type that accepts both a scalar comma-separated string
@@ -44,6 +50,11 @@ func (c *corsOriginList) UnmarshalYAML(value *yaml.Node) error {
 		var s string
 		if err := value.Decode(&s); err != nil {
 			return err
+		}
+		if strings.EqualFold(strings.TrimSpace(s), corsSentinelDisable) {
+			// Preserve sentinel so Load() can detect it and set an empty slice.
+			*c = corsOriginList{corsSentinelDisable}
+			return nil
 		}
 		*c = parseCORSOrigins(s)
 	default:
@@ -122,7 +133,11 @@ func Load() (Config, error) {
 			c.APIBearerToken = trimmed
 		}
 		if len(f.CORSAllowedOrigins) > 0 {
-			c.CORSAllowedOrigins = []string(f.CORSAllowedOrigins)
+			if len(f.CORSAllowedOrigins) == 1 && strings.EqualFold(f.CORSAllowedOrigins[0], corsSentinelDisable) {
+				c.CORSAllowedOrigins = []string{}
+			} else {
+				c.CORSAllowedOrigins = []string(f.CORSAllowedOrigins)
+			}
 		}
 	}
 
@@ -149,11 +164,15 @@ func Load() (Config, error) {
 		c.APIBearerToken = v
 	}
 	if v := strings.TrimSpace(os.Getenv(envCORSAllowedOrigins)); v != "" {
-		parsed := parseCORSOrigins(v)
-		if len(parsed) == 0 {
-			return Config{}, fmt.Errorf("config: %s is set but contains no valid origin entries", envCORSAllowedOrigins)
+		if strings.EqualFold(v, corsSentinelDisable) {
+			c.CORSAllowedOrigins = []string{}
+		} else {
+			parsed := parseCORSOrigins(v)
+			if len(parsed) == 0 {
+				return Config{}, fmt.Errorf("config: %s is set but contains no valid origin entries", envCORSAllowedOrigins)
+			}
+			c.CORSAllowedOrigins = parsed
 		}
-		c.CORSAllowedOrigins = parsed
 	}
 
 	if err := validate(c); err != nil {
