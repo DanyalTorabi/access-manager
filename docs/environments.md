@@ -8,12 +8,14 @@ See [go/README.md](../go/README.md) for the full configuration reference, and [g
 
 ## Tier matrix
 
-| Tier | Owner | HTTP bind | Database | DSN source | Auth token source | CORS | Image tag |
+| Tier | Owner | Host port binding[^1] | Database | DSN source | Auth token source | CORS | Image tag |
 |------|-------|-----------|----------|-----------|-------------------|------|-----------|
 | **Local dev** | Engineer | `127.0.0.1:8080` | SQLite (file or tmpfs) | `.env` / `config.local.yaml` | unset (loopback only) | `*` (default) | local build |
 | **CI / PR** | GitHub Actions | `127.0.0.1:8080` | SQLite tmpfs (smoke); Postgres + MySQL for integration job | `DATABASE_URL` via compose env | unset or `ACTIONS_…` secret | `*` (loopback-only CI runner) | `sha-<sha>` (built per run, not pushed except on `main`) |
-| **Staging** | Team / CI `main` merge | `0.0.0.0:8080` behind reverse proxy | Postgres | `DATABASE_URL` → GitHub Environment secret `STAGING_DATABASE_URL` | `API_BEARER_TOKEN` → GitHub Environment secret `STAGING_API_BEARER_TOKEN` | explicit origin list or `none` if proxy handles CORS | `sha-<sha>` (latest green `main` SHA) |
-| **Production** | Ops / on-call | `0.0.0.0:8080` behind reverse proxy | Postgres (or MySQL) | `DATABASE_URL` → K8s Secret `access-manager-db` key `url` | `API_BEARER_TOKEN` → K8s Secret `access-manager-auth` key `token` | `none` (reverse proxy enforces CORS policy) | pinned `sha-<sha>` (promoted manually after staging sign-off) |
+| **Staging** | Team / CI `main` merge | none (reverse proxy) | Postgres | `DATABASE_URL` → GitHub Environment secret `STAGING_DATABASE_URL` | `API_BEARER_TOKEN` → GitHub Environment secret `STAGING_API_BEARER_TOKEN` | explicit origin list or `none` if proxy handles CORS | `sha-<sha>` (latest green `main` SHA) |
+| **Production** | Ops / on-call | none (reverse proxy) | Postgres (or MySQL) | `DATABASE_URL` → K8s Secret `access-manager-db` key `url` | `API_BEARER_TOKEN` → K8s Secret `access-manager-auth` key `token` | `none` (reverse proxy enforces CORS policy) | pinned `sha-<sha>` (promoted manually after staging sign-off) |
+
+[^1]: **Host port binding** is the `ports:` mapping in the compose file (what the host OS sees). Inside every container, `HTTP_ADDR` is always `0.0.0.0:8080` so the port mapping works — see the Config key table for per-tier values. For staging and production, no host port is exposed; the reverse proxy reaches the container via Docker/K8s internal network.
 
 ---
 
@@ -119,9 +121,11 @@ Each GitHub Environment secret maps 1-to-1 to the corresponding env var the serv
 
 ---
 
-## Kubernetes (production — T21)
+## Kubernetes (production — T21, planned)
 
-> K8s deployment is defined in [plan/phase-6/T21-kubernetes.md](../plan/phase-6/T21-kubernetes.md). The notes below document the expected secrets layout for reference.
+> **Planned — T21 ([#32](https://github.com/DanyalTorabi/access-manager/issues/32)) is not yet implemented.** The manifests and namespace below are a design sketch for review, not a description of a running cluster. Do not use them as an on-call reference until T21 ships.
+
+The expected secrets layout for a future K8s deployment:
 
 ```yaml
 # access-manager-db Secret (example)
