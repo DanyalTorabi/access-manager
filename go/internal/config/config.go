@@ -13,14 +13,14 @@ import (
 )
 
 const (
-	envConfigPath        = "CONFIG_PATH"
-	envDatabaseDriver    = "DATABASE_DRIVER"
-	envDatabaseURL       = "DATABASE_URL"
-	envHTTPAddr          = "HTTP_ADDR"
+	envConfigPath         = "CONFIG_PATH"
+	envDatabaseDriver     = "DATABASE_DRIVER"
+	envDatabaseURL        = "DATABASE_URL"
+	envHTTPAddr           = "HTTP_ADDR"
 	envMigrationsDir      = "MIGRATIONS_DIR"
-	envShutdownTimeoutSec  = "SHUTDOWN_TIMEOUT_SECONDS"
-	envAPIBearerToken      = "API_BEARER_TOKEN" // #nosec G101: environment variable name, not a hardcoded secret
-	envCORSAllowedOrigins  = "CORS_ALLOWED_ORIGINS"
+	envShutdownTimeoutSec = "SHUTDOWN_TIMEOUT_SECONDS"
+	envAPIBearerToken     = "API_BEARER_TOKEN" // #nosec G101: environment variable name, not a hardcoded secret
+	envCORSAllowedOrigins = "CORS_ALLOWED_ORIGINS"
 
 	// corsSentinelDisable is a sentinel value that disables all CORS response headers.
 	// Set CORS_ALLOWED_ORIGINS=none (or cors_allowed_origins: "none" in YAML) when a
@@ -36,7 +36,15 @@ const (
 //	cors_allowed_origins:
 //	  - https://a.com                                     # native YAML list
 //	  - https://b.com
-type corsOriginList []string
+//
+// When the scalar value is the sentinel "none" (case-insensitive, whitespace-trimmed),
+// disabled is set to true so Load() can disable CORS without inspecting list contents
+// for magic values. A YAML sequence containing "none" is NOT treated as a sentinel;
+// it passes through to validate() which rejects it as an invalid origin URL.
+type corsOriginList struct {
+	origins  []string
+	disabled bool
+}
 
 func (c *corsOriginList) UnmarshalYAML(value *yaml.Node) error {
 	switch value.Kind {
@@ -45,18 +53,20 @@ func (c *corsOriginList) UnmarshalYAML(value *yaml.Node) error {
 		if err := value.Decode(&s); err != nil {
 			return err
 		}
-		*c = s
+		c.origins = s
+		c.disabled = false
 	case yaml.ScalarNode:
 		var s string
 		if err := value.Decode(&s); err != nil {
 			return err
 		}
 		if strings.EqualFold(strings.TrimSpace(s), corsSentinelDisable) {
-			// Preserve sentinel so Load() can detect it and set an empty slice.
-			*c = corsOriginList{corsSentinelDisable}
+			c.disabled = true
+			c.origins = nil
 			return nil
 		}
-		*c = parseCORSOrigins(s)
+		c.origins = parseCORSOrigins(s)
+		c.disabled = false
 	default:
 		return fmt.Errorf("cors_allowed_origins: expected string or sequence, got %s", value.Tag)
 	}
@@ -132,12 +142,10 @@ func Load() (Config, error) {
 		if trimmed := strings.TrimSpace(f.APIBearerToken); trimmed != "" {
 			c.APIBearerToken = trimmed
 		}
-		if len(f.CORSAllowedOrigins) > 0 {
-			if len(f.CORSAllowedOrigins) == 1 && strings.EqualFold(f.CORSAllowedOrigins[0], corsSentinelDisable) {
-				c.CORSAllowedOrigins = []string{}
-			} else {
-				c.CORSAllowedOrigins = []string(f.CORSAllowedOrigins)
-			}
+		if f.CORSAllowedOrigins.disabled {
+			c.CORSAllowedOrigins = []string{}
+		} else if len(f.CORSAllowedOrigins.origins) > 0 {
+			c.CORSAllowedOrigins = f.CORSAllowedOrigins.origins
 		}
 	}
 
