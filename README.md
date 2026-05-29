@@ -129,6 +129,7 @@ See **[CONTRIBUTING.md](CONTRIBUTING.md)** for local setup, PR expectations, **`
 - [docs/backend-curriculum.md](docs/backend-curriculum.md) — Backend Engineering curriculum ↔ this repo (not a ticket list)  
 - [plan/README.md](plan/README.md) — phased implementation plans per umbrella (**Tnn**)  
 - [docs/branching.md](docs/branching.md) — branches and PRs to `main`  
+- [docs/environments.md](docs/environments.md) — environment tier matrix (dev / CI / staging / prod), secrets mapping, rollback procedure  
 - [docs/security-review.md](docs/security-review.md) — threat model, actors, mitigations  
 - [CONTRIBUTING.md](CONTRIBUTING.md) — contributor guide and GitHub hygiene  
 - [AGENTS.md](AGENTS.md) — contributor rules for humans and AI  
