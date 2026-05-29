@@ -31,7 +31,7 @@ See [go/README.md](../go/README.md) for the full configuration reference, and [g
 | `HTTP_ADDR` | `127.0.0.1:8080` | `0.0.0.0:8080` (container) | `0.0.0.0:8080` (container) | `0.0.0.0:8080` (container) |
 | `SHUTDOWN_TIMEOUT_SECONDS` | `30` | `30` | `60` | `60` |
 
-> **Note on CORS `none`:** Setting `CORS_ALLOWED_ORIGINS=none` (or `cors_allowed_origins: "none"` in YAML) disables all in-process CORS response headers. Use this in staging/production when a reverse proxy (nginx, Caddy, API gateway) manages CORS centrally. See [go/README.md § CORS](../go/README.md).
+> **Note on CORS `none`:** Setting `CORS_ALLOWED_ORIGINS=none` (or `cors_allowed_origins: "none"` in YAML) disables all in-process CORS response headers. Use this in staging/production when a reverse proxy (nginx, Caddy, API gateway) manages CORS centrally. See [go/README.md § Environment variables](../go/README.md#environment-variables).
 
 ---
 
