@@ -15,7 +15,7 @@ Add a top-level `LICENSE` file using the **MIT License**, copyrighted to **Danya
 ## Why
 
 GitHub treats a repo without a `LICENSE` file as "all rights reserved" — nobody can legally reuse the code. Adding the file:
-- Makes the project legally usable and open-source (matching the OpenClaw project's licensing posture).
+- Makes the project legally usable and open-source.
 - Lets GitHub display the license badge in the repo header.
 - Lets `go` tooling and SBOM generators detect the license correctly.
 

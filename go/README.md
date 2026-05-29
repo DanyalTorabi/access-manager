@@ -162,3 +162,7 @@ Server output is structured JSON via `internal/logger` (wrapping `log/slog`). Al
 | `migrations/mysql` | MySQL / MariaDB migrations |
 
 See [AGENTS.md](../AGENTS.md) for contributor rules, security, and **library vs HTTP** boundaries.
+
+## License
+
+Licensed under the [MIT License](../LICENSE).
