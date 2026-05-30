@@ -1480,13 +1480,4 @@ func TestAPI_authzCheck_accessBitOutOfRange(t *testing.T) {
 	}
 }
 
-// --- T52: request/response error hardening tests ---
-
-// TestWriteJSON_encodeErrorLogged asserts that a response encoding failure is
-// logged at ERROR level with method and path so operators can identify the
-// failing endpoint. Because the status header is already committed, the only
-// observable signal is the log entry.
-//
-// NOTE: This test mutates the package-level logger via logger.Init.
-// t.Parallel() is intentionally omitted until T54 (injectable logger) lands.
-// See TODO(T54) in writeJSON.
+// --- T52: request/response error hardening tests are in server_request_test.go ---
