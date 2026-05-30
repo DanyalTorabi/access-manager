@@ -8,7 +8,8 @@ metadata:
     {{- include "access-manager.labels" . | nindent 4 }}
     app.kubernetes.io/component: postgres
 spec:
-  serviceName: postgres
+  # Must reference the headless Service (clusterIP: None) for stable per-pod DNS.
+  serviceName: postgres-headless
   replicas: 1
   selector:
     matchLabels:

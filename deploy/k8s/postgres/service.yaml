@@ -17,3 +17,24 @@ spec:
       port: 5432
       targetPort: postgres
       protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-headless
+  namespace: access-manager
+  labels:
+    app.kubernetes.io/name: access-manager
+    app.kubernetes.io/component: postgres
+spec:
+  # Headless service required by the StatefulSet governing service.
+  # Gives each pod a stable DNS entry: postgres-0.postgres-headless.access-manager.svc.cluster.local
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: access-manager
+    app.kubernetes.io/component: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+      protocol: TCP

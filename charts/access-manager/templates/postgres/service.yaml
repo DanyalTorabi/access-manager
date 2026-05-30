@@ -16,4 +16,24 @@ spec:
       port: 5432
       targetPort: postgres
       protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-headless
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "access-manager.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  # Headless service required by the StatefulSet governing service.
+  # Gives each pod a stable DNS entry: postgres-0.postgres-headless.<namespace>.svc.cluster.local
+  clusterIP: None
+  selector:
+    {{- include "access-manager.postgresSelectorLabels" . | nindent 4 }}
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+      protocol: TCP
 {{- end }}

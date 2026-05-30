@@ -7,7 +7,9 @@ metadata:
     app.kubernetes.io/name: access-manager
     app.kubernetes.io/component: postgres
 spec:
-  serviceName: postgres
+  # serviceName must reference the headless Service (clusterIP: None) that governs
+  # the StatefulSet. The ClusterIP service 'postgres' is kept for app connectivity.
+  serviceName: postgres-headless
   replicas: 1
   selector:
     matchLabels:
