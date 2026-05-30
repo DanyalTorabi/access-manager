@@ -17,3 +17,8 @@ comments-PR*.md
 # If you create a local copy with .yaml extension, it will be ignored:
 deploy/k8s/*.secret.yaml
 deploy/k8s/**/*.secret.yaml
+# Explicit catch for the most obvious copy-paste names:
+deploy/k8s/secret.yaml
+deploy/k8s/secrets.yaml
+deploy/k8s/postgres/secret.yaml
+deploy/k8s/postgres/secrets.yaml
