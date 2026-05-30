@@ -3,7 +3,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: postgres
-  namespace: access-manager
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "access-manager.labels" . | nindent 4 }}
     app.kubernetes.io/component: postgres

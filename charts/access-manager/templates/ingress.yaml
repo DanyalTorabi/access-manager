@@ -3,7 +3,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ include "access-manager.fullname" . }}
-  namespace: access-manager
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "access-manager.labels" . | nindent 4 }}
     app.kubernetes.io/component: ingress

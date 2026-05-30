@@ -1,6 +1,10 @@
 # Default values for access-manager.
 # Override with: helm install access-manager charts/access-manager/ --set image.tag=sha-abc1234
 
+## Name overrides — standard Helm convention.
+nameOverride: ""
+fullnameOverride: ""
+
 ## Number of replicas for the Deployment.
 replicaCount: 2
 

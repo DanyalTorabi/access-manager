@@ -7,13 +7,19 @@ Expand the name of the chart.
 
 {{/*
 Create a default fully qualified app name.
-Truncates at 63 chars to stay within Kubernetes label length limits.
+Follows the standard Helm convention: <release-name>-<chart-name>, truncated to 63 chars.
+Override with .Values.fullnameOverride or .Values.nameOverride.
 */}}
 {{- define "access-manager.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
-{{- .Chart.Name | trunc 63 | trimSuffix "-" }}
+{{- $name := default .Chart.Name .Values.nameOverride }}
+{{- if contains $name .Release.Name }}
+{{- .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
+{{- end }}
 {{- end }}
 {{- end }}
 
