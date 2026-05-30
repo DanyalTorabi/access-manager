@@ -3,7 +3,10 @@ name: access-manager
 description: Helm chart for the access-manager service
 type: application
 version: 0.1.0
-appVersion: "latest"
+# appVersion tracks the deployed image tag. Override at release time:
+#   helm upgrade access-manager charts/access-manager/ --set image.tag=sha-abc1234
+# CI can also stamp it: helm upgrade ... --set appVersion=$GIT_SHA
+appVersion: "0.0.0"
 keywords:
   - access-manager
   - authorization
