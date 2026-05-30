@@ -1,0 +1,16 @@
+apiVersion: v2
+name: access-manager
+description: Helm chart for the access-manager service
+type: application
+version: 0.1.0
+appVersion: "latest"
+keywords:
+  - access-manager
+  - authorization
+  - rbac
+home: https://github.com/DanyalTorabi/access-manager
+sources:
+  - https://github.com/DanyalTorabi/access-manager
+maintainers:
+  - name: Danyal Torabi
+    url: https://github.com/DanyalTorabi

@@ -1,0 +1,83 @@
+# Default values for access-manager.
+# Override with: helm install access-manager charts/access-manager/ --set image.tag=sha-abc1234
+
+## Number of replicas for the Deployment.
+replicaCount: 2
+
+## Container image configuration.
+image:
+  repository: ghcr.io/danyaltorabi/access-manager
+  tag: "latest"
+  pullPolicy: Always
+
+## Kubernetes Service configuration.
+service:
+  type: ClusterIP
+  port: 8080
+
+## Ingress configuration.
+ingress:
+  enabled: true
+  className: nginx
+  host: access-manager.local  # replace with your actual hostname
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "1m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+
+## Non-secret application configuration (mounted as env vars from ConfigMap).
+## Sensitive values (DATABASE_URL, API_BEARER_TOKEN) are read from Kubernetes Secrets;
+## see docs/kubernetes.md for secret creation instructions.
+config:
+  databaseDriver: "postgres"
+  migrationsDir: "migrations/postgres"
+  corsAllowedOrigins: "none"
+  shutdownTimeoutSeconds: "60"
+
+## Kubernetes Secret names and keys — must match docs/environments.md.
+## Secrets must be created manually before installing the chart.
+secrets:
+  db:
+    name: access-manager-db
+    key: url
+  auth:
+    name: access-manager-auth
+    key: token
+
+## Resource requests and limits for the app container.
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "200m"
+    memory: "128Mi"
+
+## Liveness probe configuration.
+livenessProbe:
+  initialDelaySeconds: 5
+  periodSeconds: 15
+  failureThreshold: 3
+  timeoutSeconds: 3
+
+## Readiness probe configuration.
+readinessProbe:
+  initialDelaySeconds: 3
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 3
+
+## In-cluster Postgres StatefulSet (for Minikube/dev only).
+## Set postgres.enabled=false for production and supply DATABASE_URL via the
+## access-manager-db Secret pointing at a managed Postgres instance.
+postgres:
+  enabled: true
+  image: postgres:15-alpine
+  storage: 10Gi
+  secretName: access-manager-postgres
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
