@@ -76,9 +76,10 @@ func (s *Store) GroupAuthzResourcesList(ctx context.Context, domainID, groupID s
 	}
 
 	maskSQL, maskArgs, err := buildInQueryAndArgs(
-		`SELECT p.resource_id, p.access_mask FROM permissions p `+ // #nosec G202
-			`INNER JOIN group_permissions gp ON gp.permission_id = p.id `+
-			`WHERE p.domain_id = ? AND gp.group_id = ? AND p.access_mask > 0 AND p.resource_id `,
+		`SELECT p.resource_id, p.access_mask FROM permissions p`+
+			` INNER JOIN group_permissions gp ON gp.permission_id = p.id`+
+			` WHERE p.domain_id = ? AND gp.group_id = ? AND p.access_mask > 0`,
+		"p.resource_id",
 		[]any{domainID, groupID},
 		resourceIDs,
 	)

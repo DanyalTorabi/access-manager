@@ -36,9 +36,9 @@ func inPlaceholders(n int) (string, error) {
 // UserAuthzResourcesList and returns the SQL and args in the exact placeholder
 // order to avoid call-site mistakes.
 func buildUserAuthzMaskQueryAndArgs(domainID string, resourceIDs []string, predicateArgs []any) (string, []any, error) {
-	baseSQL := `SELECT p.resource_id, p.access_mask FROM permissions p WHERE p.domain_id = ? AND p.access_mask > 0 AND p.resource_id ` // #nosec G202
+	baseSQL := `SELECT p.resource_id, p.access_mask FROM permissions p WHERE p.domain_id = ? AND p.access_mask > 0`
 	baseArgs := []any{domainID}
-	query, args, err := buildInQueryAndArgs(baseSQL, baseArgs, resourceIDs)
+	query, args, err := buildInQueryAndArgs(baseSQL, "p.resource_id", baseArgs, resourceIDs)
 	if err != nil {
 		return "", nil, err
 	}

@@ -92,11 +92,11 @@ func (s *Store) ResourceAuthzGroupsList(ctx context.Context, domainID, resourceI
 	}
 
 	maskSQL, maskArgs, err := buildInQueryAndArgs(
-		`SELECT gp.group_id, p.access_mask FROM permissions p `+ // #nosec G202
-			`INNER JOIN group_permissions gp ON gp.permission_id = p.id `+
-			`INNER JOIN groups g ON g.id = gp.group_id `+
-			`WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0 `+
-			`AND gp.group_id `,
+		`SELECT gp.group_id, p.access_mask FROM permissions p`+
+			` INNER JOIN group_permissions gp ON gp.permission_id = p.id`+
+			` INNER JOIN groups g ON g.id = gp.group_id`+
+			` WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0`,
+		"gp.group_id",
 		[]any{domainID, resourceID},
 		groupIDs,
 	)
@@ -246,10 +246,10 @@ func (s *Store) ResourceAuthzUsersList(ctx context.Context, domainID, resourceID
 
 	// Direct user grants on this resource.
 	directSQL, directArgs, err := buildInQueryAndArgs(
-		`SELECT up.user_id, p.access_mask FROM user_permissions up `+ // #nosec G202
-			`INNER JOIN permissions p ON p.id = up.permission_id `+
-			`WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0 `+
-			`AND up.user_id `,
+		`SELECT up.user_id, p.access_mask FROM user_permissions up`+
+			` INNER JOIN permissions p ON p.id = up.permission_id`+
+			` WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0`,
+		"up.user_id",
 		[]any{domainID, resourceID},
 		userIDs,
 	)
@@ -262,11 +262,11 @@ func (s *Store) ResourceAuthzUsersList(ctx context.Context, domainID, resourceID
 
 	// Indirect grants via group membership.
 	indirectSQL, indirectArgs, err := buildInQueryAndArgs(
-		`SELECT gm.user_id, p.access_mask FROM group_members gm `+ // #nosec G202
-			`INNER JOIN group_permissions gp ON gp.group_id = gm.group_id `+
-			`INNER JOIN permissions p ON p.id = gp.permission_id `+
-			`WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0 `+
-			`AND gm.user_id `,
+		`SELECT gm.user_id, p.access_mask FROM group_members gm`+
+			` INNER JOIN group_permissions gp ON gp.group_id = gm.group_id`+
+			` INNER JOIN permissions p ON p.id = gp.permission_id`+
+			` WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0`,
+		"gm.user_id",
 		[]any{domainID, resourceID},
 		userIDs,
 	)
