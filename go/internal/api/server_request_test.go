@@ -9,11 +9,9 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 
-	"github.com/dtorabi/access-manager/internal/logger"
 	"github.com/dtorabi/access-manager/internal/store"
 	"github.com/google/uuid"
 )
@@ -23,10 +21,7 @@ func dummyRequest() *http.Request {
 }
 
 func TestWriteStoreErr_allCases(t *testing.T) {
-	var buf bytes.Buffer
-	logger.Init(slog.LevelInfo, &buf)
-	t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
-
+	t.Parallel()
 	tests := []struct {
 		name    string
 		err     error
@@ -44,9 +39,11 @@ func TestWriteStoreErr_allCases(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			buf.Reset()
+			t.Parallel()
+			var buf bytes.Buffer
+			s := &Server{Log: slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))}
 			w := httptest.NewRecorder()
-			writeStoreErr(w, dummyRequest(), tt.err)
+			s.writeStoreErr(w, dummyRequest(), tt.err)
 			if w.Code != tt.want {
 				t.Fatalf("writeStoreErr(%v) = %d, want %d", tt.err, w.Code, tt.want)
 			}
@@ -65,15 +62,15 @@ func TestWriteStoreErr_allCases(t *testing.T) {
 }
 
 func TestWriteStoreErr_noSQLLeak(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
-	logger.Init(slog.LevelInfo, &buf)
-	t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
+	s := &Server{Log: slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))}
 
 	sqlDetail := "FOREIGN KEY constraint failed (errno 787)"
 	joined := fmt.Errorf("%w\n%s", store.ErrFKViolation, sqlDetail)
 
 	w := httptest.NewRecorder()
-	writeStoreErr(w, dummyRequest(), joined)
+	s.writeStoreErr(w, dummyRequest(), joined)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("want 400, got %d", w.Code)
 	}
@@ -89,12 +86,12 @@ func TestWriteStoreErr_noSQLLeak(t *testing.T) {
 }
 
 func TestWriteInternalErr_generic(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
-	logger.Init(slog.LevelInfo, &buf)
-	t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
+	s := &Server{Log: slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))}
 
 	w := httptest.NewRecorder()
-	writeInternalErr(w, dummyRequest(), fmt.Errorf("sql: database is closed"))
+	s.writeInternalErr(w, dummyRequest(), fmt.Errorf("sql: database is closed"))
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("want 500, got %d", w.Code)
 	}
@@ -130,12 +127,12 @@ func TestWriteInternalErr_misuse(t *testing.T) {
 	}
 	for _, tt := range sentinels {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var buf bytes.Buffer
-			logger.Init(slog.LevelError, &buf)
-			t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
+			s := &Server{Log: slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelError}))}
 
 			w := httptest.NewRecorder()
-			writeInternalErr(w, dummyRequest(), tt.err)
+			s.writeInternalErr(w, dummyRequest(), tt.err)
 
 			if w.Code != http.StatusInternalServerError {
 				t.Fatalf("want 500, got %d", w.Code)
@@ -756,19 +753,15 @@ func TestAPI_numericParseErrors_stableMessages(t *testing.T) {
 // logged at ERROR level with method and path so operators can identify the
 // failing endpoint. Because the status header is already committed, the only
 // observable signal is the log entry.
-//
-// NOTE: This test mutates the package-level logger via logger.Init.
-// t.Parallel() is intentionally omitted until T54 (injectable logger) lands.
-// See TODO(T54) in writeJSON.
 func TestWriteJSON_encodeErrorLogged(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
-	logger.Init(slog.LevelError, &buf)
-	t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
+	s := &Server{Log: slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelError}))}
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/api/v1/domains", nil)
 	// A channel is not JSON-serializable and will cause Encode to fail.
-	writeJSON(w, r, http.StatusOK, map[string]any{"v": make(chan int)})
+	s.writeJSON(w, r, http.StatusOK, map[string]any{"v": make(chan int)})
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("want status 200 (header already committed), got %d", w.Code)
@@ -844,11 +837,8 @@ func TestReadJSON_failureKindsLogged(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			logger.Init(slog.LevelWarn, &buf)
-			t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
-
-			ts, _ := newTestAPI(t)
+			t.Parallel()
+			ts, _, logBuf := newTestAPIWithLog(t)
 			res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(tt.body))
 			if err != nil {
 				t.Fatal(err)
@@ -862,9 +852,8 @@ func TestReadJSON_failureKindsLogged(t *testing.T) {
 
 			// Scan all log entries first, then assert. Failing on the first
 			// matching entry would mask later entries with the correct kind.
-			logBuf := buf.String()
 			var foundKind string
-			for _, line := range strings.Split(logBuf, "\n") {
+			for _, line := range strings.Split(logBuf.String(), "\n") {
 				line = strings.TrimSpace(line)
 				if line == "" {
 					continue
@@ -880,10 +869,10 @@ func TestReadJSON_failureKindsLogged(t *testing.T) {
 				break // take the first matching log entry
 			}
 			if foundKind == "" {
-				t.Fatalf("no 'request body decode failed' log entry found\nlog: %s", logBuf)
+				t.Fatalf("no 'request body decode failed' log entry found\nlog: %s", logBuf.String())
 			}
 			if foundKind != tt.wantKind {
-				t.Fatalf("kind=%q, want %q\nlog: %s", foundKind, tt.wantKind, logBuf)
+				t.Fatalf("kind=%q, want %q\nlog: %s", foundKind, tt.wantKind, logBuf.String())
 			}
 		})
 	}
@@ -892,11 +881,8 @@ func TestReadJSON_failureKindsLogged(t *testing.T) {
 // TestReadJSON_bodyTooLargeKindLogged asserts that a body exceeding the 1 MiB
 // limit returns 413 and logs kind=body_too_large.
 func TestReadJSON_bodyTooLargeKindLogged(t *testing.T) {
-	var buf bytes.Buffer
-	logger.Init(slog.LevelWarn, &buf)
-	t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
-
-	ts, _ := newTestAPI(t)
+	t.Parallel()
+	ts, _, logBuf := newTestAPIWithLog(t)
 	// Build a body just over 1 MiB; wrap in a JSON object so it parses until
 	// the size limit is hit.
 	oversized := `{"title":"` + strings.Repeat("x", maxRequestBodySize+1) + `"}`
@@ -911,9 +897,8 @@ func TestReadJSON_bodyTooLargeKindLogged(t *testing.T) {
 		t.Fatalf("want 413, got %d", res.StatusCode)
 	}
 
-	logBuf := buf.String()
 	var foundKind string
-	for _, line := range strings.Split(logBuf, "\n") {
+	for _, line := range strings.Split(logBuf.String(), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -928,7 +913,7 @@ func TestReadJSON_bodyTooLargeKindLogged(t *testing.T) {
 		}
 	}
 	if foundKind != "body_too_large" {
-		t.Fatalf("want kind=body_too_large in log, got %q\nlog: %s", foundKind, logBuf)
+		t.Fatalf("want kind=body_too_large in log, got %q\nlog: %s", foundKind, logBuf.String())
 	}
 }
 

@@ -1,7 +1,10 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -29,16 +32,41 @@ func newTestStore(t *testing.T) (store.Store, func()) {
 }
 
 // newTestAPI returns an HTTP test server backed by a real SQLite store and migrations.
+// The Server uses a discard logger so tests never mutate the package-level logger
+// and are safe to run in parallel. For tests that assert on log output use
+// newTestAPIWithLog instead.
 func newTestAPI(t *testing.T) (*httptest.Server, store.Store) {
 	t.Helper()
 	st, cleanup := newTestStore(t)
-	srv := &Server{Store: st}
+	srv := &Server{
+		Store: st,
+		Log:   slog.New(slog.NewJSONHandler(io.Discard, nil)),
+	}
 	ts := httptest.NewServer(srv.Router(nil, nil))
 	t.Cleanup(func() {
 		ts.Close()
 		cleanup()
 	})
 	return ts, st
+}
+
+// newTestAPIWithLog returns an HTTP test server, the underlying store, and a
+// bytes.Buffer that captures all log output from the Server. The handler writes
+// JSON log entries at DEBUG level so all log levels are visible to the test.
+func newTestAPIWithLog(t *testing.T) (*httptest.Server, store.Store, *bytes.Buffer) {
+	t.Helper()
+	st, cleanup := newTestStore(t)
+	var buf bytes.Buffer
+	srv := &Server{
+		Store: st,
+		Log:   slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})),
+	}
+	ts := httptest.NewServer(srv.Router(nil, nil))
+	t.Cleanup(func() {
+		ts.Close()
+		cleanup()
+	})
+	return ts, st, &buf
 }
 
 // mustPostJSON201 is a convenience wrapper for mustPostJSON with http.StatusCreated.
@@ -78,10 +106,11 @@ func auditLogEntriesWithAction(t *testing.T, buf, action string) []map[string]an
 	return out
 }
 
-// NOTE: Tests that call logger.Init mutate the package-level logger pointer.
-// No test in server_request_test.go uses t.Parallel() because of this.
-// Do NOT add t.Parallel() without first switching to a logger-injectable
-// Server field or an atomic pointer. Tracked on #47 (T36 follow-ups).
+// NOTE: Each test gets its own logger through Server.Log (set in newTestAPI /
+// newTestAPIWithLog / newBrokenTestAPIWithRegistry). The global logger is never
+// mutated in this package. t.Parallel() is safe to add to any test that does
+// not share state by other means (e.g. integration_test.go is sequential by
+// design; see its own comment).
 
 // newBrokenTestAPIWithRegistry builds a Server backed by a closed DB so any
 // store call returns an error. If reg is non-nil it is wired through Router
@@ -98,7 +127,10 @@ func newBrokenTestAPIWithRegistry(t *testing.T, reg *prometheus.Registry) *httpt
 	}
 	st := sqlstore.New(db)
 	_ = db.Close()
-	srv := &Server{Store: st}
+	srv := &Server{
+		Store: st,
+		Log:   slog.New(slog.NewJSONHandler(io.Discard, nil)),
+	}
 	var router http.Handler
 	if reg != nil {
 		router = srv.Router(reg, reg)

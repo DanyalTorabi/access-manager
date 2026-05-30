@@ -38,15 +38,6 @@ func (s *Server) serverLogger() *slog.Logger {
 	return logger.Get()
 }
 
-// logWith returns serverLogger enriched with the request method and path.
-// Callers may use it for per-request structured logging (see T55).
-func (s *Server) logWith(r *http.Request) *slog.Logger {
-	return s.serverLogger().With(
-		slog.String("method", r.Method),
-		slog.String("path", r.URL.Path),
-	)
-}
-
 // auditLog emits a structured audit event at INFO level with audit=true.
 func (s *Server) auditLog(ctx context.Context, action string, attrs ...slog.Attr) {
 	all := make([]slog.Attr, 0, len(attrs)+2)
