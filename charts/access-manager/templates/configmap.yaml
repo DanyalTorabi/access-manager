@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/component: config
 data:
   DATABASE_DRIVER: {{ .Values.config.databaseDriver | quote }}
-  HTTP_ADDR: "0.0.0.0:8080"
+  HTTP_ADDR: {{ .Values.config.httpAddr | quote }}
   MIGRATIONS_DIR: {{ .Values.config.migrationsDir | quote }}
   CORS_ALLOWED_ORIGINS: {{ .Values.config.corsAllowedOrigins | quote }}
   SHUTDOWN_TIMEOUT_SECONDS: {{ .Values.config.shutdownTimeoutSeconds | quote }}

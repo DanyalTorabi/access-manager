@@ -34,6 +34,9 @@ config:
   migrationsDir: "migrations/postgres"
   corsAllowedOrigins: "none"
   shutdownTimeoutSeconds: "60"
+  # Bind address for the HTTP server inside the pod.
+  # 0.0.0.0:8080 is required so the kubelet can reach the health probe endpoint.
+  httpAddr: "0.0.0.0:8080"
 
 ## Kubernetes Secret names and keys — must match docs/environments.md.
 ## Secrets must be created manually before installing the chart.
