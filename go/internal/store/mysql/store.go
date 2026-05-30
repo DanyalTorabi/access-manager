@@ -899,6 +899,9 @@ func inPlaceholders(n int) (string, error) {
 
 // buildUserAuthzMaskQueryAndArgs builds the batched mask query used by
 // UserAuthzResourcesList.
+// TODO(T05): the SQLite store consolidated this IN-clause pattern into
+// buildInQueryAndArgs (see internal/store/sqlite/store_authz_helpers.go).
+// Extract a shared sqlutil helper here when moving to a common package.
 func buildUserAuthzMaskQueryAndArgs(domainID string, resourceIDs []string, predicateArgs []any) (string, []any, error) {
 	placeholders, err := inPlaceholders(len(resourceIDs))
 	if err != nil {
@@ -1064,6 +1067,8 @@ func (s *Store) GroupAuthzResourcesList(ctx context.Context, domainID, groupID s
 	if err != nil {
 		return nil, 0, err
 	}
+	// TODO(T05): consolidate into a shared IN-clause helper (see SQLite precedent in
+	// internal/store/sqlite/store_authz_helpers.go) when adding a sqlutil package.
 	maskSQL := `SELECT p.resource_id, p.access_mask FROM permissions p ` + // #nosec G202
 		`INNER JOIN group_permissions gp ON gp.permission_id = p.id ` +
 		`WHERE p.domain_id = ? AND gp.group_id = ? AND p.resource_id IN (` + placeholders + `) AND p.access_mask > 0`
@@ -1165,6 +1170,8 @@ func (s *Store) ResourceAuthzGroupsList(ctx context.Context, domainID, resourceI
 	if err != nil {
 		return nil, 0, err
 	}
+	// TODO(T05): consolidate into a shared IN-clause helper (see SQLite precedent in
+	// internal/store/sqlite/store_authz_helpers.go) when adding a sqlutil package.
 	maskSQL := `SELECT gp.group_id, p.access_mask FROM permissions p ` + // #nosec G202
 		`INNER JOIN group_permissions gp ON gp.permission_id = p.id ` +
 		`INNER JOIN ` + "`groups`" + ` g ON g.id = gp.group_id ` +
@@ -1286,6 +1293,8 @@ func (s *Store) ResourceAuthzUsersList(ctx context.Context, domainID, resourceID
 
 	masksByUser := make(map[string]uint64, len(userIDs))
 
+	// TODO(T05): consolidate into a shared IN-clause helper (see SQLite precedent in
+	// internal/store/sqlite/store_authz_helpers.go) when adding a sqlutil package.
 	directSQL := `SELECT up.user_id, p.access_mask FROM user_permissions up ` + // #nosec G202
 		`INNER JOIN permissions p ON p.id = up.permission_id ` +
 		`WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0 ` +

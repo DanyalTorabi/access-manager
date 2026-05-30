@@ -10,21 +10,27 @@
 
 ## Goal
 
-Measure **authz check** latency and throughput under realistic data sizes: **Go benchmarks** on store layer and/or **k6** HTTP load against running server.
+Measure **authz check** latency and throughput under realistic data sizes: **Go benchmarks** on store layer and **k6** HTTP load against a running server. Also extract a shared mask-aggregation helper to deduplicate repeated `IN(?,…)` arg-building across four store listing methods.
 
 ## Deliverables
 
-- `internal/store/sqlite/bench_test.go` or dedicated `bench/` package.
-- Optional `k6` script in `test/load/authz.js` with env-driven base URL.
-- Document how to run in README; optional CI job (nightly, not every PR).
+- `go/internal/store/sqlite/store_authz_helpers.go` — shared `buildInQueryAndArgs` helper.
+- `go/internal/store/sqlite/bench_test.go` — Go benchmarks for the SQLite authz store layer.
+- `go/internal/access/mask_bench_test.go` — Go benchmarks for `access.CombineMasks`.
+- `test/load/authz.js` — k6 HTTP load script with env-driven base URL.
+- `test/load/RESULTS.md` — results placeholder for post-merge runs.
+- Updated `go/README.md` — benchmark and load-test usage docs.
+- Updated `CHANGELOG.md` — Unreleased entry.
 
 ## Steps
 
-1. Seed large fixture or generate synthetic domain/users/groups/permissions.
-2. Benchmark `EffectiveMask` and full HTTP `/authz/check`.
-3. Compare before/after **T4** if implemented.
+1. **Branch setup** — create `danyal/feature/t05-authz-benchmarks` from main; update this plan file. *(Commit 1)*
+2. **Shared helper** — extract `buildInQueryAndArgs(baseSQL string, baseArgs []any, ids []string) (string, []any, error)` in `store_authz_helpers.go`; update `GroupAuthzResourcesList`, `ResourceAuthzGroupsList`, and `ResourceAuthzUsersList` to use it. `buildUserAuthzMaskQueryAndArgs` in `store_authz_user_listing.go` delegates ID-list arg building to `buildInQueryAndArgs` as well. *(Commit 2)*
+3. **Go benchmarks** — `bench_test.go` for the SQLite store layer (`EffectiveMask`, `ResourceAuthzUsersList`, `UserAuthzResourcesList`, `ResourceAuthzGroupsList`, `GroupSetParent` deep-chain); `mask_bench_test.go` for `access.CombineMasks`. *(Commit 3)*
+4. **k6 load script** — `test/load/authz.js` with ramp-up stages, p99 < 50ms / error < 1% thresholds, and `setup()` seeding domain/user/resource/permission. Add `test/load/RESULTS.md` placeholder. *(Commit 4)*
+5. **Docs** — update `go/README.md` (Benchmarks + Load Tests sections) and `CHANGELOG.md` (Unreleased). *(Commit 5)*
 
-## Stress / soak (added)
+## Stress / soak
 
 Beyond micro-benchmarks and short k6 load runs, this ticket also covers **stress and soak** scenarios that intentionally push the server past its happy-path operating point to find breakage modes:
 
@@ -32,29 +38,29 @@ Beyond micro-benchmarks and short k6 load runs, this ticket also covers **stress
 - **Sustained soak**: run a steady moderate load (e.g. 50 VUs) for 30 minutes — watch for memory growth (`go_memstats_alloc_bytes`), goroutine leaks (`go_goroutines`), and SQLite WAL growth.
 - **Write-heavy stress**: many parallel writers issuing `POST /users`, `POST /permissions`, `PATCH ...` — confirm the store handles `SQLITE_BUSY` (or surfaces `503` / retry hints) instead of returning 500s.
 - **Mixed workload under failure injection**: kill the DB file mid-run (or `chmod 000` it briefly) and confirm the server returns 5xx cleanly and recovers when access is restored, without panicking or hanging.
-- Record results in a `test/load/RESULTS.md` (or appendix in the README) with date, hardware, server version, and parameters so regressions are visible release-over-release. Tie the release-cadence run into the **T66 / #102** release workflow as an optional pre-release gate.
+- Record results in `test/load/RESULTS.md` with date, hardware, server version, and parameters so regressions are visible release-over-release. Tie the release-cadence run into the **T66 / #102** release workflow as an optional pre-release gate.
 
 These stress runs are **not** in CI; they are run on demand or nightly via the optional CI job mentioned above.
 
-## Files / paths
-
-- **Create:** `*_test.go` with `func Benchmark*`, optional `test/load/*`
-
 ## Acceptance criteria
 
-- Reproducible numbers on a reference machine documented in results appendix.
+- `make test && make lint` pass with zero errors.
+- All benchmarks produce output without panics when run with `-bench=. -run='^$'`.
+- Reproducible numbers on a reference machine documented in `test/load/RESULTS.md`.
 
 ## Out of scope
 
 - Production load testing customer data.
+- Lowering `maxSteps` bound or switching `GroupSetParent` to recursive CTE (deferred; track in #16 follow-up).
 
-## Deferred from other PRs
+## Background: deferred items absorbed into Steps above
 
-- **From T44 (#59 / PR #71) review:** add a perf/regression benchmark for `Store.ResourceAuthzUsersList` (sqlite) that simulates large user/membership counts (1000+ users with mixed direct + group-inherited grants on a single resource). Today the implementation uses a per-user `EXISTS` predicate plus two batched `IN` aggregation queries, bounded by `store.MaxLimit` (100). The benchmark should both establish a baseline and let us evaluate a single-query GROUP BY / aggregated bit-OR alternative if numbers warrant it.
-- **From T45 (#60 / PR #73) review:** external-agent comments **CML3** and **CML9**.
-  - **CML3:** `Store.ResourceAuthzGroupsList` (and the sibling `ResourceAuthzUsersList` / `GroupAuthzResourcesList`) batch-aggregates masks via `IN (?, …)` clauses bounded by `store.MaxLimit` (100). Safe today against SQLite's parameter cap (≥999), but if `MaxLimit` is ever raised significantly the `IN` approach must be reworked (chunk the IDs or fold mask aggregation into the page-select). Add a benchmark that varies the page size near the SQLite parameter cap and document the chunking strategy when triggered.
-  - **CML9:** `GroupSetParent`'s parent-chain cycle detection uses a defensive `maxSteps = 1_000_000` loop. Not a hot path today, but for very deep / pathological tenant graphs this could become expensive. Add a benchmark over a deep parent chain (e.g. 10k+ levels) so we can decide whether to lower the bound, switch to recursive CTE, or memoise.
-  - **Shared mask-aggregation helper (PR #75 review):** the "select IDs, then `IN(...)` aggregate masks" pattern is repeated across `UserAuthzResourcesList`, `GroupAuthzResourcesList`, `ResourceAuthzUsersList`, and `ResourceAuthzGroupsList`. Each builds the placeholder list, the args slice, and the mask SQL inline. Extract a shared `(query string, args)` helper (similar to the existing `inPlaceholders`) so future edits don't have to keep four sites in sync, and so a single chunking implementation can serve all four when CML3 is acted on.
+The following items from previous PR reviews are addressed in this ticket:
+
+- **From T44 (#59 / PR #71) review (Step 3):** perf/regression benchmark for `Store.ResourceAuthzUsersList` simulating large user/membership counts (1000+ users with mixed direct + group-inherited grants). See `BenchmarkResourceAuthzUsersList` sub-cases Users100/Users500/Users1000.
+- **From T45 (#60 / PR #73) review — CML3 (Step 3):** benchmark that varies the page size near the SQLite parameter cap (`BenchmarkResourceAuthzGroupsList_PageNearParamCap`). The TODO comment in `store_authz_helpers.go` documents the chunking strategy for when `MaxLimit` is raised.
+- **From T45 (#60 / PR #73) review — CML9 (Step 3):** deep parent-chain benchmark (`BenchmarkGroupSetParent_DeepChain`) over chains of depth 100, 1000, and 10000.
+- **From PR #75 review — shared helper (Step 2):** `buildInQueryAndArgs` extracts the "select IDs, then `IN(...)` aggregate masks" pattern from `UserAuthzResourcesList`, `GroupAuthzResourcesList`, `ResourceAuthzUsersList`, and `ResourceAuthzGroupsList`.
 
 ## Dependencies
 

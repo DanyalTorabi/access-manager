@@ -50,7 +50,7 @@ From the **repository root** (not `go/`): **`make docker-build`**, **`make docke
 | `MIGRATIONS_DIR` | `migrations/sqlite` | Migration `.up.sql` directory — set to `migrations/postgres` or `migrations/mysql` for the matching driver (relative paths are resolved from the **process working directory** — run from `go/` or set an absolute path) |
 | `SHUTDOWN_TIMEOUT_SECONDS` | `30` | Max seconds to wait for graceful shutdown after **SIGINT** / **SIGTERM** |
 | `API_BEARER_TOKEN` | _(empty)_ | If set, all **`/api/v1/*`** routes require `Authorization: Bearer <token>`. **`/health`** stays public. Use a strong random value in production; never commit it. |
-| `CORS_ALLOWED_ORIGINS` | `*` | Comma-separated list of browser origins allowed via `Access-Control-Allow-Origin`. `*` reflects any request `Origin` header (without setting `Allow-Credentials`; use an explicit list for credentialed requests). Set to an explicit list (e.g. `https://app.example.com`) in production. Startup warning logged when `*` is used on a non-loopback address. Set to `none` (case-insensitive) to disable all CORS response headers — useful when a reverse proxy manages CORS and in-process headers should be suppressed entirely. |
+| `CORS_ALLOWED_ORIGINS` | `*` | Comma-separated list of browser origins allowed via `Access-Control-Allow-Origin`. `*` reflects any request `Origin` header (without setting `Allow-Credentials`; use an explicit list for credentialed requests). Set to an explicit list (e.g. `https://app.example.com`) in production. Set to `none` (case-insensitive, whitespace-trimmed) to disable all CORS response headers — useful when a reverse proxy manages CORS centrally. Startup warning logged when `*` is used on a non-loopback address. |
 
 Copy [`.env.example`](.env.example) to `.env` for local overrides; do **not** commit real secrets.
 
@@ -162,6 +162,46 @@ Server output is structured JSON via `internal/logger` (wrapping `log/slog`). Al
 | `migrations/mysql` | MySQL / MariaDB migrations |
 
 See [AGENTS.md](../AGENTS.md) for contributor rules, security, and **library vs HTTP** boundaries.
+
+## Benchmarks
+
+Run Go micro-benchmarks against the SQLite store layer (from **`go/`**):
+
+```sh
+# All benchmarks — 3 s per sub-benchmark:
+go test -bench=. -benchtime=3s -run='^$' ./internal/store/sqlite/ ./internal/access/
+
+# EffectiveMask only:
+go test -bench=BenchmarkEffectiveMask -benchtime=3s -run='^$' ./internal/store/sqlite/
+
+# Deep parent-chain cycle detection (slow — may take 30+ s; run in isolation):
+go test -bench=BenchmarkGroupSetParent_DeepChain -benchtime=30s -run='^$' ./internal/store/sqlite/
+```
+
+Benchmark results are not committed; run on a reference machine and record in [`test/load/RESULTS.md`](../test/load/RESULTS.md).
+
+## Load Tests (k6)
+
+Prerequisites: [k6](https://k6.io/docs/get-started/installation/) installed, server running at `BASE_URL`.
+
+Run from the **repo root** (not `go/`):
+
+```sh
+# Default (50 VUs, ~160 s ramp):
+k6 run test/load/authz.js
+
+# Custom base URL and bearer token:
+BASE_URL=http://localhost:8080 API_BEARER_TOKEN=secret k6 run test/load/authz.js
+
+# Saturation sweep — find the VU inflection point:
+k6 run --vus 200 --duration 60s test/load/authz.js
+k6 run --vus 500 --duration 30s test/load/authz.js
+
+# Soak test (30 min @ 50 VUs):
+k6 run --vus 50 --duration 30m test/load/authz.js
+```
+
+An optional nightly CI job (not required on every PR) can be wired via `.github/workflows/ci.yml`. Record results in [`test/load/RESULTS.md`](../test/load/RESULTS.md).
 
 ## License
 
