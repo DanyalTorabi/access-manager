@@ -157,4 +157,4 @@ User-facing or notable changes belong under **`## [Unreleased]`** in [CHANGELOG.
 
 ## License
 
-Add a `LICENSE` file when you publish the repository.
+Licensed under the [MIT License](LICENSE).
