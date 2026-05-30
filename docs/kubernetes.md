@@ -168,18 +168,24 @@ helm uninstall access-manager --namespace access-manager
 | Value | Default | Description |
 |-------|---------|-------------|
 | `image.tag` | `latest` | Image tag — use a pinned `sha-<sha>` in staging/production |
-| `image.pullPolicy` | `Always` | Set to `Never` when using a locally loaded Minikube image |
+| `image.pullPolicy` | `IfNotPresent` | Set to `Never` when using a locally loaded Minikube image |
 | `replicaCount` | `2` | Number of app replicas |
 | `ingress.enabled` | `true` | Toggle Ingress resource |
 | `ingress.host` | `access-manager.local` | Hostname — replace with your actual domain |
-| `postgres.enabled` | `true` | Deploy in-cluster Postgres StatefulSet |
+| `postgres.enabled` | `false` | Deploy in-cluster Postgres StatefulSet (dev/Minikube only) |
 | `postgres.storage` | `10Gi` | PVC size for in-cluster Postgres |
+| `postgres.storageClassName` | `""` | Storage class for PVC — empty uses cluster default |
 | `secrets.db.name` | `access-manager-db` | Name of the K8s Secret with `DATABASE_URL` |
 | `secrets.auth.name` | `access-manager-auth` | Name of the K8s Secret with `API_BEARER_TOKEN` |
 
 ---
 
 ## Minikube Local Testing
+
+> **Warning: Local only.** The example credentials below (`devpassword`, etc.) are for local
+> development only. Do not use them against any shared, staging, or cloud-hosted cluster.
+> See [docs/environments.md](environments.md) for the secret rotation procedure before
+> deploying to any shared environment.
 
 ```bash
 # Start cluster
