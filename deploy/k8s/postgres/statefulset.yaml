@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: access-manager
+  labels:
+    app.kubernetes.io/name: access-manager
+    app.kubernetes.io/component: postgres
+spec:
+  # serviceName must reference the headless Service (clusterIP: None) that governs
+  # the StatefulSet. The ClusterIP service 'postgres' is kept for app connectivity.
+  serviceName: postgres-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: access-manager
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: access-manager
+        app.kubernetes.io/component: postgres
+    spec:
+      # The official postgres image starts as root to initialise the data directory
+      # (chmod/chown /var/lib/postgresql/data) then drops to UID 999 (postgres)
+      # via su-exec internally. Do not set runAsNonRoot at the pod level.
+      securityContext:
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: postgres
+              containerPort: 5432
+              protocol: TCP
+          envFrom:
+            - secretRef:
+                name: access-manager-postgres
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 5
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          # postgres writes to its data directory so readOnlyRootFilesystem cannot be set.
+          # Drop all capabilities and disallow privilege escalation at the container level.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+              subPath: pgdata
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        # Leave storageClassName empty to use the cluster default storage class.
+        # For cloud providers set this to the appropriate class, e.g.:
+        #   gke: standard-rwo  eks: gp3  aks: managed-premium
+        storageClassName: ""
+        resources:
+          requests:
+            storage: 10Gi

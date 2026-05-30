@@ -11,3 +11,14 @@ dist/
 .idea/
 .vscode/
 comments-PR*.md
+
+# Kubernetes: prevent real secret files from being committed.
+# Use secret.example (no .yaml extension) as a reference and create secrets with kubectl.
+# If you create a local copy with .yaml extension, it will be ignored:
+deploy/k8s/*.secret.yaml
+deploy/k8s/**/*.secret.yaml
+# Explicit catch for the most obvious copy-paste names:
+deploy/k8s/secret.yaml
+deploy/k8s/secrets.yaml
+deploy/k8s/postgres/secret.yaml
+deploy/k8s/postgres/secrets.yaml

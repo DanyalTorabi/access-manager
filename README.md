@@ -68,6 +68,20 @@ make docker-down
 - **[docker-compose.yml](docker-compose.yml)** — `app` service  
 - **[.dockerignore](.dockerignore)**
 
+## Kubernetes
+
+Raw manifests and a Helm chart are provided under **[`deploy/k8s/`](deploy/k8s/)** and **[`charts/access-manager/`](charts/access-manager/)**. Both include liveness/readiness probes on `/health`, non-root pod security (distroless `nonroot` UID 65532), resource limits, and an optional in-cluster Postgres StatefulSet for dev/Minikube. Production deployments should use a managed database and supply the DSN via a K8s Secret.
+
+**Full guide:** [docs/kubernetes.md](docs/kubernetes.md)
+
+```bash
+# Quick dry-run
+kubectl apply --dry-run=client -f deploy/k8s/
+
+# Helm lint
+helm lint charts/access-manager/
+```
+
 ## Observability
 
 Prometheus metrics are exported at **`/metrics`** (outside bearer auth, like `/health`). Compose includes **Prometheus** and **Grafana** services bound to loopback:

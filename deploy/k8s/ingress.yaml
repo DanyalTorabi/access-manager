@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: access-manager
+  namespace: access-manager
+  labels:
+    app.kubernetes.io/name: access-manager
+    app.kubernetes.io/component: ingress
+  annotations:
+    # nginx ingress controller — adjust annotations for your cluster's controller.
+    nginx.ingress.kubernetes.io/proxy-body-size: "1m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: access-manager.local  # replace with your actual hostname
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: access-manager
+                port:
+                  name: http
