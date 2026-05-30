@@ -1,12 +1,12 @@
 module github.com/dtorabi/access-manager
 
-go 1.25.0
-
-toolchain go1.25.9
+go 1.25.10
 
 require (
 	github.com/go-chi/chi/v5 v5.2.5
+	github.com/go-sql-driver/mysql v1.10.0
 	github.com/google/uuid v1.6.0
+	github.com/lib/pq v1.12.3
 	github.com/prometheus/client_golang v1.23.2
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.47.0
@@ -17,9 +17,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/go-sql-driver/mysql v1.10.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
-	github.com/lib/pq v1.12.3 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
