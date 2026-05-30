@@ -2,7 +2,6 @@ package logger
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"log/slog"
 	"testing"
@@ -59,34 +58,6 @@ func TestError(t *testing.T) {
 	}
 	if m["error"] != "fail" {
 		t.Fatalf("want error=fail, got %v", m["error"])
-	}
-}
-
-func TestAudit(t *testing.T) {
-	var buf bytes.Buffer
-	Init(slog.LevelInfo, &buf)
-
-	Audit(context.Background(), "grant_user_permission",
-		slog.String("domain_id", "d1"),
-		slog.String("user_id", "u1"),
-		slog.String("permission_id", "p1"),
-	)
-
-	var m map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &m); err != nil {
-		t.Fatalf("invalid JSON: %v — raw: %s", err, buf.String())
-	}
-	if m["msg"] != "audit" {
-		t.Fatalf("want msg=audit, got %v", m["msg"])
-	}
-	if m["audit"] != true {
-		t.Fatalf("want audit=true, got %v", m["audit"])
-	}
-	if m["action"] != "grant_user_permission" {
-		t.Fatalf("want action=grant_user_permission, got %v", m["action"])
-	}
-	if m["domain_id"] != "d1" {
-		t.Fatalf("want domain_id=d1, got %v", m["domain_id"])
 	}
 }
 

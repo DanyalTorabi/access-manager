@@ -38,12 +38,3 @@ func Warn(msg string, attrs ...slog.Attr) {
 func Error(msg string, attrs ...slog.Attr) {
 	l.LogAttrs(context.Background(), slog.LevelError, msg, attrs...)
 }
-
-// Audit emits a structured audit event at INFO level with audit=true.
-// Use for security-relevant mutations (grants, revokes, entity changes).
-func Audit(ctx context.Context, action string, attrs ...slog.Attr) {
-	all := make([]slog.Attr, 0, len(attrs)+2)
-	all = append(all, slog.Bool("audit", true), slog.String("action", action))
-	all = append(all, attrs...)
-	l.LogAttrs(ctx, slog.LevelInfo, "audit", all...)
-}
