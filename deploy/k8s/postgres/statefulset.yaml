@@ -81,6 +81,10 @@ spec:
       spec:
         accessModes:
           - ReadWriteOnce
+        # Leave storageClassName empty to use the cluster default storage class.
+        # For cloud providers set this to the appropriate class, e.g.:
+        #   gke: standard-rwo  eks: gp3  aks: managed-premium
+        storageClassName: ""
         resources:
           requests:
             storage: 10Gi

@@ -73,6 +73,11 @@ spec:
       spec:
         accessModes:
           - ReadWriteOnce
+        {{- if .Values.postgres.storageClassName }}
+        storageClassName: {{ .Values.postgres.storageClassName | quote }}
+        {{- else if (hasKey .Values.postgres "storageClassName") }}
+        storageClassName: ""
+        {{- end }}
         resources:
           requests:
             storage: {{ .Values.postgres.storage }}

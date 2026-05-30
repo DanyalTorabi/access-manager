@@ -87,6 +87,9 @@ postgres:
   enabled: false
   image: postgres:15-alpine
   storage: 10Gi
+  # storageClassName for the PVC. Empty string uses the cluster default storage class.
+  # For cloud providers use the appropriate class, e.g.: gke=standard-rwo, eks=gp3, aks=managed-premium.
+  storageClassName: ""
   secretName: access-manager-postgres
   resources:
     requests:
