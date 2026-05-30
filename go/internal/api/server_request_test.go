@@ -116,6 +116,7 @@ func TestWriteInternalErr_generic(t *testing.T) {
 // still returning a generic 500 to the client — making the wrong call site
 // immediately visible in production.
 func TestWriteInternalErr_misuse(t *testing.T) {
+	t.Parallel()
 	sentinels := []struct {
 		name string
 		err  error
@@ -155,6 +156,7 @@ func TestWriteInternalErr_misuse(t *testing.T) {
 
 // newBrokenTestAPIWithRegistry builds a Server backed by a closed DB so any
 func TestAPI_storeErrors(t *testing.T) {
+	t.Parallel()
 	ts := newBrokenTestAPI(t)
 	domID := uuid.NewString()
 	userID := uuid.NewString()
@@ -243,6 +245,7 @@ func TestAPI_storeErrors(t *testing.T) {
 // --- pagination tests ---
 
 func TestAPI_patchEmptyBody_allEntities(t *testing.T) {
+	t.Parallel()
 	ts, _ := newTestAPI(t)
 	dom := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + dom
@@ -299,6 +302,7 @@ func TestAPI_patchEmptyBody_allEntities(t *testing.T) {
 }
 
 func TestAPI_pagination_invalidOffset(t *testing.T) {
+	t.Parallel()
 	ts, _ := newTestAPI(t)
 	tests := []struct {
 		name string
@@ -324,6 +328,7 @@ func TestAPI_pagination_invalidOffset(t *testing.T) {
 }
 
 func TestAPI_pagination_limitClamping(t *testing.T) {
+	t.Parallel()
 	ts, _ := newTestAPI(t)
 	mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"d"}`)
 
@@ -345,6 +350,7 @@ func TestAPI_pagination_limitClamping(t *testing.T) {
 }
 
 func TestAPI_pagination_offsetPastEnd(t *testing.T) {
+	t.Parallel()
 	ts, _ := newTestAPI(t)
 	mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"d"}`)
 
@@ -369,6 +375,7 @@ func TestAPI_pagination_offsetPastEnd(t *testing.T) {
 }
 
 func TestAPI_pagination_invalidOffset_otherEndpoints(t *testing.T) {
+	t.Parallel()
 	ts, _ := newTestAPI(t)
 	dom := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + dom
@@ -399,6 +406,7 @@ func TestAPI_pagination_invalidOffset_otherEndpoints(t *testing.T) {
 }
 
 func TestAPI_scopedList_pagination(t *testing.T) {
+	t.Parallel()
 	ts, _ := newTestAPI(t)
 	dom := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + dom
@@ -457,6 +465,7 @@ func TestAPI_scopedList_pagination(t *testing.T) {
 }
 
 func TestAPI_parseListOpts(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name           string
 		qs             string
@@ -513,6 +522,7 @@ func TestAPI_parseListOpts(t *testing.T) {
 }
 
 func TestAPI_parseSortOrder(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		qs        string
@@ -556,6 +566,7 @@ func TestAPI_parseSortOrder(t *testing.T) {
 }
 
 func TestAPI_readJSON_tooLargeBody(t *testing.T) {
+	t.Parallel()
 	ts, _ := newTestAPI(t)
 	bigBody := `{"title":"` + strings.Repeat("x", 2*1024*1024) + `"}`
 	res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(bigBody))
@@ -575,6 +586,7 @@ func TestAPI_readJSON_tooLargeBody(t *testing.T) {
 // wrapped by an outer fmt.Errorf("%w", err). This is the regression that T48
 // fixed.
 func TestPublicInvalidInputMsg_typedExtraction(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		err  error
@@ -601,6 +613,7 @@ func TestPublicInvalidInputMsg_typedExtraction(t *testing.T) {
 // rejection path returns a stable sentinel error and never embeds the raw
 // strconv message or the user input.
 func TestParseUint64Validated(t *testing.T) {
+	t.Parallel()
 	const max = maxAccessMask // 1<<63 - 1
 	type tc struct {
 		name    string
@@ -666,6 +679,7 @@ func TestParseUint64Validated(t *testing.T) {
 // numeric input on every handler that parses bit / access_mask. Status code
 // is asserted before the body is read.
 func TestAPI_numericParseErrors_stableMessages(t *testing.T) {
+	t.Parallel()
 	ts, _ := newTestAPI(t)
 	dom := seedDomain(t, ts, "test-domain")
 	base := ts.URL + "/api/v1/domains/" + dom
@@ -792,6 +806,7 @@ func TestWriteJSON_encodeErrorLogged(t *testing.T) {
 // TestReadJSON_trailingDataRejected asserts that sending two JSON objects in a
 // single request body returns 400 with a stable, client-safe message.
 func TestReadJSON_trailingDataRejected(t *testing.T) {
+	t.Parallel()
 	ts, _ := newTestAPI(t)
 	// Second JSON object after the first — trailing data.
 	body := `{"title":"first"}{"title":"second"}`
@@ -817,6 +832,7 @@ func TestReadJSON_trailingDataRejected(t *testing.T) {
 // TestReadJSON_failureKindsLogged asserts that readJSON logs the correct
 // structured kind label for each class of decode failure.
 func TestReadJSON_failureKindsLogged(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		body       string
