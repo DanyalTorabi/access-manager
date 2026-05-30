@@ -329,8 +329,12 @@ func BenchmarkGroupSetParent_DeepChain(b *testing.B) {
 			s := newBenchStore(b)
 			domainID := seedBenchDomain(b, s)
 
-			// Batch-insert the chain inside one transaction to avoid 10 000
-			// individual auto-commit round-trips, which would dominate setup time.
+			// Batch-insert the chain inside one transaction using raw SQL to
+			// avoid N individual auto-commit round-trips that would dominate
+			// setup time at depth=10 000.  This intentionally bypasses the
+			// GroupCreate business logic (ID uniqueness checks, event hooks) —
+			// the benchmark is measuring GroupSetParent, not GroupCreate, so
+			// only the schema invariants (FK, unique id) need to be satisfied.
 			tx, err := s.db.BeginTx(ctx, nil)
 			if err != nil {
 				b.Fatal(err)
@@ -354,10 +358,12 @@ func BenchmarkGroupSetParent_DeepChain(b *testing.B) {
 				b.Fatal(err)
 			}
 
-			// Create a leaf group that will be re-parented to group(depth-1)
-			// on every iteration. Re-parenting triggers the full chain walk.
+			// Create a leaf group that will be re-parented on every iteration.
+			// Alternate between the last two chain nodes so each call changes the
+			// parent and walks the full chain (avoids a potential idempotent
+			// short-circuit if one is ever added to GroupSetParent).
 			leafID := "chain-leaf"
-			leafParent := ids[depth-1]
+			parents := [2]string{ids[depth-1], ids[depth-2]}
 			if err := s.GroupCreate(ctx, &store.Group{ID: leafID, DomainID: domainID, Title: "leaf"}); err != nil {
 				b.Fatal(err)
 			}
@@ -365,7 +371,8 @@ func BenchmarkGroupSetParent_DeepChain(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				if err := s.GroupSetParent(ctx, domainID, leafID, &leafParent); err != nil {
+				p := parents[i%2]
+				if err := s.GroupSetParent(ctx, domainID, leafID, &p); err != nil {
 					b.Fatal(err)
 				}
 			}
