@@ -234,12 +234,13 @@ func BenchmarkResourceAuthzUsersList(b *testing.B) {
 }
 
 // BenchmarkUserAuthzResourcesList measures listing resources with effective
-// masks for a user at increasing resource counts.
+// masks for a user at increasing resource counts.  Two sub-cases exercise
+// the two code paths inside the query: direct grants and group-inherited grants.
 func BenchmarkUserAuthzResourcesList(b *testing.B) {
 	ctx := context.Background()
 
 	for _, n := range []int{10, 100} {
-		b.Run(fmt.Sprintf("Resources%d", n), func(b *testing.B) {
+		b.Run(fmt.Sprintf("Direct/Resources%d", n), func(b *testing.B) {
 			s := newBenchStore(b)
 			domainID := seedBenchDomain(b, s)
 
@@ -258,6 +259,46 @@ func BenchmarkUserAuthzResourcesList(b *testing.B) {
 					b.Fatal(err)
 				}
 				if err := s.GrantUserPermission(ctx, domainID, uid, pid); err != nil {
+					b.Fatal(err)
+				}
+			}
+
+			opts := store.ListOpts{Limit: store.MaxLimit}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if _, _, err := s.UserAuthzResourcesList(ctx, domainID, uid, opts); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+
+		b.Run(fmt.Sprintf("GroupInherited/Resources%d", n), func(b *testing.B) {
+			s := newBenchStore(b)
+			domainID := seedBenchDomain(b, s)
+
+			uid := "bench-user"
+			if err := s.UserCreate(ctx, &store.User{ID: uid, DomainID: domainID, Title: "u"}); err != nil {
+				b.Fatal(err)
+			}
+			gid := "bench-group"
+			if err := s.GroupCreate(ctx, &store.Group{ID: gid, DomainID: domainID, Title: "g"}); err != nil {
+				b.Fatal(err)
+			}
+			if err := s.AddUserToGroup(ctx, domainID, uid, gid); err != nil {
+				b.Fatal(err)
+			}
+
+			for i := 0; i < n; i++ {
+				rid := fmt.Sprintf("r-%d", i)
+				if err := s.ResourceCreate(ctx, &store.Resource{ID: rid, DomainID: domainID, Title: rid}); err != nil {
+					b.Fatal(err)
+				}
+				pid := fmt.Sprintf("p-%d", i)
+				if err := s.PermissionCreate(ctx, &store.Permission{ID: pid, DomainID: domainID, Title: pid, ResourceID: rid, AccessMask: 1}); err != nil {
+					b.Fatal(err)
+				}
+				if err := s.GrantGroupPermission(ctx, domainID, gid, pid); err != nil {
 					b.Fatal(err)
 				}
 			}
