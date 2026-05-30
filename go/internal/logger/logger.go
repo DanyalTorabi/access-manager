@@ -19,7 +19,11 @@ func Init(level slog.Level, w io.Writer) {
 	l = slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{Level: level}))
 }
 
-// Get returns the package-level logger.
+// Get returns the package-level logger. The returned pointer is valid only after
+// Init has been called and must not be used concurrently with Init. In
+// production, Init is called once at startup before any request handlers run,
+// so subsequent Get() calls are safe. Tests must not call Init after the server
+// starts (use Server.Log for per-test log capture instead).
 func Get() *slog.Logger {
 	return l
 }
