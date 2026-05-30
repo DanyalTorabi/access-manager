@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **T68 / #119:** `go 1.25.10` resolves GO-2026-4971 — Windows-only panic in `net.Dial`/`LookupPort` on NUL byte. Does not affect this Linux server binary; bumped proactively. Primary motivation is toolchain alignment (see `### Changed`).
+
+### Changed
+
+- **T68 / #119:** `go/go.mod` `go` directive raised from `1.25.0` to `1.25.10`. The redundant `toolchain` line was removed by `go mod tidy` (unnecessary once the `go` directive equals the installed version). The `Set GOTOOLCHAIN from go.mod` workaround steps removed from all three CI jobs (`go`, `docker`, `integration`); `actions/setup-go@v5` now installs the correct version directly from the `go` directive, eliminating the runtime toolchain download.
+
 ### Added
 
 - **T64 / #100:** Added `LICENSE` file (MIT). The repository is now unambiguously open-source under the MIT License (`Copyright (c) 2026 Danyal Torabi`). `README.md` and `go/README.md` updated to reference it.

@@ -24,15 +24,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Use the exact toolchain from go.mod to avoid version mismatch between
-      # the installed Go and the auto-downloaded toolchain (golang/go#75031).
-      - name: Set GOTOOLCHAIN from go.mod
-        working-directory: ${{ github.workspace }}
-        run: |
-          TC=$(sed -n 's/^toolchain //p' go/go.mod | head -1)
-          [ -z "$TC" ] && TC="go$(sed -n 's/^go //p' go/go.mod | head -1)"
-          echo "GOTOOLCHAIN=${TC}" >> "$GITHUB_ENV"
-
       - uses: actions/setup-go@v5
         with:
           go-version-file: go/go.mod
@@ -71,12 +62,6 @@ jobs:
           echo "Health check failed after ~60s"
           exit 1
 
-      - name: Set GOTOOLCHAIN from go.mod (e2e)
-        run: |
-          TC=$(sed -n 's/^toolchain //p' go/go.mod | head -1)
-          [ -z "$TC" ] && TC="go$(sed -n 's/^go //p' go/go.mod | head -1)"
-          echo "GOTOOLCHAIN=${TC}" >> "$GITHUB_ENV"
-
       - uses: actions/setup-go@v5
         with:
           go-version-file: go/go.mod
@@ -101,13 +86,6 @@ jobs:
         working-directory: go
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set GOTOOLCHAIN from go.mod
-        working-directory: ${{ github.workspace }}
-        run: |
-          TC=$(sed -n 's/^toolchain //p' go/go.mod | head -1)
-          [ -z "$TC" ] && TC="go$(sed -n 's/^go //p' go/go.mod | head -1)"
-          echo "GOTOOLCHAIN=${TC}" >> "$GITHUB_ENV"
 
       - uses: actions/setup-go@v5
         with:

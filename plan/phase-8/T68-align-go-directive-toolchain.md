@@ -25,20 +25,19 @@ This also caused local lint runs to print:
 go: github.com/golangci/golangci-lint/v2@v2.11.4 requires go >= 1.25.0; switching to go1.25.10
 ```
 
-The drift to 1.25.10 was a secondary effect of golangci-lint's own `go.mod` pulling a newer patch, compounding the version confusion.
+This message is the authoritative signal for the correct minimum toolchain: golangci-lint's own dependency graph requires `go1.25.10`. The correct fix target was therefore `go 1.25.10`, not `go 1.25.9`.
 
 **Discovered during:** PR #118 (T22) review — pre-existing, not introduced by T22.
 
 ## Fix
 
-Raise the `go` directive in `go/go.mod` to match the `toolchain` directive:
+Raise the `go` directive in `go/go.mod` to `1.25.10` (the minimum required by the dependency graph):
 
 ```
-go 1.25.9
-toolchain go1.25.9
+go 1.25.10
 ```
 
-Run `go mod tidy` after the change. The `toolchain` line becomes redundant once `go` matches it, but keeping it explicit is harmless and makes intent clear.
+Run `go mod tidy` after the change. The `toolchain` line is removed automatically by `go mod tidy` because it becomes redundant once the `go` directive equals or exceeds the previously declared toolchain. As a secondary benefit, `go1.25.10` also resolves stdlib vulnerability GO-2026-4971 (Windows-only panic in `net.Dial`/`LookupPort` on NUL byte).
 
 ## Steps
 
@@ -50,11 +49,11 @@ Run `go mod tidy` after the change. The `toolchain` line becomes redundant once 
 ## Files / paths
 
 - **Modify:** `go/go.mod`
-- **Possibly simplify:** `.github/workflows/ci.yml` (GOTOOLCHAIN step)
+- **Modify:** `.github/workflows/ci.yml` — removed the `Set GOTOOLCHAIN from go.mod` workaround steps from all three jobs (`go`, `docker`, `integration`); `actions/setup-go@v5` installs the correct version directly from the `go` directive now that `go` and `toolchain` are aligned
 
 ## Acceptance criteria
 
-- `go/go.mod` `go` directive matches `toolchain` directive.
+- `go/go.mod` has a single `go` directive set to `1.25.10`; no separate `toolchain` directive.
 - `make test` and `make lint` pass locally.
 - CI no longer logs a toolchain download or version-switch message.
 
