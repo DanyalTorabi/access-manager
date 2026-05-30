@@ -74,10 +74,10 @@ readinessProbe:
 terminationGracePeriodSeconds: 75
 
 ## In-cluster Postgres StatefulSet (for Minikube/dev only).
-## Set postgres.enabled=false for production and supply DATABASE_URL via the
-## access-manager-db Secret pointing at a managed Postgres instance.
+## Disabled by default — production should use a managed Postgres instance.
+## Enable for local dev: helm install access-manager charts/access-manager/ --set postgres.enabled=true
 postgres:
-  enabled: true
+  enabled: false
   image: postgres:15-alpine
   storage: 10Gi
   secretName: access-manager-postgres

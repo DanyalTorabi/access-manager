@@ -134,8 +134,9 @@ helm template access-manager charts/access-manager/ | kubectl apply --dry-run=cl
 ### Install
 
 ```bash
-# With default values (postgres.enabled=true, image.tag=latest)
+# Dev/Minikube: enable in-cluster Postgres
 helm install access-manager charts/access-manager/ \
+  --set postgres.enabled=true \
   --namespace access-manager \
   --create-namespace
 
