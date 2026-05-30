@@ -48,7 +48,7 @@ Before reviewing code, read context files to understand what the PR is **suppose
 2. **Plan file** — Find the matching plan file under `plan/` by ticket number from the PR body (e.g. `plan/phase-6/T21-kubernetes.md`). Read it fully.
 3. **CHANGELOG.md** — Check the Unreleased section for the PR's declared deliverables.
 4. **Referenced issues** — If the PR body contains `Fixes #N` or `Closes #N`, read the GitHub issue with `gh issue view N`.
-5. **Existing review comments** — Run `gh pr review [PRN] --comments` or check `comments-PR#[PRN].md` if it already exists, to avoid duplicating known issues.
+5. **Existing review comments** — Run `gh pr view [PRN] --comments` to read existing review comments, or check `comments-PR#[PRN].md` if it already exists, to avoid duplicating known issues.
 
 Use this context to calibrate:
 - What the PR intends to deliver.
