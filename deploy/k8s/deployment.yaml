@@ -29,6 +29,9 @@ spec:
         runAsUser: 65532
         runAsGroup: 65532
         fsGroup: 65532
+      # Allow the app to finish graceful shutdown before SIGKILL.
+      # Must exceed SHUTDOWN_TIMEOUT_SECONDS (60) plus a safety buffer.
+      terminationGracePeriodSeconds: 75
       containers:
         - name: server
           # Replace :latest with a pinned sha tag before deploying to staging/production.
@@ -59,7 +62,9 @@ spec:
             httpGet:
               path: /health
               port: http
-            initialDelaySeconds: 5
+            # The server runs DB migrations before binding HTTP. Allow at least 30s
+            # for the first-deploy migration run before the liveness probe fires.
+            initialDelaySeconds: 30
             periodSeconds: 15
             failureThreshold: 3
             timeoutSeconds: 3

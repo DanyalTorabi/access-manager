@@ -56,7 +56,8 @@ resources:
 
 ## Liveness probe configuration.
 livenessProbe:
-  initialDelaySeconds: 5
+  # Allow at least 30s for DB migrations to complete on first deploy before the probe fires.
+  initialDelaySeconds: 30
   periodSeconds: 15
   failureThreshold: 3
   timeoutSeconds: 3
@@ -67,6 +68,10 @@ readinessProbe:
   periodSeconds: 10
   failureThreshold: 3
   timeoutSeconds: 3
+
+## Graceful shutdown: must exceed config.shutdownTimeoutSeconds plus a safety buffer.
+## Kubernetes default is 30s which is less than SHUTDOWN_TIMEOUT_SECONDS=60.
+terminationGracePeriodSeconds: 75
 
 ## In-cluster Postgres StatefulSet (for Minikube/dev only).
 ## Set postgres.enabled=false for production and supply DATABASE_URL via the
