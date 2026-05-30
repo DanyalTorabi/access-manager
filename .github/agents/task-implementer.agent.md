@@ -34,10 +34,10 @@ Compare the plan file with the GitHub issue. Then produce a written plan that in
 - **Scope summary** — what this ticket delivers and what it explicitly excludes
 - **Refinements needed** — list any gaps, contradictions, or outdated details in the plan file that should be updated before starting
 - **GitHub issue refinements** — note any title or description improvements to suggest (do NOT edit the issue unless the user confirms)
-- **Branch name** — format: `danyal/feat/t[TICKET]-short-kebab-description` (lowercase; author segment is always `danyal`)
+- **Branch name** — format: `danyal/feature/t[TICKET]-short-kebab-description` (lowercase; author segment is always `danyal`)
 - **Step-by-step implementation steps** — ordered, each small enough to warrant a single commit
 - **Commit message for each step** — imperative mood, references the issue: `Refs #[ISSUE]`
-- **Test commands** to run before the PR: `make type-check && make lint && make test-run && make build`
+- **Test commands** to run before the PR: `make test && make lint`
 - **PR title** — format: `[T[TICKET]] short imperative title`
 - **PR body draft** — must include `Closes #[ISSUE]` or `Refs #[ISSUE]`
 
@@ -63,7 +63,7 @@ Execute the plan step by step.
    ```
 2. Create the branch:
    ```bash
-   git checkout -b danyal/feat/t[TICKET]-short-kebab-description
+   git checkout -b danyal/feature/t[TICKET]-short-kebab-description
    ```
 
 ### Per step
@@ -88,16 +88,16 @@ For each implementation step in the plan:
 
 After all steps are done, run the full suite:
 ```bash
-make type-check && make lint && make test-run && make build
+make test && make lint
 ```
 
-All must pass with zero errors and zero warnings before continuing.
+All must pass with zero errors before continuing.
 
 ### Push and PR
 
 1. Push the branch:
    ```bash
-   git push -u origin danyal/feat/t[TICKET]-short-kebab-description
+   git push -u origin danyal/feature/t[TICKET]-short-kebab-description
    ```
 2. Show the user the proposed PR title and body for review.
 3. Only create the PR after explicit user confirmation:
@@ -110,10 +110,9 @@ All must pass with zero errors and zero warnings before continuing.
 ## Constraints
 
 - **Branch author segment is always `danyal`** — never `copilot`, `claude`, `cursor`, or any AI tool name.
-- **Never hardcode secrets** — `VITE_API_BEARER_TOKEN` and similar env vars must stay in `.env.local` only.
-- **Layer boundaries** — pages → hooks → `api/*.ts` → `api/client.ts`. Do not cross layers.
-- **TypeScript strict** — no `any`, no `@ts-ignore` without justification.
-- **No unused code** — do not add speculative functions, types, or components.
+- **Never hardcode secrets** — `API_BEARER_TOKEN` and similar values must come from environment variables or `config.yaml`; never appear in committed source files. See `go/.env.example`.
+- **Layer boundaries** — `cmd/server` → `internal/api` (chi, HTTP) → `internal/store` (interface) → `internal/store/sqlite` (impl). `internal/access` and `internal/store` must not import chi or net/http.
+- **No unused code** — do not add speculative functions, types, or methods with no callers. Reference the ticket for any deferred code.
 - **Always show proposed commit messages and PR body** before running `git commit`, `git push`, or `gh pr create`.
 - **Destructive actions require confirmation** — never `git reset --hard`, `git push --force`, or `rm -rf` without explicit user approval.
 - **Do not skip plan phase** — never start coding without presenting and confirming the plan first.
@@ -123,15 +122,14 @@ All must pass with zero errors and zero warnings before continuing.
 ## Architecture reminder
 
 ```
-pages/   →  hooks/   →  api/*.ts   →  api/client.ts
+cmd/server  →  internal/api  →  internal/store (interface)  →  internal/store/sqlite
 ```
 
-- Pages: render + local UI state only
-- Hooks: TanStack Query (`useQuery` / `useMutation`)
-- `api/*.ts`: named typed functions per entity
-- `api/client.ts`: fetch wrapper, `ApiError`, auth header
-- Forms: React Hook Form + `zodResolver`
-- Tables: TanStack Table `useReactTable`
-- Query keys must include all variables the query depends on
-- Always `invalidateQueries` after successful mutations
-- Use `cn()` from `src/lib/utils.ts` for conditional class merging
+- `cmd/server`: config (env/yaml), DB open, migrate, HTTP listen
+- `internal/api`: HTTP routes and chi handlers — no business rules
+- `internal/access` + `internal/store`: library-oriented; no chi/net/http imports
+- `internal/store/sqlite`: SQLite implementation of `store.Store`
+- Run `go` commands from `go/`; run `make` from repo root or `go/`
+- After logic changes: `make test`
+- After lint-sensitive changes: `make lint`
+- For larger or risky changes: `make cover`
