@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/dtorabi/access-manager/internal/access"
-	"github.com/dtorabi/access-manager/internal/logger"
 	"github.com/dtorabi/access-manager/internal/store"
 	"github.com/go-chi/chi/v5"
 )
@@ -16,10 +15,10 @@ func (s *Server) addUserToGroup(w http.ResponseWriter, r *http.Request) {
 	uid := chi.URLParam(r, "userID")
 	gid := chi.URLParam(r, "groupID")
 	if err := s.Store.AddUserToGroup(r.Context(), domainID, uid, gid); err != nil {
-		writeStoreErr(w, r, err)
+		s.writeStoreErr(w, r, err)
 		return
 	}
-	logger.Audit(r.Context(), "add_user_to_group", slog.String("domain_id", domainID), slog.String("user_id", uid), slog.String("group_id", gid))
+	s.auditLog(r.Context(), "add_user_to_group", slog.String("domain_id", domainID), slog.String("user_id", uid), slog.String("group_id", gid))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -28,10 +27,10 @@ func (s *Server) removeUserFromGroup(w http.ResponseWriter, r *http.Request) {
 	uid := chi.URLParam(r, "userID")
 	gid := chi.URLParam(r, "groupID")
 	if err := s.Store.RemoveUserFromGroup(r.Context(), domainID, uid, gid); err != nil {
-		writeStoreErr(w, r, err)
+		s.writeStoreErr(w, r, err)
 		return
 	}
-	logger.Audit(r.Context(), "remove_user_from_group", slog.String("domain_id", domainID), slog.String("user_id", uid), slog.String("group_id", gid))
+	s.auditLog(r.Context(), "remove_user_from_group", slog.String("domain_id", domainID), slog.String("user_id", uid), slog.String("group_id", gid))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -40,10 +39,10 @@ func (s *Server) grantUserPermission(w http.ResponseWriter, r *http.Request) {
 	uid := chi.URLParam(r, "userID")
 	pid := chi.URLParam(r, "permissionID")
 	if err := s.Store.GrantUserPermission(r.Context(), domainID, uid, pid); err != nil {
-		writeStoreErr(w, r, err)
+		s.writeStoreErr(w, r, err)
 		return
 	}
-	logger.Audit(r.Context(), "grant_user_permission", slog.String("domain_id", domainID), slog.String("user_id", uid), slog.String("permission_id", pid))
+	s.auditLog(r.Context(), "grant_user_permission", slog.String("domain_id", domainID), slog.String("user_id", uid), slog.String("permission_id", pid))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -52,10 +51,10 @@ func (s *Server) revokeUserPermission(w http.ResponseWriter, r *http.Request) {
 	uid := chi.URLParam(r, "userID")
 	pid := chi.URLParam(r, "permissionID")
 	if err := s.Store.RevokeUserPermission(r.Context(), domainID, uid, pid); err != nil {
-		writeStoreErr(w, r, err)
+		s.writeStoreErr(w, r, err)
 		return
 	}
-	logger.Audit(r.Context(), "revoke_user_permission", slog.String("domain_id", domainID), slog.String("user_id", uid), slog.String("permission_id", pid))
+	s.auditLog(r.Context(), "revoke_user_permission", slog.String("domain_id", domainID), slog.String("user_id", uid), slog.String("permission_id", pid))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -64,7 +63,7 @@ const userAuthzResourcesSortField = "resource_id"
 func (s *Server) userAuthzResources(w http.ResponseWriter, r *http.Request) {
 	opts, err := parseOffsetLimitOpts(r)
 	if err != nil {
-		writeErr(w, r, http.StatusBadRequest, err)
+		s.writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	// This endpoint only exposes pagination and uses a fixed stable ordering.
@@ -75,10 +74,10 @@ func (s *Server) userAuthzResources(w http.ResponseWriter, r *http.Request) {
 	uid := chi.URLParam(r, "userID")
 	list, total, err := s.Store.UserAuthzResourcesList(r.Context(), domainID, uid, opts)
 	if err != nil {
-		writeStoreErr(w, r, err)
+		s.writeStoreErr(w, r, err)
 		return
 	}
-	writeList(w, r, userAuthzResourceDTOs(list), total, opts)
+	s.writeList(w, r, userAuthzResourceDTOs(list), total, opts)
 }
 
 const groupAuthzResourcesSortField = "resource_id"
@@ -86,7 +85,7 @@ const groupAuthzResourcesSortField = "resource_id"
 func (s *Server) groupAuthzResources(w http.ResponseWriter, r *http.Request) {
 	opts, err := parseOffsetLimitOpts(r)
 	if err != nil {
-		writeErr(w, r, http.StatusBadRequest, err)
+		s.writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	opts.Sort = groupAuthzResourcesSortField
@@ -96,10 +95,10 @@ func (s *Server) groupAuthzResources(w http.ResponseWriter, r *http.Request) {
 	gid := chi.URLParam(r, "groupID")
 	list, total, err := s.Store.GroupAuthzResourcesList(r.Context(), domainID, gid, opts)
 	if err != nil {
-		writeStoreErr(w, r, err)
+		s.writeStoreErr(w, r, err)
 		return
 	}
-	writeList(w, r, groupAuthzResourceDTOs(list), total, opts)
+	s.writeList(w, r, groupAuthzResourceDTOs(list), total, opts)
 }
 
 // resourceAuthzUsersSortField is the meta.sort label returned to clients.
@@ -114,7 +113,7 @@ const resourceAuthzUsersSortField = "user_id"
 func (s *Server) resourceAuthzUsers(w http.ResponseWriter, r *http.Request) {
 	opts, err := parseOffsetLimitOpts(r)
 	if err != nil {
-		writeErr(w, r, http.StatusBadRequest, err)
+		s.writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	// Populated for meta only; the store enforces fixed ORDER BY users.id ASC.
@@ -125,10 +124,10 @@ func (s *Server) resourceAuthzUsers(w http.ResponseWriter, r *http.Request) {
 	rid := chi.URLParam(r, "resourceID")
 	list, total, err := s.Store.ResourceAuthzUsersList(r.Context(), domainID, rid, opts)
 	if err != nil {
-		writeStoreErr(w, r, err)
+		s.writeStoreErr(w, r, err)
 		return
 	}
-	writeList(w, r, resourceAuthzUserDTOs(list), total, opts)
+	s.writeList(w, r, resourceAuthzUserDTOs(list), total, opts)
 }
 
 const resourceAuthzGroupsSortField = "group_id"
@@ -136,7 +135,7 @@ const resourceAuthzGroupsSortField = "group_id"
 func (s *Server) resourceAuthzGroups(w http.ResponseWriter, r *http.Request) {
 	opts, err := parseOffsetLimitOpts(r)
 	if err != nil {
-		writeErr(w, r, http.StatusBadRequest, err)
+		s.writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	// Populated for meta only; the store enforces fixed ORDER BY group_permissions.group_id ASC.
@@ -147,10 +146,10 @@ func (s *Server) resourceAuthzGroups(w http.ResponseWriter, r *http.Request) {
 	rid := chi.URLParam(r, "resourceID")
 	list, total, err := s.Store.ResourceAuthzGroupsList(r.Context(), domainID, rid, opts)
 	if err != nil {
-		writeStoreErr(w, r, err)
+		s.writeStoreErr(w, r, err)
 		return
 	}
-	writeList(w, r, resourceAuthzGroupDTOs(list), total, opts)
+	s.writeList(w, r, resourceAuthzGroupDTOs(list), total, opts)
 }
 
 func (s *Server) grantGroupPermission(w http.ResponseWriter, r *http.Request) {
@@ -158,10 +157,10 @@ func (s *Server) grantGroupPermission(w http.ResponseWriter, r *http.Request) {
 	gid := chi.URLParam(r, "groupID")
 	pid := chi.URLParam(r, "permissionID")
 	if err := s.Store.GrantGroupPermission(r.Context(), domainID, gid, pid); err != nil {
-		writeStoreErr(w, r, err)
+		s.writeStoreErr(w, r, err)
 		return
 	}
-	logger.Audit(r.Context(), "grant_group_permission", slog.String("domain_id", domainID), slog.String("group_id", gid), slog.String("permission_id", pid))
+	s.auditLog(r.Context(), "grant_group_permission", slog.String("domain_id", domainID), slog.String("group_id", gid), slog.String("permission_id", pid))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -170,10 +169,10 @@ func (s *Server) revokeGroupPermission(w http.ResponseWriter, r *http.Request) {
 	gid := chi.URLParam(r, "groupID")
 	pid := chi.URLParam(r, "permissionID")
 	if err := s.Store.RevokeGroupPermission(r.Context(), domainID, gid, pid); err != nil {
-		writeStoreErr(w, r, err)
+		s.writeStoreErr(w, r, err)
 		return
 	}
-	logger.Audit(r.Context(), "revoke_group_permission", slog.String("domain_id", domainID), slog.String("group_id", gid), slog.String("permission_id", pid))
+	s.auditLog(r.Context(), "revoke_group_permission", slog.String("domain_id", domainID), slog.String("group_id", gid), slog.String("permission_id", pid))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -203,17 +202,17 @@ func (s *Server) authzCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	bit, err := parseUint64Validated(bitStr, maxAccessMask)
 	if err != nil {
-		writeErr(w, r, http.StatusBadRequest, err)
+		s.writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	mask, err := s.Store.EffectiveMask(r.Context(), domainID, userID, resourceID)
 	if err != nil {
-		writeStoreErr(w, r, err)
+		s.writeStoreErr(w, r, err)
 		return
 	}
 	allowed := access.HasBit(mask, bit)
 	result = authzResultOK
-	writeJSON(w, r, http.StatusOK, map[string]any{
+	s.writeJSON(w, r, http.StatusOK, map[string]any{
 		"allowed":        allowed,
 		"effective_mask": strconv.FormatUint(mask, 10),
 	})
@@ -233,9 +232,9 @@ func (s *Server) authzMasks(w http.ResponseWriter, r *http.Request) {
 	}
 	masks, err := s.Store.PermissionMasksForUserResource(r.Context(), domainID, userID, resourceID)
 	if err != nil {
-		writeStoreErr(w, r, err)
+		s.writeStoreErr(w, r, err)
 		return
 	}
 	result = authzResultOK
-	writeJSON(w, r, http.StatusOK, map[string]any{"masks": masks})
+	s.writeJSON(w, r, http.StatusOK, map[string]any{"masks": masks})
 }

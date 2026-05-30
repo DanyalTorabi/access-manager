@@ -11,12 +11,10 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/dtorabi/access-manager/internal/logger"
 	"github.com/dtorabi/access-manager/internal/store"
 )
 
-// TODO(T54): replace r-threading with logWith(r) once T54 injectable logger lands.
-func writeJSON(w http.ResponseWriter, r *http.Request, status int, v any) {
+func (s *Server) writeJSON(w http.ResponseWriter, r *http.Request, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
@@ -29,18 +27,18 @@ func writeJSON(w http.ResponseWriter, r *http.Request, status int, v any) {
 				slog.String("path", r.URL.Path),
 			)
 		}
-		logger.Error("response encode failed", attrs...)
+		s.serverLogger().LogAttrs(r.Context(), slog.LevelError, "response encode failed", attrs...)
 	}
 }
 
-func writeErr(w http.ResponseWriter, r *http.Request, status int, err error) {
-	writeJSON(w, r, status, map[string]string{"error": err.Error()})
+func (s *Server) writeErr(w http.ResponseWriter, r *http.Request, status int, err error) {
+	s.writeJSON(w, r, status, map[string]string{"error": err.Error()})
 }
 
 // writeStoreErr classifies a store-layer error into the correct HTTP status
 // and returns a stable, database-agnostic message. The full error is logged
 // server-side so operators can correlate support requests with logs.
-func writeStoreErr(w http.ResponseWriter, r *http.Request, err error) {
+func (s *Server) writeStoreErr(w http.ResponseWriter, r *http.Request, err error) {
 	var status int
 	var msg string
 	switch {
@@ -60,8 +58,8 @@ func writeStoreErr(w http.ResponseWriter, r *http.Request, err error) {
 		status = http.StatusInternalServerError
 		msg = "internal server error"
 	}
-	logRequestErr(r, status, err)
-	writeJSON(w, r, status, map[string]string{"error": msg})
+	s.logRequestErr(r, status, err)
+	s.writeJSON(w, r, status, map[string]string{"error": msg})
 }
 
 // writeInternalErr logs the full error and returns a generic 500 to the client.
@@ -74,23 +72,24 @@ func writeStoreErr(w http.ResponseWriter, r *http.Request, err error) {
 // the function logs an additional ERROR-level alert so the incorrect call site
 // is immediately visible in production instead of silently producing a 500 for
 // errors that should map to 4xx. The client always receives the generic 500.
-func writeInternalErr(w http.ResponseWriter, r *http.Request, err error) {
+func (s *Server) writeInternalErr(w http.ResponseWriter, r *http.Request, err error) {
 	if errors.Is(err, store.ErrNotFound) || errors.Is(err, store.ErrConflict) ||
 		errors.Is(err, store.ErrFKViolation) || errors.Is(err, store.ErrInvalidInput) {
-		logger.Error("writeInternalErr misuse: structured store error must use writeStoreErr",
+		s.serverLogger().LogAttrs(r.Context(), slog.LevelError,
+			"writeInternalErr misuse: structured store error must use writeStoreErr",
 			slog.String("err", err.Error()),
 			slog.String("method", r.Method),
 			slog.String("path", r.URL.Path),
 		)
 	}
-	logRequestErr(r, http.StatusInternalServerError, err)
-	writeJSON(w, r, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+	s.logRequestErr(r, http.StatusInternalServerError, err)
+	s.writeJSON(w, r, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
 }
 
 // logRequestErr logs the error with request context. 5xx errors are logged at
 // ERROR level; 4xx at WARN to avoid inflating error-level alerts for expected
 // client mistakes.
-func logRequestErr(r *http.Request, status int, err error) {
+func (s *Server) logRequestErr(r *http.Request, status int, err error) {
 	attrs := []slog.Attr{
 		slog.Int("status", status),
 		slog.String("err", err.Error()),
@@ -98,9 +97,9 @@ func logRequestErr(r *http.Request, status int, err error) {
 		slog.String("path", r.URL.Path),
 	}
 	if status >= 500 {
-		logger.Error("request error", attrs...)
+		s.serverLogger().LogAttrs(r.Context(), slog.LevelError, "request error", attrs...)
 	} else {
-		logger.Warn("request error", attrs...)
+		s.serverLogger().LogAttrs(r.Context(), slog.LevelWarn, "request error", attrs...)
 	}
 }
 
@@ -266,8 +265,8 @@ func parseSortOrder(q url.Values, allowed []string) (string, store.SortOrder, er
 	return sortField, order, nil
 }
 
-func writeList(w http.ResponseWriter, r *http.Request, data any, total int64, opts store.ListOpts) {
-	writeJSON(w, r, http.StatusOK, listEnvelope{
+func (s *Server) writeList(w http.ResponseWriter, r *http.Request, data any, total int64, opts store.ListOpts) {
+	s.writeJSON(w, r, http.StatusOK, listEnvelope{
 		Data: data,
 		Meta: listMeta{
 			Total:  total,
@@ -279,20 +278,20 @@ func writeList(w http.ResponseWriter, r *http.Request, data any, total int64, op
 	})
 }
 
-func readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
+func (s *Server) readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dst); err != nil {
 		var maxErr *http.MaxBytesError
 		if errors.As(err, &maxErr) {
-			logReadJSONErr(r, "body_too_large", "request body too large")
-			writeErr(w, r, http.StatusRequestEntityTooLarge, errors.New("request body too large"))
+			s.logReadJSONErr(r, "body_too_large", "request body too large")
+			s.writeErr(w, r, http.StatusRequestEntityTooLarge, errors.New("request body too large"))
 			return false
 		}
 		cls := classifyDecodeErr(err)
-		logReadJSONErr(r, cls.kind, cls.logMsg)
-		writeErr(w, r, http.StatusBadRequest, errors.New(cls.clientMsg))
+		s.logReadJSONErr(r, cls.kind, cls.logMsg)
+		s.writeErr(w, r, http.StatusBadRequest, errors.New(cls.clientMsg))
 		return false
 	}
 	// Decode a second value to verify the stream is exhausted. io.EOF means
@@ -303,8 +302,8 @@ func readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	// stream exhaustion, and its behaviour outside that scope is undocumented.
 	var extra json.RawMessage
 	if err := dec.Decode(&extra); !errors.Is(err, io.EOF) {
-		logReadJSONErr(r, "trailing_data", "trailing data after first JSON value")
-		writeErr(w, r, http.StatusBadRequest, errors.New("request body must contain exactly one JSON value"))
+		s.logReadJSONErr(r, "trailing_data", "trailing data after first JSON value")
+		s.writeErr(w, r, http.StatusBadRequest, errors.New("request body must contain exactly one JSON value"))
 		return false
 	}
 	return true
@@ -349,8 +348,8 @@ func classifyDecodeErr(err error) decodeClass {
 // The detail parameter must be a pre-sanitized string — never pass err.Error()
 // directly for errors that may contain user-controlled input (e.g. unknown
 // field names from DisallowUnknownFields).
-func logReadJSONErr(r *http.Request, kind, detail string) {
-	logger.Warn("request body decode failed",
+func (s *Server) logReadJSONErr(r *http.Request, kind, detail string) {
+	s.serverLogger().LogAttrs(r.Context(), slog.LevelWarn, "request body decode failed",
 		slog.String("kind", kind),
 		slog.String("method", r.Method),
 		slog.String("path", r.URL.Path),

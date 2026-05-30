@@ -1,9 +1,12 @@
 package api
 
 import (
+	"context"
+	"log/slog"
 	"net/http"
 	"strings"
 
+	"github.com/dtorabi/access-manager/internal/logger"
 	"github.com/dtorabi/access-manager/internal/store"
 	"github.com/go-chi/chi/v5"
 	"github.com/prometheus/client_golang/prometheus"
@@ -19,8 +22,37 @@ type Server struct {
 	// CORSAllowedOrigins lists origins permitted via Access-Control-Allow-Origin.
 	// ["*"] allows any origin (default). Empty slice disables CORS headers entirely.
 	CORSAllowedOrigins []string
+	// Log is an optional per-server logger. When nil, the package-level logger
+	// from internal/logger is used. Set this in tests to capture log output
+	// per-test without mutating global state.
+	Log *slog.Logger
 
 	metrics *Metrics
+}
+
+// serverLogger returns s.Log when set, or the package-level logger otherwise.
+func (s *Server) serverLogger() *slog.Logger {
+	if s.Log != nil {
+		return s.Log
+	}
+	return logger.Get()
+}
+
+// logWith returns serverLogger enriched with the request method and path.
+// Callers may use it for per-request structured logging (see T55).
+func (s *Server) logWith(r *http.Request) *slog.Logger {
+	return s.serverLogger().With(
+		slog.String("method", r.Method),
+		slog.String("path", r.URL.Path),
+	)
+}
+
+// auditLog emits a structured audit event at INFO level with audit=true.
+func (s *Server) auditLog(ctx context.Context, action string, attrs ...slog.Attr) {
+	all := make([]slog.Attr, 0, len(attrs)+2)
+	all = append(all, slog.Bool("audit", true), slog.String("action", action))
+	all = append(all, attrs...)
+	s.serverLogger().LogAttrs(ctx, slog.LevelInfo, "audit", all...)
 }
 
 // NegativeMaskCounter returns the store_negative_mask_observed_total
@@ -122,7 +154,7 @@ func (s *Server) Router(reg prometheus.Registerer, gather prometheus.Gatherer) c
 }
 
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, r, http.StatusOK, map[string]string{"status": "ok"})
+	s.writeJSON(w, r, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 type titleBody struct {
