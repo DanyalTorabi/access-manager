@@ -49,19 +49,19 @@ Make the `Server` use an injectable `*slog.Logger` instead of the global from
 
 ## Deliverables
 
-- Add an optional `Log *slog.Logger` field to `Server`. When nil, fall back to
-  the package-level `logger` global (backward-compatible with existing callers
-  including `cmd/server`).
-- Expose a `logWith(r *http.Request) *slog.Logger` helper on `Server` that
-  returns the per-server logger (or the global) enriched with request context
-  attributes; replace current `logger.Error(...)` / `logger.Warn(...)` call
-  sites in handlers with this helper.
-- Update `newTestAPI(t)` and `newBrokenTestAPI(t)` to inject a
-  `*slog.Logger` backed by a per-test `slog.NewJSONHandler(&buf, ...)` so
-  each test gets an isolated log buffer.
-- Explicitly annotate CML-T52-9-origin tests with `t.Parallel()` once
-  injection is in place and verify the race detector passes (`go test -race`).
-- Update the API test-file comment explaining the logger isolation strategy.
+- Add optional `Log *slog.Logger` field to `Server`; fall back to `logger.Get()` when nil.
+- Add `serverLogger() *slog.Logger` accessor and `auditLog(ctx, action, attrs...)` on `Server`.
+- Convert 8 package-level helpers in `server_request.go` to `(s *Server)` methods; route all
+  `logger.Error/Warn` calls through `s.serverLogger().LogAttrs(...)`.
+- Update all 7 handler files to use `s.` methods and `s.auditLog(...)`.
+- `newTestAPI` injects a discard logger (signature unchanged, 60+ call sites unaffected).
+- Add `newTestAPIWithLog` (returns `*syncBuffer`) for tests that assert on log content;
+  `syncBuffer` is goroutine-safe for concurrent server writes and test reads.
+- Update `newBrokenTestAPIWithRegistry` to inject a discard logger.
+- Add `t.Parallel()` to all tests whose only blocker was the global logger; verify
+  `go test -race ./internal/api/...` passes.
+- Add `Get() *slog.Logger` to `internal/logger` for the Server fallback.
+- Remove `logger.Audit` (dead code after migration).
 
 ## Out of scope
 
@@ -78,10 +78,10 @@ Make the `Server` use an injectable `*slog.Logger` instead of the global from
 2. Add to `server.go`:
    - `Log *slog.Logger` field on `Server` (nil = fall back to `logger.Get()`)
    - `serverLogger() *slog.Logger` — returns `s.Log` when non-nil, else `logger.Get()`
-   - `logWith(r *http.Request) *slog.Logger` — returns `serverLogger()` enriched
-     with `method` and `path` attributes (deliverable; available for T55)
    - `auditLog(ctx context.Context, action string, attrs ...slog.Attr)` — mirrors
-     `logger.Audit` but routes through `s.serverLogger()`
+     the removed `logger.Audit` but routes through `s.serverLogger()`
+   - Note: `logWith(r *http.Request) *slog.Logger` was planned but deferred to
+     T55 (see TODO comment in `server.go`) because it had no callers in this PR.
 
 ### Phase 2 — Convert server_request.go helpers to Server methods (commit 2)
 3. Convert 8 package-level functions to `(s *Server)` methods; replace every
@@ -123,12 +123,11 @@ Make the `Server` use an injectable `*slog.Logger` instead of the global from
     `internal/logger` import where no longer used.
 
 ### Phase 6 — Enable t.Parallel() (commit 6)
-11. Add `t.Parallel()` to: `TestWriteJSON_encodeErrorLogged`,
-    `TestAPI_auditLog_domainCreate`, `TestAPI_auditLog_groupCreate_parentFields`,
-    `TestReadJSON_decodeErrors_kindLogged`, `TestReadJSON_bodyTooLargeKindLogged`,
-    and the T52 test in `server_authz_test.go` that carried a "t.Parallel()
-    intentionally omitted until T54" note.
-    Do NOT add `t.Parallel()` to `integration_test.go` (sequential by design).
+11. `TestWriteJSON_encodeErrorLogged` (the T52 encode-failure test) was moved from
+    `server_authz_test.go` to `server_request_test.go` and given `t.Parallel()`.
+    `server_authz_test.go` retains only a pointer comment directing readers to
+    `server_request_test.go`. The remaining formerly-blocked tests were given
+    `t.Parallel()` as part of the cleanup pass.
 12. Update all remaining "Do NOT add t.Parallel()" comments in test files.
 
 ## Acceptance criteria

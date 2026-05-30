@@ -38,6 +38,9 @@ func (s *Server) serverLogger() *slog.Logger {
 	return logger.Get()
 }
 
+// TODO(T55): add logWith(r *http.Request) *slog.Logger returning serverLogger()
+// enriched with method and path for per-request context in encode-failure logs.
+
 // auditLog emits a structured audit event at INFO level with audit=true.
 func (s *Server) auditLog(ctx context.Context, action string, attrs ...slog.Attr) {
 	all := make([]slog.Attr, 0, len(attrs)+2)
