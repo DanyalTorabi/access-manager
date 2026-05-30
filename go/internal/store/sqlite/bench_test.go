@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/dtorabi/access-manager/internal/store"
@@ -38,7 +39,7 @@ func newBenchStore(b *testing.B) *Store {
 func seedBenchDomain(b *testing.B, s *Store) string {
 	b.Helper()
 	ctx := context.Background()
-	id := fmt.Sprintf("bench-domain-%s", b.Name())
+	id := fmt.Sprintf("bench-domain-%s", strings.ReplaceAll(b.Name(), "/", "-"))
 	if err := s.DomainCreate(ctx, &store.Domain{ID: id, Title: "bench"}); err != nil {
 		b.Fatal(err)
 	}
@@ -120,7 +121,6 @@ func BenchmarkEffectiveMask(b *testing.B) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		b.Run(tc.name, func(b *testing.B) {
 			s := newBenchStore(b)
 			domainID := seedBenchDomain(b, s)
@@ -182,7 +182,6 @@ func BenchmarkResourceAuthzUsersList(b *testing.B) {
 	ctx := context.Background()
 
 	for _, n := range []int{100, 500, 1000} {
-		n := n
 		b.Run(fmt.Sprintf("Users%d", n), func(b *testing.B) {
 			s := newBenchStore(b)
 			domainID := seedBenchDomain(b, s)
@@ -240,7 +239,6 @@ func BenchmarkUserAuthzResourcesList(b *testing.B) {
 	ctx := context.Background()
 
 	for _, n := range []int{10, 100} {
-		n := n
 		b.Run(fmt.Sprintf("Resources%d", n), func(b *testing.B) {
 			s := newBenchStore(b)
 			domainID := seedBenchDomain(b, s)
@@ -284,7 +282,6 @@ func BenchmarkResourceAuthzGroupsList_PageNearParamCap(b *testing.B) {
 	ctx := context.Background()
 
 	for _, n := range []int{50, 100, 200} {
-		n := n
 		b.Run(fmt.Sprintf("Groups%d", n), func(b *testing.B) {
 			s := newBenchStore(b)
 			domainID := seedBenchDomain(b, s)
@@ -328,7 +325,6 @@ func BenchmarkGroupSetParent_DeepChain(b *testing.B) {
 	ctx := context.Background()
 
 	for _, depth := range []int{100, 1000, 10000} {
-		depth := depth
 		b.Run(fmt.Sprintf("Depth%d", depth), func(b *testing.B) {
 			s := newBenchStore(b)
 			domainID := seedBenchDomain(b, s)
