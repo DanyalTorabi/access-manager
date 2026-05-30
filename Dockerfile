@@ -9,7 +9,12 @@ RUN go mod download
 COPY go/ ./
 # Image platform matches target (linux/amd64 or linux/arm64); no CGO for modernc.org/sqlite.
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server
-RUN mkdir -p /out/migrations && cp -r migrations/sqlite /out/migrations/sqlite
+# Bundle all migration dialects so the same image works with any supported database.
+# MIGRATIONS_DIR (default: migrations/sqlite) selects which directory to run at startup.
+RUN mkdir -p /out/migrations && \
+    cp -r migrations/sqlite /out/migrations/sqlite && \
+    cp -r migrations/postgres /out/migrations/postgres && \
+    cp -r migrations/mysql /out/migrations/mysql
 
 FROM gcr.io/distroless/static-debian12:nonroot
 WORKDIR /home/nonroot

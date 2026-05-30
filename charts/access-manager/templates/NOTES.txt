@@ -1,0 +1,27 @@
+access-manager has been deployed.
+
+Service: {{ include "access-manager.fullname" . }}
+Namespace: {{ .Release.Namespace }}
+
+{{- if .Values.ingress.enabled }}
+URL: http://{{ .Values.ingress.host }}/health
+{{- else }}
+Run the following to forward the service locally:
+  kubectl port-forward svc/{{ include "access-manager.fullname" . }} 8080:{{ .Values.service.port }} -n {{ .Release.Namespace }}
+Then: curl http://127.0.0.1:8080/health
+{{- end }}
+
+{{- if eq .Values.image.tag "latest" }}
+
+WARNING: image.tag is set to "latest". This is suitable for local development only.
+For staging/production, pin to a specific SHA:
+  helm upgrade {{ .Release.Name }} charts/access-manager/ --set image.tag=sha-<your-sha>
+Using :latest in production can cause uncontrolled upgrades on pod restarts.
+{{- end }}
+
+{{- if .Values.postgres.enabled }}
+
+NOTE: In-cluster Postgres is enabled. This is for dev/Minikube only.
+For production, disable it (postgres.enabled=false) and supply a
+managed Postgres URL via the access-manager-db Secret.
+{{- end }}

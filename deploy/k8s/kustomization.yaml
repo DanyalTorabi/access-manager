@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# namespace is intentionally not set here — each manifest owns its namespace: field.
+# Setting it here would silently override all resource namespaces in overlays,
+# which makes it hard to reason about which namespace a resource lands in.
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+  # Uncomment the postgres/ overlay to deploy the in-cluster Postgres StatefulSet.
+  # For production, use a managed Postgres and supply access-manager-db Secret manually.
+  # - postgres/statefulset.yaml
+  # - postgres/service.yaml
+  #
+  # NOTE: secret.example and postgres/secret.example are NOT listed here.
+  # They are reference templates only — create secrets with kubectl create secret generic.
+  # See docs/kubernetes.md for instructions.
