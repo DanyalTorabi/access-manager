@@ -7,8 +7,10 @@ replicaCount: 2
 ## Container image configuration.
 image:
   repository: ghcr.io/danyaltorabi/access-manager
+  # Use a pinned sha tag for staging/production (e.g. sha-abc1234).
+  # :latest with IfNotPresent is acceptable for local/dev; never use :latest with Always in production.
   tag: "latest"
-  pullPolicy: Always
+  pullPolicy: IfNotPresent
 
 ## Kubernetes Service configuration.
 service:

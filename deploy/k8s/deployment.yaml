@@ -31,8 +31,11 @@ spec:
         fsGroup: 65532
       containers:
         - name: server
+          # Replace :latest with a pinned sha tag before deploying to staging/production.
+          # Example: ghcr.io/danyaltorabi/access-manager:sha-abc1234
+          # See docs/environments.md §Image tag strategy and docs/kubernetes.md §Rolling update.
           image: ghcr.io/danyaltorabi/access-manager:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - name: http
               containerPort: 8080
