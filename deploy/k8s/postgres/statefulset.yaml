@@ -64,6 +64,13 @@ spec:
             limits:
               cpu: "500m"
               memory: "512Mi"
+          # postgres writes to its data directory so readOnlyRootFilesystem cannot be set.
+          # Drop all capabilities and disallow privilege escalation at the container level.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data

@@ -56,6 +56,13 @@ spec:
             timeoutSeconds: 5
           resources:
             {{- toYaml .Values.postgres.resources | nindent 12 }}
+          # postgres writes to its data directory so readOnlyRootFilesystem cannot be set.
+          # Drop all capabilities and disallow privilege escalation at the container level.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
