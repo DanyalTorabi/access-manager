@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -21,13 +22,15 @@ func (s *Server) writeJSON(w http.ResponseWriter, r *http.Request, status int, v
 		// The response header is already committed; log with request context for
 		// operator visibility so the failing endpoint can be identified.
 		attrs := []slog.Attr{slog.String("err", err.Error())}
+		ctx := context.Background()
 		if r != nil {
+			ctx = r.Context()
 			attrs = append(attrs,
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
 			)
 		}
-		s.serverLogger().LogAttrs(r.Context(), slog.LevelError, "response encode failed", attrs...)
+		s.serverLogger().LogAttrs(ctx, slog.LevelError, "response encode failed", attrs...)
 	}
 }
 
