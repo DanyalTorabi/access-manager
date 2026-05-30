@@ -1,4 +1,4 @@
-# T54 — Injectable logger for parallel-safe API tests and structured per-request logging
+# T54 — Injectable Server logger for parallel-safe API tests
 
 ## Ticket
 
@@ -49,19 +49,19 @@ Make the `Server` use an injectable `*slog.Logger` instead of the global from
 
 ## Deliverables
 
-- Add an optional `Log *slog.Logger` field to `Server`. When nil, fall back to
-  the package-level `logger` global (backward-compatible with existing callers
-  including `cmd/server`).
-- Expose a `logWith(r *http.Request) *slog.Logger` helper on `Server` that
-  returns the per-server logger (or the global) enriched with request context
-  attributes; replace current `logger.Error(...)` / `logger.Warn(...)` call
-  sites in handlers with this helper.
-- Update `newTestAPI(t)` and `newBrokenTestAPI(t)` to inject a
-  `*slog.Logger` backed by a per-test `slog.NewJSONHandler(&buf, ...)` so
-  each test gets an isolated log buffer.
-- Explicitly annotate CML-T52-9-origin tests with `t.Parallel()` once
-  injection is in place and verify the race detector passes (`go test -race`).
-- Update the API test-file comment explaining the logger isolation strategy.
+- Add optional `Log *slog.Logger` field to `Server`; fall back to `logger.Get()` when nil.
+- Add `serverLogger() *slog.Logger` accessor and `auditLog(ctx, action, attrs...)` on `Server`.
+- Convert 8 package-level helpers in `server_request.go` to `(s *Server)` methods; route all
+  `logger.Error/Warn` calls through `s.serverLogger().LogAttrs(...)`.
+- Update all 7 handler files to use `s.` methods and `s.auditLog(...)`.
+- `newTestAPI` injects a discard logger (signature unchanged, 60+ call sites unaffected).
+- Add `newTestAPIWithLog` (returns `*syncBuffer`) for tests that assert on log content;
+  `syncBuffer` is goroutine-safe for concurrent server writes and test reads.
+- Update `newBrokenTestAPIWithRegistry` to inject a discard logger.
+- Add `t.Parallel()` to all tests whose only blocker was the global logger; verify
+  `go test -race ./internal/api/...` passes.
+- Add `Get() *slog.Logger` to `internal/logger` for the Server fallback.
+- Remove `logger.Audit` (dead code after migration).
 
 ## Out of scope
 
@@ -71,14 +71,64 @@ Make the `Server` use an injectable `*slog.Logger` instead of the global from
 
 ## Steps
 
-1. Add `Log *slog.Logger` field to `Server`; add `serverLogger() *slog.Logger`
-   accessor that returns `s.Log` when non-nil and falls back to the package-level
-   logger.
-2. Replace all `logger.Error(...)` / `logger.Warn(...)` calls in `server.go`
-   handlers with `serverLogger()` (or `logWith(r)`).
-3. Update `newTestAPI(t)` to inject a per-test logger.
-4. Iteratively add `t.Parallel()` to API unit tests and run race detector.
-5. Verify `make test -race` passes.
+### Phase 1 — Core infrastructure (commit 1)
+1. Add `Get() *slog.Logger` to `internal/logger/logger.go` to expose the
+   package-level pointer for the Server fallback without coupling `api` to the
+   global directly.
+2. Add to `server.go`:
+   - `Log *slog.Logger` field on `Server` (nil = fall back to `logger.Get()`)
+   - `serverLogger() *slog.Logger` — returns `s.Log` when non-nil, else `logger.Get()`
+   - `auditLog(ctx context.Context, action string, attrs ...slog.Attr)` — mirrors
+     the removed `logger.Audit` but routes through `s.serverLogger()`
+   - Note: `logWith(r *http.Request) *slog.Logger` was planned but deferred to
+     T55 (see TODO comment in `server.go`) because it had no callers in this PR.
+
+### Phase 2 — Convert server_request.go helpers to Server methods (commit 2)
+3. Convert 8 package-level functions to `(s *Server)` methods; replace every
+   `logger.Error/Warn` call with `s.serverLogger().LogAttrs(...)`:
+   `writeJSON`, `writeErr`, `writeStoreErr`, `writeInternalErr`,
+   `logRequestErr`, `logReadJSONErr`, `writeList`, `readJSON`.
+   Remove the `// TODO(T54)` comment from `writeJSON`.
+
+### Phase 3 — Update handler files (commit 3)
+4. In all 7 handler files add `s.` prefix to the now-method calls and replace
+   every `logger.Audit(r.Context(), action, attrs...)` with
+   `s.auditLog(r.Context(), action, attrs...)` (26 call sites across
+   `server_domains.go`, `server_users.go`, `server_groups.go`,
+   `server_resources.go`, `server_permissions.go`, `server_access_types.go`,
+   `server_authz.go`).
+
+### Phase 4 — Update test helpers (commit 4)
+5. `newTestAPI` signature stays `(*httptest.Server, store.Store)` — avoids
+   touching 60+ call sites. Internally set `srv.Log` to a discard logger so
+   the global is never touched, making all tests race-safe immediately.
+6. Add `newTestAPIWithLog(t) (*httptest.Server, store.Store, *bytes.Buffer)`
+   backed by a `slog.LevelDebug` handler over a `bytes.Buffer` — used by the
+   handful of tests that assert on log output.
+7. Update `newBrokenTestAPIWithRegistry` to inject the discard logger as well.
+8. Update the "Do NOT add t.Parallel()" NOTE comment to explain the new
+   per-test injection strategy.
+
+### Phase 5 — Migrate tests off logger.Init (commit 5)
+9. Tests that call request helpers directly (no HTTP server):
+   `TestWriteStoreErr_allCases`, `TestWriteStoreErr_noSQLLeak`,
+   `TestWriteInternalErr_generic`, `TestWriteInternalErr_misuse`,
+   `TestWriteJSON_encodeErrorLogged`.
+   Pattern: `logger.Init(level, &buf)` + package call →
+   `s := &Server{Log: slog.New(...)}; s.writeStoreErr(...)`.
+10. Tests that used `newTestAPI + logger.Init`, switch to `newTestAPIWithLog(t)`:
+    `TestAPI_auditLog_domainCreate`, `TestAPI_auditLog_groupCreate_parentFields`,
+    `TestReadJSON_decodeErrors_kindLogged`, `TestReadJSON_bodyTooLargeKindLogged`.
+    Drop all `logger.Init(...)` / `t.Cleanup(logger.Init...)` lines and the
+    `internal/logger` import where no longer used.
+
+### Phase 6 — Enable t.Parallel() (commit 6)
+11. `TestWriteJSON_encodeErrorLogged` (the T52 encode-failure test) was moved from
+    `server_authz_test.go` to `server_request_test.go` and given `t.Parallel()`.
+    `server_authz_test.go` retains only a pointer comment directing readers to
+    `server_request_test.go`. The remaining formerly-blocked tests were given
+    `t.Parallel()` as part of the cleanup pass.
+12. Update all remaining "Do NOT add t.Parallel()" comments in test files.
 
 ## Acceptance criteria
 

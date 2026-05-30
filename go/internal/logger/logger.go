@@ -19,6 +19,15 @@ func Init(level slog.Level, w io.Writer) {
 	l = slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{Level: level}))
 }
 
+// Get returns the package-level logger. The returned pointer is valid only after
+// Init has been called and must not be used concurrently with Init. In
+// production, Init is called once at startup before any request handlers run,
+// so subsequent Get() calls are safe. Tests must not call Init after the server
+// starts (use Server.Log for per-test log capture instead).
+func Get() *slog.Logger {
+	return l
+}
+
 // Info logs at INFO level.
 func Info(msg string, attrs ...slog.Attr) {
 	l.LogAttrs(context.Background(), slog.LevelInfo, msg, attrs...)
@@ -32,13 +41,4 @@ func Warn(msg string, attrs ...slog.Attr) {
 // Error logs at ERROR level.
 func Error(msg string, attrs ...slog.Attr) {
 	l.LogAttrs(context.Background(), slog.LevelError, msg, attrs...)
-}
-
-// Audit emits a structured audit event at INFO level with audit=true.
-// Use for security-relevant mutations (grants, revokes, entity changes).
-func Audit(ctx context.Context, action string, attrs ...slog.Attr) {
-	all := make([]slog.Attr, 0, len(attrs)+2)
-	all = append(all, slog.Bool("audit", true), slog.String("action", action))
-	all = append(all, attrs...)
-	l.LogAttrs(ctx, slog.LevelInfo, "audit", all...)
 }

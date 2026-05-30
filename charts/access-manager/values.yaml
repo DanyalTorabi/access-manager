@@ -1,0 +1,100 @@
+# Default values for access-manager.
+# Override with: helm install access-manager charts/access-manager/ --set image.tag=sha-abc1234
+
+## Name overrides — standard Helm convention.
+nameOverride: ""
+fullnameOverride: ""
+
+## Number of replicas for the Deployment.
+replicaCount: 2
+
+## Container image configuration.
+image:
+  repository: ghcr.io/danyaltorabi/access-manager
+  # Use a pinned sha tag for staging/production (e.g. sha-abc1234).
+  # :latest with IfNotPresent is acceptable for local/dev; never use :latest with Always in production.
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+## Kubernetes Service configuration.
+service:
+  type: ClusterIP
+  port: 8080
+
+## Ingress configuration.
+ingress:
+  enabled: true
+  className: nginx
+  host: access-manager.local  # replace with your actual hostname
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "1m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+
+## Non-secret application configuration (mounted as env vars from ConfigMap).
+## Sensitive values (DATABASE_URL, API_BEARER_TOKEN) are read from Kubernetes Secrets;
+## see docs/kubernetes.md for secret creation instructions.
+config:
+  databaseDriver: "postgres"
+  migrationsDir: "migrations/postgres"
+  corsAllowedOrigins: "none"
+  shutdownTimeoutSeconds: "60"
+  # Bind address for the HTTP server inside the pod.
+  # 0.0.0.0:8080 is required so the kubelet can reach the health probe endpoint.
+  httpAddr: "0.0.0.0:8080"
+
+## Kubernetes Secret names and keys — must match docs/environments.md.
+## Secrets must be created manually before installing the chart.
+secrets:
+  db:
+    name: access-manager-db
+    key: url
+  auth:
+    name: access-manager-auth
+    key: token
+
+## Resource requests and limits for the app container.
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "200m"
+    memory: "128Mi"
+
+## Liveness probe configuration.
+livenessProbe:
+  # Allow at least 30s for DB migrations to complete on first deploy before the probe fires.
+  initialDelaySeconds: 30
+  periodSeconds: 15
+  failureThreshold: 3
+  timeoutSeconds: 3
+
+## Readiness probe configuration.
+readinessProbe:
+  initialDelaySeconds: 3
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 3
+
+## Graceful shutdown: must exceed config.shutdownTimeoutSeconds plus a safety buffer.
+## Kubernetes default is 30s which is less than SHUTDOWN_TIMEOUT_SECONDS=60.
+terminationGracePeriodSeconds: 75
+
+## In-cluster Postgres StatefulSet (for Minikube/dev only).
+## Disabled by default — production should use a managed Postgres instance.
+## Enable for local dev: helm install access-manager charts/access-manager/ --set postgres.enabled=true
+postgres:
+  enabled: false
+  image: postgres:15-alpine
+  storage: 10Gi
+  # storageClassName for the PVC. Empty string uses the cluster default storage class.
+  # For cloud providers use the appropriate class, e.g.: gke=standard-rwo, eks=gp3, aks=managed-premium.
+  storageClassName: ""
+  secretName: access-manager-postgres
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"

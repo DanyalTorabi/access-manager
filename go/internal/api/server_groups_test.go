@@ -1,27 +1,20 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 
-	"github.com/dtorabi/access-manager/internal/logger"
 	"github.com/dtorabi/access-manager/internal/store"
 	"github.com/google/uuid"
 )
 
 func TestAPI_auditLog_groupCreate_parentFields(t *testing.T) {
-	var buf bytes.Buffer
-	logger.Init(slog.LevelInfo, &buf)
-	t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
-
-	ts, _ := newTestAPI(t)
+	t.Parallel()
+	ts, _, logBuf := newTestAPIWithLog(t)
 	var dom store.Domain
 	if err := json.Unmarshal(mustPostJSON201(t, ts.URL+"/api/v1/domains", `{"title":"ad"}`), &dom); err != nil {
 		t.Fatal(err)
@@ -29,9 +22,9 @@ func TestAPI_auditLog_groupCreate_parentFields(t *testing.T) {
 	base := ts.URL + "/api/v1/domains/" + dom.ID
 
 	mustPostJSON201(t, base+"/groups", `{"title":"rootg"}`)
-	groups := auditLogEntriesWithAction(t, buf.String(), "group_create")
+	groups := auditLogEntriesWithAction(t, logBuf.String(), "group_create")
 	if len(groups) != 1 {
-		t.Fatalf("want 1 group_create audit after first group, got %d: %q", len(groups), buf.String())
+		t.Fatalf("want 1 group_create audit after first group, got %d: %q", len(groups), logBuf.String())
 	}
 	rootLine := groups[0]
 	if rootLine["parent_root"] != true {
@@ -44,9 +37,9 @@ func TestAPI_auditLog_groupCreate_parentFields(t *testing.T) {
 	}
 	childBody := fmt.Sprintf(`{"title":"ch","parent_group_id":%q}`, parent.ID)
 	mustPostJSON201(t, base+"/groups", childBody)
-	groups = auditLogEntriesWithAction(t, buf.String(), "group_create")
+	groups = auditLogEntriesWithAction(t, logBuf.String(), "group_create")
 	if len(groups) != 3 {
-		t.Fatalf("want 3 group_create audits after domain + 3 groups, got %d: %q", len(groups), buf.String())
+		t.Fatalf("want 3 group_create audits after domain + 3 groups, got %d: %q", len(groups), logBuf.String())
 	}
 	childLine := groups[len(groups)-1]
 	if childLine["parent_group_id"] != parent.ID {

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **T21 / #32:** Kubernetes deployment — raw manifests (`deploy/k8s/`) and Helm chart (`charts/access-manager/`) for deploying access-manager to any Kubernetes cluster. Includes: Namespace, ConfigMap, Deployment (2 replicas, RollingUpdate, `/health` liveness + readiness probes, non-root `securityContext` matching the distroless image UID 65532, `readOnlyRootFilesystem`), ClusterIP Service, nginx Ingress, and an optional in-cluster Postgres StatefulSet + PVC for Minikube/dev. Secret names align with `docs/environments.md` (`access-manager-db` / `access-manager-auth`). `docs/kubernetes.md` added with prerequisites, secret creation, `kubectl apply`, Helm install/upgrade, rolling-update, and Minikube smoke-test instructions.
+
 ### Security
 
 - **T68 / #119:** `go 1.25.10` resolves GO-2026-4971 — Windows-only panic in `net.Dial`/`LookupPort` on NUL byte. Does not affect this Linux server binary; bumped proactively. Primary motivation is toolchain alignment (see `### Changed`).

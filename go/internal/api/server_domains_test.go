@@ -1,31 +1,22 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 
-	"github.com/dtorabi/access-manager/internal/logger"
 	"github.com/dtorabi/access-manager/internal/store"
 )
 
-// NOTE: Tests that call logger.Init mutate the package-level logger pointer.
-// This is safe only because no test in this file uses t.Parallel().
-// Do NOT add t.Parallel() without first switching to a logger-injectable
-// Server field or an atomic pointer. Tracked on #47 (T36 follow-ups).
+// NOTE: Each test gets its own logger through newTestAPIWithLog or the
+// discard logger in newTestAPI. The global logger is never mutated.
 
 func TestAPI_auditLog_domainCreate(t *testing.T) {
-	var buf bytes.Buffer
-	logger.Init(slog.LevelInfo, &buf)
-	t.Cleanup(func() { logger.Init(slog.LevelInfo, os.Stderr) })
-
-	ts, _ := newTestAPI(t)
+	t.Parallel()
+	ts, _, logBuf := newTestAPIWithLog(t)
 	payload := `{"title":"AuditCo"}`
 	res, err := http.Post(ts.URL+"/api/v1/domains", "application/json", strings.NewReader(payload))
 	if err != nil {
@@ -41,9 +32,9 @@ func TestAPI_auditLog_domainCreate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	domainAudits := auditLogEntriesWithAction(t, buf.String(), "domain_create")
+	domainAudits := auditLogEntriesWithAction(t, logBuf.String(), "domain_create")
 	if len(domainAudits) != 1 {
-		t.Fatalf("want 1 domain_create audit, got %d in %q", len(domainAudits), buf.String())
+		t.Fatalf("want 1 domain_create audit, got %d in %q", len(domainAudits), logBuf.String())
 	}
 	line := domainAudits[0]
 	if line["msg"] != "audit" {
