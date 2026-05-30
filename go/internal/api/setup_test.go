@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/dtorabi/access-manager/internal/store"
@@ -50,23 +51,46 @@ func newTestAPI(t *testing.T) (*httptest.Server, store.Store) {
 	return ts, st
 }
 
+// syncBuffer is a bytes.Buffer safe for concurrent use by multiple goroutines.
+// slog.NewJSONHandler writes from the HTTP server goroutine while tests read
+// via String() from the test goroutine; the mutex prevents data races under
+// -race.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (n int, err error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
 // newTestAPIWithLog returns an HTTP test server, the underlying store, and a
-// bytes.Buffer that captures all log output from the Server. The handler writes
+// syncBuffer that captures all log output from the Server. The handler writes
 // JSON log entries at DEBUG level so all log levels are visible to the test.
-func newTestAPIWithLog(t *testing.T) (*httptest.Server, store.Store, *bytes.Buffer) {
+// syncBuffer is safe for concurrent access by the server goroutine (writer)
+// and the test goroutine (reader).
+func newTestAPIWithLog(t *testing.T) (*httptest.Server, store.Store, *syncBuffer) {
 	t.Helper()
 	st, cleanup := newTestStore(t)
-	var buf bytes.Buffer
+	buf := &syncBuffer{}
 	srv := &Server{
 		Store: st,
-		Log:   slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})),
+		Log:   slog.New(slog.NewJSONHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug})),
 	}
 	ts := httptest.NewServer(srv.Router(nil, nil))
 	t.Cleanup(func() {
 		ts.Close()
 		cleanup()
 	})
-	return ts, st, &buf
+	return ts, st, buf
 }
 
 // mustPostJSON201 is a convenience wrapper for mustPostJSON with http.StatusCreated.
