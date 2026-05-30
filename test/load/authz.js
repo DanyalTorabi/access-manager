@@ -66,7 +66,11 @@ function post(path, body) {
   if (res.status !== 201) {
     fail(`setup: POST ${path} returned ${res.status}: ${res.body}`);
   }
-  return JSON.parse(res.body).id;
+  const id = JSON.parse(res.body).id;
+  if (!id) {
+    fail(`setup: POST ${path} response missing id field`);
+  }
+  return id;
 }
 
 function postNoBody(path) {
@@ -84,7 +88,15 @@ function postNoBody(path) {
 export function setup() {
   const domainID = post('/api/v1/domains', { title: 'k6-bench-domain' });
 
-  const userID = post(`/api/v1/domains/${domainID}/users`, { title: 'k6-bench-user' });
+  // Seed a pool of users so VUs spread load across different rows instead
+  // of hammering a single hot user.
+  const USER_POOL = 10;
+  const userIDs = [];
+  for (let i = 0; i < USER_POOL; i++) {
+    const uid = post(`/api/v1/domains/${domainID}/users`, { title: `k6-bench-user-${i}` });
+    userIDs.push(uid);
+  }
+
   const resourceID = post(`/api/v1/domains/${domainID}/resources`, { title: 'k6-bench-resource' });
   const permID = post(`/api/v1/domains/${domainID}/permissions`, {
     title: 'k6-bench-perm',
@@ -92,10 +104,12 @@ export function setup() {
     access_mask: '1',
   });
 
-  // Grant the permission to the user.
-  postNoBody(`/api/v1/domains/${domainID}/users/${userID}/permissions/${permID}`);
+  // Grant the permission to every user.
+  for (const uid of userIDs) {
+    postNoBody(`/api/v1/domains/${domainID}/users/${uid}/permissions/${permID}`);
+  }
 
-  return { domainID, userID, resourceID, bit: '1' };
+  return { domainID, userIDs, resourceID, permID, bit: '1' };
 }
 
 // ---------------------------------------------------------------------------
@@ -103,7 +117,9 @@ export function setup() {
 // ---------------------------------------------------------------------------
 
 export default function (data) {
-  const { domainID, userID, resourceID, bit } = data;
+  const { domainID, userIDs, resourceID, bit } = data;
+  // Each VU picks a different user from the pool to avoid a single hot row.
+  const userID = userIDs[(__VU - 1) % userIDs.length];
   const url =
     `${BASE_URL}/api/v1/domains/${domainID}/authz/check` +
     `?user_id=${userID}&resource_id=${resourceID}&access_bit=${bit}`;
@@ -120,4 +136,35 @@ export default function (data) {
       }
     },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Teardown — delete seeded entities in FK-safe order.
+// Runs once after all VUs finish.
+// ---------------------------------------------------------------------------
+
+function del(path) {
+  const res = http.del(`${BASE_URL}${path}`, null, { headers: headers(false) });
+  if (res.status !== 204 && res.status !== 404) {
+    console.warn(`teardown: DELETE ${path} returned ${res.status}`);
+  }
+}
+
+export function teardown(data) {
+  const { domainID, userIDs, resourceID, permID } = data;
+
+  // Revoke grants first (FK: user_permissions references users and permissions).
+  for (const uid of userIDs) {
+    del(`/api/v1/domains/${domainID}/users/${uid}/permissions/${permID}`);
+  }
+  // Delete the permission (FK: permissions references resources).
+  del(`/api/v1/domains/${domainID}/permissions/${permID}`);
+  // Delete users.
+  for (const uid of userIDs) {
+    del(`/api/v1/domains/${domainID}/users/${uid}`);
+  }
+  // Delete resource.
+  del(`/api/v1/domains/${domainID}/resources/${resourceID}`);
+  // Delete domain.
+  del(`/api/v1/domains/${domainID}`);
 }
