@@ -13,6 +13,7 @@ dist/
 comments-PR*.md
 
 # Kubernetes: prevent real secret files from being committed.
-# Use secret.example.yaml as a reference and create secrets with kubectl.
+# Use secret.example (no .yaml extension) as a reference and create secrets with kubectl.
+# If you create a local copy with .yaml extension, it will be ignored:
 deploy/k8s/*.secret.yaml
 deploy/k8s/**/*.secret.yaml

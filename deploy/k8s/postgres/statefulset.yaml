@@ -19,10 +19,10 @@ spec:
         app.kubernetes.io/name: access-manager
         app.kubernetes.io/component: postgres
     spec:
+      # The official postgres image starts as root to initialise the data directory
+      # (chmod/chown /var/lib/postgresql/data) then drops to UID 999 (postgres)
+      # via su-exec internally. Do not set runAsNonRoot at the pod level.
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 999   # standard postgres image UID
-        runAsGroup: 999
         fsGroup: 999
       containers:
         - name: postgres

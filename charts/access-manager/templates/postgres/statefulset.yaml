@@ -18,10 +18,9 @@ spec:
       labels:
         {{- include "access-manager.postgresSelectorLabels" . | nindent 8 }}
     spec:
+      # The official postgres image starts as root to initialise the data directory
+      # then drops to UID 999 internally via su-exec. Do not set runAsNonRoot here.
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 999
-        runAsGroup: 999
         fsGroup: 999
       containers:
         - name: postgres
