@@ -91,19 +91,17 @@ func (s *Store) ResourceAuthzGroupsList(ctx context.Context, domainID, resourceI
 		return []store.ResourceAuthzGroup{}, total, nil
 	}
 
-	placeholders, err := inPlaceholders(len(groupIDs))
+	maskSQL, maskArgs, err := buildInQueryAndArgs(
+		`SELECT gp.group_id, p.access_mask FROM permissions p `+ // #nosec G202
+			`INNER JOIN group_permissions gp ON gp.permission_id = p.id `+
+			`INNER JOIN groups g ON g.id = gp.group_id `+
+			`WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0 `+
+			`AND gp.group_id `,
+		[]any{domainID, resourceID},
+		groupIDs,
+	)
 	if err != nil {
 		return nil, 0, err
-	}
-	maskSQL := `SELECT gp.group_id, p.access_mask FROM permissions p ` + // #nosec G202
-		`INNER JOIN group_permissions gp ON gp.permission_id = p.id ` +
-		`INNER JOIN groups g ON g.id = gp.group_id ` +
-		`WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0 ` +
-		`AND gp.group_id IN (` + placeholders + `)`
-	maskArgs := make([]any, 0, 2+len(groupIDs))
-	maskArgs = append(maskArgs, domainID, resourceID)
-	for _, gid := range groupIDs {
-		maskArgs = append(maskArgs, gid)
 	}
 
 	maskRows, err := s.db.QueryContext(ctx, maskSQL, maskArgs...)
@@ -244,37 +242,36 @@ func (s *Store) ResourceAuthzUsersList(ctx context.Context, domainID, resourceID
 	// is well above this (>=999), so the IN (?,…) expansions below are safe.
 	// If MaxLimit is ever raised above the SQLite parameter cap, batch the
 	// IN clauses or chunk userIDs.
-	placeholders, err := inPlaceholders(len(userIDs))
-	if err != nil {
-		return nil, 0, err
-	}
-
 	masksByUser := make(map[string]uint64, len(userIDs))
 
 	// Direct user grants on this resource.
-	directSQL := `SELECT up.user_id, p.access_mask FROM user_permissions up ` + // #nosec G202
-		`INNER JOIN permissions p ON p.id = up.permission_id ` +
-		`WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0 ` +
-		`AND up.user_id IN (` + placeholders + `)`
-	directArgs := make([]any, 0, 2+len(userIDs))
-	directArgs = append(directArgs, domainID, resourceID)
-	for _, uid := range userIDs {
-		directArgs = append(directArgs, uid)
+	directSQL, directArgs, err := buildInQueryAndArgs(
+		`SELECT up.user_id, p.access_mask FROM user_permissions up `+ // #nosec G202
+			`INNER JOIN permissions p ON p.id = up.permission_id `+
+			`WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0 `+
+			`AND up.user_id `,
+		[]any{domainID, resourceID},
+		userIDs,
+	)
+	if err != nil {
+		return nil, 0, err
 	}
 	if err := scanUserMasks(ctx, s, directSQL, directArgs, masksByUser); err != nil {
 		return nil, 0, err
 	}
 
 	// Indirect grants via group membership.
-	indirectSQL := `SELECT gm.user_id, p.access_mask FROM group_members gm ` + // #nosec G202
-		`INNER JOIN group_permissions gp ON gp.group_id = gm.group_id ` +
-		`INNER JOIN permissions p ON p.id = gp.permission_id ` +
-		`WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0 ` +
-		`AND gm.user_id IN (` + placeholders + `)`
-	indirectArgs := make([]any, 0, 2+len(userIDs))
-	indirectArgs = append(indirectArgs, domainID, resourceID)
-	for _, uid := range userIDs {
-		indirectArgs = append(indirectArgs, uid)
+	indirectSQL, indirectArgs, err := buildInQueryAndArgs(
+		`SELECT gm.user_id, p.access_mask FROM group_members gm `+ // #nosec G202
+			`INNER JOIN group_permissions gp ON gp.group_id = gm.group_id `+
+			`INNER JOIN permissions p ON p.id = gp.permission_id `+
+			`WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0 `+
+			`AND gm.user_id `,
+		[]any{domainID, resourceID},
+		userIDs,
+	)
+	if err != nil {
+		return nil, 0, err
 	}
 	if err := scanUserMasks(ctx, s, indirectSQL, indirectArgs, masksByUser); err != nil {
 		return nil, 0, err

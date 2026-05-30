@@ -75,17 +75,15 @@ func (s *Store) GroupAuthzResourcesList(ctx context.Context, domainID, groupID s
 		return []store.GroupAuthzResource{}, total, nil
 	}
 
-	placeholders, err := inPlaceholders(len(resourceIDs))
+	maskSQL, maskArgs, err := buildInQueryAndArgs(
+		`SELECT p.resource_id, p.access_mask FROM permissions p `+ // #nosec G202
+			`INNER JOIN group_permissions gp ON gp.permission_id = p.id `+
+			`WHERE p.domain_id = ? AND gp.group_id = ? AND p.access_mask > 0 AND p.resource_id `,
+		[]any{domainID, groupID},
+		resourceIDs,
+	)
 	if err != nil {
 		return nil, 0, err
-	}
-	maskSQL := `SELECT p.resource_id, p.access_mask FROM permissions p ` + // #nosec G202
-		`INNER JOIN group_permissions gp ON gp.permission_id = p.id ` +
-		`WHERE p.domain_id = ? AND gp.group_id = ? AND p.resource_id IN (` + placeholders + `) AND p.access_mask > 0`
-	maskArgs := make([]any, 0, 2+len(resourceIDs))
-	maskArgs = append(maskArgs, domainID, groupID)
-	for _, rid := range resourceIDs {
-		maskArgs = append(maskArgs, rid)
 	}
 
 	maskRows, err := s.db.QueryContext(ctx, maskSQL, maskArgs...)
