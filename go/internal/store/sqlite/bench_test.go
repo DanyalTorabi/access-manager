@@ -315,11 +315,12 @@ func BenchmarkUserAuthzResourcesList(b *testing.B) {
 	}
 }
 
-// BenchmarkResourceAuthzGroupsList_PageNearParamCap measures the IN-clause
+// BenchmarkResourceAuthzGroupsList_PageNearMaxLimit measures the IN-clause
 // approach as the number of seeded groups varies, verifying behaviour near
-// the SQLite parameter cap. Sub-benchmarks seed 50, 100, and 200 groups
-// (> MaxLimit to exercise pagination) but query one page of MaxLimit (100).
-func BenchmarkResourceAuthzGroupsList_PageNearParamCap(b *testing.B) {
+// MaxLimit (the maximum page size).  Sub-benchmarks seed 50, 100, and 200
+// groups (> MaxLimit to exercise pagination) but query one page of MaxLimit
+// (100).
+func BenchmarkResourceAuthzGroupsList_PageNearMaxLimit(b *testing.B) {
 	ctx := context.Background()
 
 	for _, n := range []int{50, 100, 200} {
