@@ -11,3 +11,8 @@ dist/
 .idea/
 .vscode/
 comments-PR*.md
+
+# Kubernetes: prevent real secret files from being committed.
+# Use secret.example.yaml as a reference and create secrets with kubectl.
+deploy/k8s/*.secret.yaml
+deploy/k8s/**/*.secret.yaml
