@@ -50,7 +50,7 @@ From the **repository root** (not `go/`): **`make docker-build`**, **`make docke
 | `MIGRATIONS_DIR` | `migrations/sqlite` | Migration `.up.sql` directory — set to `migrations/postgres` or `migrations/mysql` for the matching driver (relative paths are resolved from the **process working directory** — run from `go/` or set an absolute path) |
 | `SHUTDOWN_TIMEOUT_SECONDS` | `30` | Max seconds to wait for graceful shutdown after **SIGINT** / **SIGTERM** |
 | `API_BEARER_TOKEN` | _(empty)_ | If set, all **`/api/v1/*`** routes require `Authorization: Bearer <token>`. **`/health`** stays public. Use a strong random value in production; never commit it. |
-| `CORS_ALLOWED_ORIGINS` | `*` | Comma-separated list of browser origins allowed via `Access-Control-Allow-Origin`. `*` reflects any request `Origin` header (without setting `Allow-Credentials`; use an explicit list for credentialed requests). Set to an explicit list (e.g. `https://app.example.com`) in production. Startup warning logged when `*` is used on a non-loopback address. To explicitly disable CORS headers (e.g. when a reverse proxy manages CORS), a sentinel disable value is planned for T22. |
+| `CORS_ALLOWED_ORIGINS` | `*` | Comma-separated list of browser origins allowed via `Access-Control-Allow-Origin`. `*` reflects any request `Origin` header (without setting `Allow-Credentials`; use an explicit list for credentialed requests). Set to an explicit list (e.g. `https://app.example.com`) in production. Set to `none` (case-insensitive, whitespace-trimmed) to disable all CORS response headers — useful when a reverse proxy manages CORS centrally. Startup warning logged when `*` is used on a non-loopback address. |
 
 Copy [`.env.example`](.env.example) to `.env` for local overrides; do **not** commit real secrets.
 
@@ -183,6 +183,8 @@ Benchmark results are not committed; run on a reference machine and record in [`
 ## Load Tests (k6)
 
 Prerequisites: [k6](https://k6.io/docs/get-started/installation/) installed, server running at `BASE_URL`.
+
+Run from the **repo root** (not `go/`):
 
 ```sh
 # Default (50 VUs, ~160 s ramp):
