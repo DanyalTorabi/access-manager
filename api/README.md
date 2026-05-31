@@ -2,8 +2,22 @@
 
 | File | Purpose |
 |------|---------|
-| [openapi.yaml](openapi.yaml) | OpenAPI 3.0 description of all public HTTP routes (`/health`, `/api/v1/...`). Root `security` lists `{}` and `bearerAuth` so the contract matches optional Bearer when the token env is unset. |
+| [openapi.yaml](openapi.yaml) | OpenAPI 3.0 description of all public HTTP routes (`/health`, `/api/v1/...`, `/api/v2/...`). Root `security` lists `{}` and `bearerAuth` so the contract matches optional Bearer when the token env is unset. |
 | [postman/access-manager.postman_collection.json](postman/access-manager.postman_collection.json) | Postman v2.1 collection for manual calls. |
+
+## V1 vs V2
+
+Both API versions share the same underlying store; data written through one is readable through the other.
+
+| | `/api/v1` | `/api/v2` |
+|--|-----------|-----------|
+| Permission representation | `"mask": "3"` (uint64 string) | `"permissions": ["read","write"]` |
+| Authz listings | `"effective_mask": "3"` | `"permissions": ["read","write"]` |
+| Access-type create | `bit` required | `bit` optional — auto-allocated if omitted |
+| Unknown bits | numeric only | `"_bit:<value>"` sentinel string |
+| New endpoints | — | `GET .../users/{uid}/resources/{rid}/permissions` (effective titles) |
+
+Domain, user, group, and resource CRUD remain on `/api/v1` only.
 
 ## Postman
 

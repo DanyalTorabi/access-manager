@@ -1,47 +1,156 @@
 {
   "info": {
     "name": "access-manager",
-    "description": "Use with api/openapi.yaml as the contract source of truth.\n\nCreate requests auto-save IDs into collection variables (domainId, userId, etc.) so you can \"Run collection\" top-to-bottom without manual copy-paste.\n\nSet baseUrl (default http://127.0.0.1:8080) and bearerToken (when API_BEARER_TOKEN is configured) before running.\n\nFor DELETE samples, dependents are removed first (permissions → resources/access-types → memberships → users/groups → domain).",
+    "description": "Use with api/openapi.yaml as the contract source of truth.\n\nCreate requests auto-save IDs into collection variables (domainId, userId, etc.) so you can \"Run collection\" top-to-bottom without manual copy-paste.\n\nSet baseUrl (default http://127.0.0.1:8080) and bearerToken (when API_BEARER_TOKEN is configured) before running.\n\nFor DELETE samples, dependents are removed first (permissions \u2192 resources/access-types \u2192 memberships \u2192 users/groups \u2192 domain).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    {"key": "baseUrl", "value": "http://127.0.0.1:8080"},
-    {"key": "bearerToken", "value": ""},
-    {"key": "domainId", "value": ""},
-    {"key": "userId", "value": ""},
-    {"key": "groupId", "value": ""},
-    {"key": "resourceId", "value": ""},
-    {"key": "permissionId", "value": ""},
-    {"key": "accessTypeId", "value": ""}
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8080"
+    },
+    {
+      "key": "bearerToken",
+      "value": ""
+    },
+    {
+      "key": "domainId",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "groupId",
+      "value": ""
+    },
+    {
+      "key": "resourceId",
+      "value": ""
+    },
+    {
+      "key": "permissionId",
+      "value": ""
+    },
+    {
+      "key": "accessTypeId",
+      "value": ""
+    }
   ],
   "auth": {
     "type": "bearer",
-    "bearer": [{"key": "token", "value": "{{bearerToken}}", "type": "string"}]
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{bearerToken}}",
+        "type": "string"
+      }
+    ]
   },
   "item": [
     {
       "name": "Health",
-      "request": {"method": "GET", "url": "{{baseUrl}}/health"},
-      "auth": {"type": "noauth"}
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/health"
+      },
+      "auth": {
+        "type": "noauth"
+      }
     },
     {
       "name": "Create domain",
       "request": {
         "method": "POST",
-        "header": [{"key": "Content-Type", "value": "application/json"}],
-        "body": {"mode": "raw", "raw": "{\"title\": \"Example domain\"}"},
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\": \"Example domain\"}"
+        },
         "url": "{{baseUrl}}/api/v1/domains"
       },
-      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["var json = pm.response.json();", "if (json.ID) pm.collectionVariables.set('domainId', json.ID);"]}}]
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var json = pm.response.json();",
+              "if (json.ID) pm.collectionVariables.set('domainId', json.ID);"
+            ]
+          }
+        }
+      ]
     },
-    {"name": "List domains", "request": {"method": "GET", "url": {"raw": "{{baseUrl}}/api/v1/domains?offset=0&limit=20&search=", "query": [{"key": "offset", "value": "0"}, {"key": "limit", "value": "20"}, {"key": "search", "value": "", "description": "Case-insensitive title match"}, {"key": "search_type", "value": "contains", "description": "contains | starts_with | ends_with (only with search)", "disabled": true}, {"key": "sort", "value": "title", "description": "Sort field: title (default)", "disabled": true}, {"key": "order", "value": "asc", "description": "asc (default) | desc", "disabled": true}]}}},
-    {"name": "Get domain", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}"}},
+    {
+      "name": "List domains",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/domains?offset=0&limit=20&search=",
+          "query": [
+            {
+              "key": "offset",
+              "value": "0"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            },
+            {
+              "key": "search",
+              "value": "",
+              "description": "Case-insensitive title match"
+            },
+            {
+              "key": "search_type",
+              "value": "contains",
+              "description": "contains | starts_with | ends_with (only with search)",
+              "disabled": true
+            },
+            {
+              "key": "sort",
+              "value": "title",
+              "description": "Sort field: title (default)",
+              "disabled": true
+            },
+            {
+              "key": "order",
+              "value": "asc",
+              "description": "asc (default) | desc",
+              "disabled": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get domain",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}"
+      }
+    },
     {
       "name": "Patch domain",
       "request": {
         "method": "PATCH",
-        "header": [{"key": "Content-Type", "value": "application/json"}],
-        "body": {"mode": "raw", "raw": "{\"title\": \"Renamed domain\"}"},
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\": \"Renamed domain\"}"
+        },
         "url": "{{baseUrl}}/api/v1/domains/{{domainId}}"
       }
     },
@@ -49,20 +158,94 @@
       "name": "Create user",
       "request": {
         "method": "POST",
-        "header": [{"key": "Content-Type", "value": "application/json"}],
-        "body": {"mode": "raw", "raw": "{\"title\": \"Alice\"}"},
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\": \"Alice\"}"
+        },
         "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users"
       },
-      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["var json = pm.response.json();", "if (json.ID) pm.collectionVariables.set('userId', json.ID);"]}}]
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var json = pm.response.json();",
+              "if (json.ID) pm.collectionVariables.set('userId', json.ID);"
+            ]
+          }
+        }
+      ]
     },
-    {"name": "List users", "request": {"method": "GET", "url": {"raw": "{{baseUrl}}/api/v1/domains/{{domainId}}/users?offset=0&limit=20&search=", "query": [{"key": "offset", "value": "0"}, {"key": "limit", "value": "20"}, {"key": "search", "value": "", "description": "Case-insensitive title match"}, {"key": "search_type", "value": "contains", "description": "contains | starts_with | ends_with (only with search)", "disabled": true}, {"key": "sort", "value": "title", "description": "Sort field: title (default)", "disabled": true}, {"key": "order", "value": "asc", "description": "asc (default) | desc", "disabled": true}]}}},
-    {"name": "Get user", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}"}},
+    {
+      "name": "List users",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/domains/{{domainId}}/users?offset=0&limit=20&search=",
+          "query": [
+            {
+              "key": "offset",
+              "value": "0"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            },
+            {
+              "key": "search",
+              "value": "",
+              "description": "Case-insensitive title match"
+            },
+            {
+              "key": "search_type",
+              "value": "contains",
+              "description": "contains | starts_with | ends_with (only with search)",
+              "disabled": true
+            },
+            {
+              "key": "sort",
+              "value": "title",
+              "description": "Sort field: title (default)",
+              "disabled": true
+            },
+            {
+              "key": "order",
+              "value": "asc",
+              "description": "asc (default) | desc",
+              "disabled": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get user",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}"
+      }
+    },
     {
       "name": "Patch user",
       "request": {
         "method": "PATCH",
-        "header": [{"key": "Content-Type", "value": "application/json"}],
-        "body": {"mode": "raw", "raw": "{\"title\": \"Alice (updated)\"}"},
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\": \"Alice (updated)\"}"
+        },
         "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}"
       }
     },
@@ -70,20 +253,99 @@
       "name": "Create group",
       "request": {
         "method": "POST",
-        "header": [{"key": "Content-Type", "value": "application/json"}],
-        "body": {"mode": "raw", "raw": "{\"title\": \"Admins\"}"},
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\": \"Admins\"}"
+        },
         "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups"
       },
-      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["var json = pm.response.json();", "if (json.ID) pm.collectionVariables.set('groupId', json.ID);"]}}]
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var json = pm.response.json();",
+              "if (json.ID) pm.collectionVariables.set('groupId', json.ID);"
+            ]
+          }
+        }
+      ]
     },
-    {"name": "List groups", "request": {"method": "GET", "url": {"raw": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups?offset=0&limit=20&search=&parent_group_id=", "query": [{"key": "offset", "value": "0"}, {"key": "limit", "value": "20"}, {"key": "search", "value": "", "description": "Case-insensitive title match"}, {"key": "search_type", "value": "contains", "description": "contains | starts_with | ends_with (only with search)", "disabled": true}, {"key": "sort", "value": "title", "description": "Sort field: title (default)", "disabled": true}, {"key": "order", "value": "asc", "description": "asc (default) | desc", "disabled": true}, {"key": "parent_group_id", "value": "", "description": "Filter by parent group UUID"}]}}},
-    {"name": "Get group", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups/{{groupId}}"}},
+    {
+      "name": "List groups",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups?offset=0&limit=20&search=&parent_group_id=",
+          "query": [
+            {
+              "key": "offset",
+              "value": "0"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            },
+            {
+              "key": "search",
+              "value": "",
+              "description": "Case-insensitive title match"
+            },
+            {
+              "key": "search_type",
+              "value": "contains",
+              "description": "contains | starts_with | ends_with (only with search)",
+              "disabled": true
+            },
+            {
+              "key": "sort",
+              "value": "title",
+              "description": "Sort field: title (default)",
+              "disabled": true
+            },
+            {
+              "key": "order",
+              "value": "asc",
+              "description": "asc (default) | desc",
+              "disabled": true
+            },
+            {
+              "key": "parent_group_id",
+              "value": "",
+              "description": "Filter by parent group UUID"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get group",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups/{{groupId}}"
+      }
+    },
     {
       "name": "Patch group",
       "request": {
         "method": "PATCH",
-        "header": [{"key": "Content-Type", "value": "application/json"}],
-        "body": {"mode": "raw", "raw": "{\"title\": \"Admins (updated)\"}"},
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\": \"Admins (updated)\"}"
+        },
         "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups/{{groupId}}"
       }
     },
@@ -91,8 +353,16 @@
       "name": "Set group parent",
       "request": {
         "method": "PATCH",
-        "header": [{"key": "Content-Type", "value": "application/json"}],
-        "body": {"mode": "raw", "raw": "{\"parent_group_id\": null}"},
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"parent_group_id\": null}"
+        },
         "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups/{{groupId}}/parent"
       }
     },
@@ -100,20 +370,94 @@
       "name": "Create resource",
       "request": {
         "method": "POST",
-        "header": [{"key": "Content-Type", "value": "application/json"}],
-        "body": {"mode": "raw", "raw": "{\"title\": \"Doc\"}"},
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\": \"Doc\"}"
+        },
         "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/resources"
       },
-      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["var json = pm.response.json();", "if (json.ID) pm.collectionVariables.set('resourceId', json.ID);"]}}]
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var json = pm.response.json();",
+              "if (json.ID) pm.collectionVariables.set('resourceId', json.ID);"
+            ]
+          }
+        }
+      ]
     },
-    {"name": "List resources", "request": {"method": "GET", "url": {"raw": "{{baseUrl}}/api/v1/domains/{{domainId}}/resources?offset=0&limit=20&search=", "query": [{"key": "offset", "value": "0"}, {"key": "limit", "value": "20"}, {"key": "search", "value": "", "description": "Case-insensitive title match"}, {"key": "search_type", "value": "contains", "description": "contains | starts_with | ends_with (only with search)", "disabled": true}, {"key": "sort", "value": "title", "description": "Sort field: title (default)", "disabled": true}, {"key": "order", "value": "asc", "description": "asc (default) | desc", "disabled": true}]}}},
-    {"name": "Get resource", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/resources/{{resourceId}}"}},
+    {
+      "name": "List resources",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/domains/{{domainId}}/resources?offset=0&limit=20&search=",
+          "query": [
+            {
+              "key": "offset",
+              "value": "0"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            },
+            {
+              "key": "search",
+              "value": "",
+              "description": "Case-insensitive title match"
+            },
+            {
+              "key": "search_type",
+              "value": "contains",
+              "description": "contains | starts_with | ends_with (only with search)",
+              "disabled": true
+            },
+            {
+              "key": "sort",
+              "value": "title",
+              "description": "Sort field: title (default)",
+              "disabled": true
+            },
+            {
+              "key": "order",
+              "value": "asc",
+              "description": "asc (default) | desc",
+              "disabled": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get resource",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/resources/{{resourceId}}"
+      }
+    },
     {
       "name": "Patch resource",
       "request": {
         "method": "PATCH",
-        "header": [{"key": "Content-Type", "value": "application/json"}],
-        "body": {"mode": "raw", "raw": "{\"title\": \"Doc (updated)\"}"},
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\": \"Doc (updated)\"}"
+        },
         "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/resources/{{resourceId}}"
       }
     },
@@ -121,20 +465,94 @@
       "name": "Create access type",
       "request": {
         "method": "POST",
-        "header": [{"key": "Content-Type", "value": "application/json"}],
-        "body": {"mode": "raw", "raw": "{\"title\": \"Read\", \"bit\": \"1\"}"},
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\": \"Read\", \"bit\": \"1\"}"
+        },
         "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/access-types"
       },
-      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["var json = pm.response.json();", "if (json.ID) pm.collectionVariables.set('accessTypeId', json.ID);"]}}]
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var json = pm.response.json();",
+              "if (json.ID) pm.collectionVariables.set('accessTypeId', json.ID);"
+            ]
+          }
+        }
+      ]
     },
-    {"name": "List access types", "request": {"method": "GET", "url": {"raw": "{{baseUrl}}/api/v1/domains/{{domainId}}/access-types?offset=0&limit=20&search=", "query": [{"key": "offset", "value": "0"}, {"key": "limit", "value": "20"}, {"key": "search", "value": "", "description": "Case-insensitive title match"}, {"key": "search_type", "value": "contains", "description": "contains | starts_with | ends_with (only with search)", "disabled": true}, {"key": "sort", "value": "title", "description": "Sort field: title (default)", "disabled": true}, {"key": "order", "value": "asc", "description": "asc (default) | desc", "disabled": true}]}}},
-    {"name": "Get access type", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/access-types/{{accessTypeId}}"}},
+    {
+      "name": "List access types",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/domains/{{domainId}}/access-types?offset=0&limit=20&search=",
+          "query": [
+            {
+              "key": "offset",
+              "value": "0"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            },
+            {
+              "key": "search",
+              "value": "",
+              "description": "Case-insensitive title match"
+            },
+            {
+              "key": "search_type",
+              "value": "contains",
+              "description": "contains | starts_with | ends_with (only with search)",
+              "disabled": true
+            },
+            {
+              "key": "sort",
+              "value": "title",
+              "description": "Sort field: title (default)",
+              "disabled": true
+            },
+            {
+              "key": "order",
+              "value": "asc",
+              "description": "asc (default) | desc",
+              "disabled": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get access type",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/access-types/{{accessTypeId}}"
+      }
+    },
     {
       "name": "Patch access type",
       "request": {
         "method": "PATCH",
-        "header": [{"key": "Content-Type", "value": "application/json"}],
-        "body": {"mode": "raw", "raw": "{\"title\": \"Read (updated)\"}"},
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\": \"Read (updated)\"}"
+        },
         "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/access-types/{{accessTypeId}}"
       }
     },
@@ -142,39 +560,388 @@
       "name": "Create permission",
       "request": {
         "method": "POST",
-        "header": [{"key": "Content-Type", "value": "application/json"}],
-        "body": {"mode": "raw", "raw": "{\"title\": \"Read doc\", \"resource_id\": \"{{resourceId}}\", \"access_mask\": \"1\"}"},
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\": \"Read doc\", \"resource_id\": \"{{resourceId}}\", \"access_mask\": \"1\"}"
+        },
         "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/permissions"
       },
-      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["var json = pm.response.json();", "if (json.ID) pm.collectionVariables.set('permissionId', json.ID);"]}}]
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var json = pm.response.json();",
+              "if (json.ID) pm.collectionVariables.set('permissionId', json.ID);"
+            ]
+          }
+        }
+      ]
     },
-    {"name": "List permissions", "request": {"method": "GET", "url": {"raw": "{{baseUrl}}/api/v1/domains/{{domainId}}/permissions?offset=0&limit=20&search=&resource_id=", "query": [{"key": "offset", "value": "0"}, {"key": "limit", "value": "20"}, {"key": "search", "value": "", "description": "Case-insensitive title match"}, {"key": "search_type", "value": "contains", "description": "contains | starts_with | ends_with (only with search)", "disabled": true}, {"key": "sort", "value": "title", "description": "Sort field: title (default), resource_id", "disabled": true}, {"key": "order", "value": "asc", "description": "asc (default) | desc", "disabled": true}, {"key": "resource_id", "value": "", "description": "Filter by resource UUID"}]}}},
-    {"name": "Get permission", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/permissions/{{permissionId}}"}},
+    {
+      "name": "List permissions",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/domains/{{domainId}}/permissions?offset=0&limit=20&search=&resource_id=",
+          "query": [
+            {
+              "key": "offset",
+              "value": "0"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            },
+            {
+              "key": "search",
+              "value": "",
+              "description": "Case-insensitive title match"
+            },
+            {
+              "key": "search_type",
+              "value": "contains",
+              "description": "contains | starts_with | ends_with (only with search)",
+              "disabled": true
+            },
+            {
+              "key": "sort",
+              "value": "title",
+              "description": "Sort field: title (default), resource_id",
+              "disabled": true
+            },
+            {
+              "key": "order",
+              "value": "asc",
+              "description": "asc (default) | desc",
+              "disabled": true
+            },
+            {
+              "key": "resource_id",
+              "value": "",
+              "description": "Filter by resource UUID"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get permission",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/permissions/{{permissionId}}"
+      }
+    },
     {
       "name": "Patch permission",
       "request": {
         "method": "PATCH",
-        "header": [{"key": "Content-Type", "value": "application/json"}],
-        "body": {"mode": "raw", "raw": "{\"title\": \"Read doc (updated)\"}"},
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\": \"Read doc (updated)\"}"
+        },
         "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/permissions/{{permissionId}}"
       }
     },
-    {"name": "Add user to group", "request": {"method": "POST", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}/groups/{{groupId}}"}},
-    {"name": "Grant user permission", "request": {"method": "POST", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}/permissions/{{permissionId}}"}},
-    {"name": "Grant group permission", "request": {"method": "POST", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups/{{groupId}}/permissions/{{permissionId}}"}},
-    {"name": "Authz check", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/authz/check?user_id={{userId}}&resource_id={{resourceId}}&access_bit=1"}},
-    {"name": "Authz masks", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/authz/masks?user_id={{userId}}&resource_id={{resourceId}}"}},
-    {"name": "List user authz resources", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}/authz/resources?offset=0&limit=20"}},
-    {"name": "List resource authz users", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/resources/{{resourceId}}/authz/users?offset=0&limit=20"}},
-    {"name": "List resource authz groups", "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/resources/{{resourceId}}/authz/groups?offset=0&limit=20"}},
-    {"name": "Revoke group permission", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups/{{groupId}}/permissions/{{permissionId}}"}},
-    {"name": "Revoke user permission", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}/permissions/{{permissionId}}"}},
-    {"name": "Remove user from group", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}/groups/{{groupId}}"}},
-    {"name": "Delete permission", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/permissions/{{permissionId}}"}},
-    {"name": "Delete access type", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/access-types/{{accessTypeId}}"}},
-    {"name": "Delete resource", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/resources/{{resourceId}}"}},
-    {"name": "Delete user", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}"}},
-    {"name": "Delete group", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups/{{groupId}}"}},
-    {"name": "Delete domain", "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/domains/{{domainId}}"}}
+    {
+      "name": "Add user to group",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}/groups/{{groupId}}"
+      }
+    },
+    {
+      "name": "Grant user permission",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}/permissions/{{permissionId}}"
+      }
+    },
+    {
+      "name": "Grant group permission",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups/{{groupId}}/permissions/{{permissionId}}"
+      }
+    },
+    {
+      "name": "Authz check",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/authz/check?user_id={{userId}}&resource_id={{resourceId}}&access_bit=1"
+      }
+    },
+    {
+      "name": "Authz masks",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/authz/masks?user_id={{userId}}&resource_id={{resourceId}}"
+      }
+    },
+    {
+      "name": "List user authz resources",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}/authz/resources?offset=0&limit=20"
+      }
+    },
+    {
+      "name": "List resource authz users",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/resources/{{resourceId}}/authz/users?offset=0&limit=20"
+      }
+    },
+    {
+      "name": "List resource authz groups",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/resources/{{resourceId}}/authz/groups?offset=0&limit=20"
+      }
+    },
+    {
+      "name": "V2 \u2014 Title-based Permissions",
+      "item": [
+        {
+          "name": "V2 Create access type (auto-bit)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"title\": \"read\"}"
+            },
+            "url": "{{baseUrl}}/api/v2/domains/{{domainId}}/access-types"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.ID) pm.collectionVariables.set('v2AccessTypeId', json.ID);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "V2 Create access type (explicit bit)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"title\": \"write\", \"bit\": \"2\"}"
+            },
+            "url": "{{baseUrl}}/api/v2/domains/{{domainId}}/access-types"
+          }
+        },
+        {
+          "name": "V2 List access types",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v2/domains/{{domainId}}/access-types"
+          }
+        },
+        {
+          "name": "V2 Create permission",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"title\": \"user-resource-grant\", \"resource_id\": \"{{resourceId}}\", \"permissions\": [\"read\"]}"
+            },
+            "url": "{{baseUrl}}/api/v2/domains/{{domainId}}/permissions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.ID) pm.collectionVariables.set('v2PermissionId', json.ID);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "V2 Get permission",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v2/domains/{{domainId}}/permissions/{{v2PermissionId}}"
+          }
+        },
+        {
+          "name": "V2 Patch permission",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"permissions\": [\"read\", \"write\"]}"
+            },
+            "url": "{{baseUrl}}/api/v2/domains/{{domainId}}/permissions/{{v2PermissionId}}"
+          }
+        },
+        {
+          "name": "V2 List permissions",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v2/domains/{{domainId}}/permissions"
+          }
+        },
+        {
+          "name": "V2 List user authz resources",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v2/domains/{{domainId}}/users/{{userId}}/authz/resources",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v2",
+                "domains",
+                "{{domainId}}",
+                "users",
+                "{{userId}}",
+                "authz",
+                "resources"
+              ]
+            }
+          }
+        },
+        {
+          "name": "V2 List resource authz users",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v2/domains/{{domainId}}/resources/{{resourceId}}/authz/users"
+          }
+        },
+        {
+          "name": "V2 List resource authz groups",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v2/domains/{{domainId}}/resources/{{resourceId}}/authz/groups"
+          }
+        },
+        {
+          "name": "V2 List group authz resources",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v2/domains/{{domainId}}/groups/{{groupId}}/authz/resources"
+          }
+        },
+        {
+          "name": "V2 Get user resource effective permissions",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v2/domains/{{domainId}}/users/{{userId}}/resources/{{resourceId}}/permissions"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Revoke group permission",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups/{{groupId}}/permissions/{{permissionId}}"
+      }
+    },
+    {
+      "name": "Revoke user permission",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}/permissions/{{permissionId}}"
+      }
+    },
+    {
+      "name": "Remove user from group",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}/groups/{{groupId}}"
+      }
+    },
+    {
+      "name": "Delete permission",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/permissions/{{permissionId}}"
+      }
+    },
+    {
+      "name": "Delete access type",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/access-types/{{accessTypeId}}"
+      }
+    },
+    {
+      "name": "Delete resource",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/resources/{{resourceId}}"
+      }
+    },
+    {
+      "name": "Delete user",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/users/{{userId}}"
+      }
+    },
+    {
+      "name": "Delete group",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}/groups/{{groupId}}"
+      }
+    },
+    {
+      "name": "Delete domain",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/api/v1/domains/{{domainId}}"
+      }
+    }
   ]
 }
