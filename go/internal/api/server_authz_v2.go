@@ -68,6 +68,9 @@ func (s *Server) userAuthzResourcesV2(w http.ResponseWriter, r *http.Request) {
 
 	dtos := make([]userAuthzResourceV2, 0, len(list))
 	for _, it := range list {
+		// Users report EffectiveMask: the union of their direct permissions plus
+		// those inherited through group membership. This is the true set of
+		// permissions the user has on the resource.
 		dtos = append(dtos, userAuthzResourceV2{
 			ResourceID:  it.ResourceID,
 			Permissions: access.MaskToTitles(it.EffectiveMask, types),
@@ -102,6 +105,9 @@ func (s *Server) groupAuthzResourcesV2(w http.ResponseWriter, r *http.Request) {
 
 	dtos := make([]groupAuthzResourceV2, 0, len(list))
 	for _, it := range list {
+		// Groups report Mask: their direct permissions on the resource.
+		// This is NOT the union of member permissions (that would be computed
+		// per-member and is returned in userAuthzResourcesV2 as EffectiveMask).
 		dtos = append(dtos, groupAuthzResourceV2{
 			ResourceID:  it.ResourceID,
 			Permissions: access.MaskToTitles(it.Mask, types),
@@ -136,6 +142,9 @@ func (s *Server) resourceAuthzUsersV2(w http.ResponseWriter, r *http.Request) {
 
 	dtos := make([]resourceAuthzUserV2, 0, len(list))
 	for _, it := range list {
+		// Users report EffectiveMask: the union of their direct permissions plus
+		// those inherited through group membership. This is the true set of
+		// permissions the user has on this resource.
 		dtos = append(dtos, resourceAuthzUserV2{
 			UserID:      it.UserID,
 			Permissions: access.MaskToTitles(it.EffectiveMask, types),
@@ -170,6 +179,8 @@ func (s *Server) resourceAuthzGroupsV2(w http.ResponseWriter, r *http.Request) {
 
 	dtos := make([]resourceAuthzGroupV2, 0, len(list))
 	for _, it := range list {
+		// Groups report Mask: their direct permissions on this resource.
+		// This is NOT the union of member permissions.
 		dtos = append(dtos, resourceAuthzGroupV2{
 			GroupID:     it.GroupID,
 			Permissions: access.MaskToTitles(it.Mask, types),

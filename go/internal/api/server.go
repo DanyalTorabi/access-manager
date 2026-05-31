@@ -60,6 +60,15 @@ func (s *Server) NegativeMaskCounter() prometheus.Counter {
 	return s.metrics.NegativeMaskTotal
 }
 
+// addAuthMiddleware applies Bearer auth middleware to the provided router if
+// APIBearerToken is configured. This ensures v1 and v2 API versions are kept
+// in sync regarding authentication requirements.
+func (s *Server) addAuthMiddleware(r chi.Router) {
+	if tok := strings.TrimSpace(s.APIBearerToken); tok != "" {
+		r.Use(BearerAuth(tok))
+	}
+}
+
 // Router builds the chi router. reg and gather supply the Prometheus registry
 // for metrics middleware and the /metrics endpoint. Pass nil for both to
 // disable instrumentation (e.g. in tests that don't care about metrics).
@@ -87,9 +96,7 @@ func (s *Server) Router(reg prometheus.Registerer, gather prometheus.Gatherer) c
 	}
 
 	r.Route("/api/v1", func(r chi.Router) {
-		if tok := strings.TrimSpace(s.APIBearerToken); tok != "" {
-			r.Use(BearerAuth(tok))
-		}
+		s.addAuthMiddleware(r)
 		r.Post("/domains", s.domainCreate)
 		r.Get("/domains", s.domainList)
 		r.Get("/domains/{domainID}", s.domainGet)
@@ -149,9 +156,7 @@ func (s *Server) Router(reg prometheus.Registerer, gather prometheus.Gatherer) c
 	// endpoints differ from v1 (they accept/return title arrays instead of
 	// numeric masks). CRUD for domains, users, groups, and resources stays at v1.
 	r.Route("/api/v2", func(r chi.Router) {
-		if tok := strings.TrimSpace(s.APIBearerToken); tok != "" {
-			r.Use(BearerAuth(tok))
-		}
+		s.addAuthMiddleware(r)
 
 		// Access types: POST uses auto-bit allocation; other verbs reuse v1 handlers.
 		r.Get("/domains/{domainID}/access-types", s.accessTypeList)
