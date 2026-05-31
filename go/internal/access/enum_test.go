@@ -7,19 +7,21 @@ import (
 	"github.com/dtorabi/access-manager/internal/store"
 )
 
-// makeTypes is a helper that builds a []store.AccessType from pairs of
-// (title, bitValue).
-func makeTypes(pairs ...any) []store.AccessType {
-	if len(pairs)%2 != 0 {
-		panic("makeTypes: must receive an even number of arguments")
-	}
-	out := make([]store.AccessType, 0, len(pairs)/2)
-	for i := 0; i < len(pairs); i += 2 {
+// accessTypeEntry is a (title, bit) pair used by makeTypes.
+type accessTypeEntry struct {
+	title string
+	bit   uint64
+}
+
+// makeTypes builds a []store.AccessType from (title, bit) pairs.
+func makeTypes(entries ...accessTypeEntry) []store.AccessType {
+	out := make([]store.AccessType, 0, len(entries))
+	for _, e := range entries {
 		out = append(out, store.AccessType{
 			ID:       "id",
 			DomainID: "dom",
-			Title:    pairs[i].(string),
-			Bit:      pairs[i+1].(uint64),
+			Title:    e.title,
+			Bit:      e.bit,
 		})
 	}
 	return out
@@ -27,9 +29,9 @@ func makeTypes(pairs ...any) []store.AccessType {
 
 func TestMaskToTitles(t *testing.T) {
 	types := makeTypes(
-		"read", uint64(1),
-		"write", uint64(2),
-		"delete", uint64(4),
+		accessTypeEntry{"read", uint64(1)},
+		accessTypeEntry{"write", uint64(2)},
+		accessTypeEntry{"delete", uint64(4)},
 	)
 
 	tests := []struct {
@@ -100,9 +102,9 @@ func TestMaskToTitles_nilTypes(t *testing.T) {
 
 func TestTitlesToMask(t *testing.T) {
 	types := makeTypes(
-		"read", uint64(1),
-		"write", uint64(2),
-		"delete", uint64(4),
+		accessTypeEntry{"read", uint64(1)},
+		accessTypeEntry{"write", uint64(2)},
+		accessTypeEntry{"delete", uint64(4)},
 	)
 
 	tests := []struct {
@@ -196,17 +198,17 @@ func TestAllocateNextBit(t *testing.T) {
 		},
 		{
 			name:  "bit 1 taken: returns 2",
-			types: makeTypes("read", uint64(1)),
+			types: makeTypes(accessTypeEntry{"read", uint64(1)}),
 			want:  2,
 		},
 		{
 			name:  "bits 1 and 2 taken: returns 4",
-			types: makeTypes("read", uint64(1), "write", uint64(2)),
+			types: makeTypes(accessTypeEntry{"read", uint64(1)}, accessTypeEntry{"write", uint64(2)}),
 			want:  4,
 		},
 		{
 			name:  "sparse gap: bits 1 and 4 taken, returns 2",
-			types: makeTypes("read", uint64(1), "delete", uint64(4)),
+			types: makeTypes(accessTypeEntry{"read", uint64(1)}, accessTypeEntry{"delete", uint64(4)}),
 			want:  2,
 		},
 		{
