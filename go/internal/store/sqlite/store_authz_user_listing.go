@@ -45,6 +45,13 @@ func (s *Store) UserAuthzResourcesList(ctx context.Context, domainID, userID str
 	}
 
 	var total int64
+	// COUNT and the page SELECT below are issued as separate statements,
+	// not wrapped in a read transaction. Under concurrent writes the page
+	// and total may briefly disagree (a row counted here may be deleted
+	// before the page query, or vice versa). This is acceptable for a
+	// listing endpoint; if strict consistency is ever required, both
+	// queries should run inside a single read transaction.
+	//
 	// user_resource_masks only holds non-zero mask rows (computeAndUpsertMask
 	// deletes the row when the combined mask is zero), so no access_mask filter
 	// is required here.
