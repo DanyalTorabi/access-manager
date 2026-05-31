@@ -175,3 +175,32 @@ func groupMemberIDs(ctx context.Context, tx *sql.Tx, domainID, groupID string) (
 	}
 	return ids, rows.Err()
 }
+
+// permissionHolderUserIDs returns all distinct user IDs that hold
+// permissionID — either directly via user_permissions or transitively via
+// group_permissions + group_members. Used by PermissionPatch to identify
+// which (user, resource) pairs in user_resource_masks need recomputation when
+// a permission's access_mask or resource_id changes.
+func permissionHolderUserIDs(ctx context.Context, tx *sql.Tx, domainID, permissionID string) ([]string, error) {
+	rows, err := tx.QueryContext(ctx, `
+SELECT up.user_id FROM user_permissions up
+WHERE up.domain_id = ? AND up.permission_id = ?
+UNION
+SELECT DISTINCT gm.user_id FROM group_permissions gp
+INNER JOIN group_members gm ON gm.group_id = gp.group_id AND gm.domain_id = gp.domain_id
+WHERE gp.domain_id = ? AND gp.permission_id = ?`,
+		domainID, permissionID, domainID, permissionID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}

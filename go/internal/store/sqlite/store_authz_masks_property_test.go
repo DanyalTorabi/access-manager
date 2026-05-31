@@ -235,3 +235,81 @@ func TestMaterialized_reconcile(t *testing.T) {
 		t.Errorf("after reconcile: mask = %#x, want %#x", gotMask, wantMask)
 	}
 }
+
+// TestMaterialized_permissionPatchInvalidatesCache verifies that
+// PermissionPatch correctly refreshes user_resource_masks when a
+// permission's access_mask or resource_id is changed.
+func TestMaterialized_permissionPatchInvalidatesCache(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+
+	domID := uuid.NewString()
+	uid := uuid.NewString()
+	rid1 := uuid.NewString()
+	rid2 := uuid.NewString()
+	pid := uuid.NewString()
+
+	if err := s.DomainCreate(ctx, &store.Domain{ID: domID, Title: "d"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UserCreate(ctx, &store.User{ID: uid, DomainID: domID, Title: "u"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range []*store.Resource{
+		{ID: rid1, DomainID: domID, Title: "r1"},
+		{ID: rid2, DomainID: domID, Title: "r2"},
+	} {
+		if err := s.ResourceCreate(ctx, r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.PermissionCreate(ctx, &store.Permission{ID: pid, DomainID: domID, Title: "p", ResourceID: rid1, AccessMask: 0x1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.GrantUserPermission(ctx, domID, uid, pid); err != nil {
+		t.Fatal(err)
+	}
+
+	// Precondition: mask on rid1 is 0x1, mask on rid2 is 0.
+	m1, err := s.EffectiveMask(ctx, domID, uid, rid1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m1 != 0x1 {
+		t.Fatalf("pre-patch: EffectiveMask rid1 = %#x, want 0x1", m1)
+	}
+
+	// Patch: change access_mask from 0x1 to 0x3.
+	newMask := uint64(0x3)
+	if _, err := s.PermissionPatch(ctx, domID, pid, store.PermissionPatchParams{AccessMask: &newMask}); err != nil {
+		t.Fatal(err)
+	}
+	m1After, err := s.EffectiveMask(ctx, domID, uid, rid1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m1After != 0x3 {
+		t.Errorf("after mask patch: EffectiveMask rid1 = %#x, want 0x3", m1After)
+	}
+
+	// Patch: reassign permission to rid2 (mask stays 0x3).
+	if _, err := s.PermissionPatch(ctx, domID, pid, store.PermissionPatchParams{ResourceID: &rid2}); err != nil {
+		t.Fatal(err)
+	}
+	// Old resource should now have mask 0 (cache row deleted).
+	m1Old, err := s.EffectiveMask(ctx, domID, uid, rid1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m1Old != 0 {
+		t.Errorf("after resource reassign: EffectiveMask rid1 = %#x, want 0", m1Old)
+	}
+	// New resource should reflect the mask.
+	m2New, err := s.EffectiveMask(ctx, domID, uid, rid2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m2New != 0x3 {
+		t.Errorf("after resource reassign: EffectiveMask rid2 = %#x, want 0x3", m2New)
+	}
+}
