@@ -144,6 +144,38 @@ func (s *Server) Router(reg prometheus.Registerer, gather prometheus.Gatherer) c
 		r.Get("/domains/{domainID}/authz/check", s.authzCheck)
 		r.Get("/domains/{domainID}/authz/masks", s.authzMasks)
 	})
+
+	// /api/v2 uses the same Bearer auth middleware as v1. Only permission-related
+	// endpoints differ from v1 (they accept/return title arrays instead of
+	// numeric masks). CRUD for domains, users, groups, and resources stays at v1.
+	r.Route("/api/v2", func(r chi.Router) {
+		if tok := strings.TrimSpace(s.APIBearerToken); tok != "" {
+			r.Use(BearerAuth(tok))
+		}
+
+		// Access types: POST uses auto-bit allocation; other verbs reuse v1 handlers.
+		r.Get("/domains/{domainID}/access-types", s.accessTypeList)
+		r.Post("/domains/{domainID}/access-types", s.accessTypeCreateV2)
+		r.Get("/domains/{domainID}/access-types/{accessTypeID}", s.accessTypeGet)
+		r.Patch("/domains/{domainID}/access-types/{accessTypeID}", s.accessTypePatch)
+		r.Delete("/domains/{domainID}/access-types/{accessTypeID}", s.accessTypeDelete)
+
+		// Permissions: request/response uses title arrays instead of numeric access_mask.
+		r.Get("/domains/{domainID}/permissions", s.permissionListV2)
+		r.Post("/domains/{domainID}/permissions", s.permissionCreateV2)
+		r.Get("/domains/{domainID}/permissions/{permissionID}", s.permissionGetV2)
+		r.Patch("/domains/{domainID}/permissions/{permissionID}", s.permissionPatchV2)
+		r.Delete("/domains/{domainID}/permissions/{permissionID}", s.permissionDelete)
+
+		// Authz listing: returns sorted title arrays instead of numeric masks.
+		r.Get("/domains/{domainID}/users/{userID}/authz/resources", s.userAuthzResourcesV2)
+		r.Get("/domains/{domainID}/groups/{groupID}/authz/resources", s.groupAuthzResourcesV2)
+		r.Get("/domains/{domainID}/resources/{resourceID}/authz/users", s.resourceAuthzUsersV2)
+		r.Get("/domains/{domainID}/resources/{resourceID}/authz/groups", s.resourceAuthzGroupsV2)
+
+		// New endpoint: effective permission titles for a specific user + resource pair.
+		r.Get("/domains/{domainID}/users/{userID}/resources/{resourceID}/permissions", s.userResourcePermissionsV2)
+	})
 	return r
 }
 
