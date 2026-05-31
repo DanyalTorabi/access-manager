@@ -45,8 +45,11 @@ func (s *Store) UserAuthzResourcesList(ctx context.Context, domainID, userID str
 	}
 
 	var total int64
+	// user_resource_masks only holds non-zero mask rows (computeAndUpsertMask
+	// deletes the row when the combined mask is zero), so no access_mask filter
+	// is required here.
 	if err := s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM user_resource_masks WHERE domain_id = ? AND user_id = ? AND access_mask != 0`,
+		`SELECT COUNT(*) FROM user_resource_masks WHERE domain_id = ? AND user_id = ?`,
 		domainID, userID,
 	).Scan(&total); err != nil {
 		return nil, 0, err
@@ -54,7 +57,7 @@ func (s *Store) UserAuthzResourcesList(ctx context.Context, domainID, userID str
 
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT resource_id, access_mask FROM user_resource_masks`+
-			` WHERE domain_id = ? AND user_id = ? AND access_mask != 0`+
+			` WHERE domain_id = ? AND user_id = ?`+
 			` ORDER BY resource_id ASC LIMIT ? OFFSET ?`,
 		domainID, userID, opts.Limit, opts.Offset,
 	)

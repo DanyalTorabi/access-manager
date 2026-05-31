@@ -152,6 +152,9 @@ func (s *Store) ResourceAuthzUsersList(ctx context.Context, domainID, resourceID
 	}
 
 	var total int64
+	// user_resource_masks only holds non-zero mask rows (computeAndUpsertMask
+	// deletes the row when the combined mask is zero), so no access_mask filter
+	// is required here.
 	if err := s.db.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM user_resource_masks WHERE domain_id = ? AND resource_id = ?`,
 		domainID, resourceID,
