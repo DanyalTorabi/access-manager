@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **T70 / #127:** V2 API test coverage — added 32 new test functions across `server_access_types_v2_test.go` (+5), `server_permissions_v2_test.go` (+4), and `server_authz_v2_test.go` (+23). Tests cover list pagination, sorting/filtering, PATCH partial updates, unsupported-parameter rejection, not-found errors, authz integration (user, group, inheritance, union masks), no-domain-leakage, and duplicate-grant idempotency. All 55 V2 tests pass under `go test -race`.
+
 - **T21 / #32:** Kubernetes deployment — raw manifests (`deploy/k8s/`) and Helm chart (`charts/access-manager/`) for deploying access-manager to any Kubernetes cluster. Includes: Namespace, ConfigMap, Deployment (2 replicas, RollingUpdate, `/health` liveness + readiness probes, non-root `securityContext` matching the distroless image UID 65532, `readOnlyRootFilesystem`), ClusterIP Service, nginx Ingress, and an optional in-cluster Postgres StatefulSet + PVC for Minikube/dev. Secret names align with `docs/environments.md` (`access-manager-db` / `access-manager-auth`). `docs/kubernetes.md` added with prerequisites, secret creation, `kubectl apply`, Helm install/upgrade, rolling-update, and Minikube smoke-test instructions.
 
 ### Security

@@ -254,13 +254,4 @@ func TestAPI_v2_accessTypePatch_titleOnly(t *testing.T) {
 	}
 }
 
-// seedAccessTypeV2TS creates an access type via the V2 endpoint and returns its
-// response; used by tests in this file that need the full V2 response.
-func seedAccessTypeV2TS(t *testing.T, ts *httptest.Server, domID, title string) accessTypeResponseV2 {
-	t.Helper()
-	var at accessTypeResponseV2
-	if err := json.Unmarshal(mustPostJSON201(t, domainBaseV2(ts, domID)+"/access-types", fmt.Sprintf(`{"title":%q}`, title)), &at); err != nil {
-		t.Fatal(err)
-	}
-	return at
-}
+
