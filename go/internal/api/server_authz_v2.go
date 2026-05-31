@@ -45,7 +45,7 @@ type userResourcePermissionsV2Response struct {
 func (s *Server) userAuthzResourcesV2(w http.ResponseWriter, r *http.Request) {
 	opts, err := parseOffsetLimitOpts(r)
 	if err != nil {
-		writeErr(w, r, http.StatusBadRequest, err)
+		s.writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	opts.Sort = userAuthzResourcesSortField
@@ -56,13 +56,13 @@ func (s *Server) userAuthzResourcesV2(w http.ResponseWriter, r *http.Request) {
 
 	list, total, err := s.Store.UserAuthzResourcesList(r.Context(), domainID, uid, opts)
 	if err != nil {
-		writeStoreErr(w, r, err)
+		s.writeStoreErr(w, r, err)
 		return
 	}
 
 	types, err := s.loadDomainAccessTypes(r, domainID)
 	if err != nil {
-		writeInternalErr(w, r, err)
+		s.writeInternalErr(w, r, err)
 		return
 	}
 
@@ -76,13 +76,13 @@ func (s *Server) userAuthzResourcesV2(w http.ResponseWriter, r *http.Request) {
 			Permissions: access.MaskToTitles(it.EffectiveMask, types),
 		})
 	}
-	writeList(w, r, dtos, total, opts)
+	s.writeList(w, r, dtos, total, opts)
 }
 
 func (s *Server) groupAuthzResourcesV2(w http.ResponseWriter, r *http.Request) {
 	opts, err := parseOffsetLimitOpts(r)
 	if err != nil {
-		writeErr(w, r, http.StatusBadRequest, err)
+		s.writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	opts.Sort = groupAuthzResourcesSortField
@@ -93,13 +93,13 @@ func (s *Server) groupAuthzResourcesV2(w http.ResponseWriter, r *http.Request) {
 
 	list, total, err := s.Store.GroupAuthzResourcesList(r.Context(), domainID, gid, opts)
 	if err != nil {
-		writeStoreErr(w, r, err)
+		s.writeStoreErr(w, r, err)
 		return
 	}
 
 	types, err := s.loadDomainAccessTypes(r, domainID)
 	if err != nil {
-		writeInternalErr(w, r, err)
+		s.writeInternalErr(w, r, err)
 		return
 	}
 
@@ -113,13 +113,13 @@ func (s *Server) groupAuthzResourcesV2(w http.ResponseWriter, r *http.Request) {
 			Permissions: access.MaskToTitles(it.Mask, types),
 		})
 	}
-	writeList(w, r, dtos, total, opts)
+	s.writeList(w, r, dtos, total, opts)
 }
 
 func (s *Server) resourceAuthzUsersV2(w http.ResponseWriter, r *http.Request) {
 	opts, err := parseOffsetLimitOpts(r)
 	if err != nil {
-		writeErr(w, r, http.StatusBadRequest, err)
+		s.writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	opts.Sort = resourceAuthzUsersSortField
@@ -130,13 +130,13 @@ func (s *Server) resourceAuthzUsersV2(w http.ResponseWriter, r *http.Request) {
 
 	list, total, err := s.Store.ResourceAuthzUsersList(r.Context(), domainID, rid, opts)
 	if err != nil {
-		writeStoreErr(w, r, err)
+		s.writeStoreErr(w, r, err)
 		return
 	}
 
 	types, err := s.loadDomainAccessTypes(r, domainID)
 	if err != nil {
-		writeInternalErr(w, r, err)
+		s.writeInternalErr(w, r, err)
 		return
 	}
 
@@ -150,13 +150,13 @@ func (s *Server) resourceAuthzUsersV2(w http.ResponseWriter, r *http.Request) {
 			Permissions: access.MaskToTitles(it.EffectiveMask, types),
 		})
 	}
-	writeList(w, r, dtos, total, opts)
+	s.writeList(w, r, dtos, total, opts)
 }
 
 func (s *Server) resourceAuthzGroupsV2(w http.ResponseWriter, r *http.Request) {
 	opts, err := parseOffsetLimitOpts(r)
 	if err != nil {
-		writeErr(w, r, http.StatusBadRequest, err)
+		s.writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	opts.Sort = resourceAuthzGroupsSortField
@@ -167,13 +167,13 @@ func (s *Server) resourceAuthzGroupsV2(w http.ResponseWriter, r *http.Request) {
 
 	list, total, err := s.Store.ResourceAuthzGroupsList(r.Context(), domainID, rid, opts)
 	if err != nil {
-		writeStoreErr(w, r, err)
+		s.writeStoreErr(w, r, err)
 		return
 	}
 
 	types, err := s.loadDomainAccessTypes(r, domainID)
 	if err != nil {
-		writeInternalErr(w, r, err)
+		s.writeInternalErr(w, r, err)
 		return
 	}
 
@@ -186,7 +186,7 @@ func (s *Server) resourceAuthzGroupsV2(w http.ResponseWriter, r *http.Request) {
 			Permissions: access.MaskToTitles(it.Mask, types),
 		})
 	}
-	writeList(w, r, dtos, total, opts)
+	s.writeList(w, r, dtos, total, opts)
 }
 
 // userResourcePermissionsV2 returns the effective permission titles for a
@@ -199,17 +199,17 @@ func (s *Server) userResourcePermissionsV2(w http.ResponseWriter, r *http.Reques
 
 	mask, err := s.Store.EffectiveMask(r.Context(), domainID, uid, rid)
 	if err != nil {
-		writeStoreErr(w, r, err)
+		s.writeStoreErr(w, r, err)
 		return
 	}
 
 	types, err := s.loadDomainAccessTypes(r, domainID)
 	if err != nil {
-		writeInternalErr(w, r, err)
+		s.writeInternalErr(w, r, err)
 		return
 	}
 
-	writeJSON(w, r, http.StatusOK, userResourcePermissionsV2Response{
+	s.writeJSON(w, r, http.StatusOK, userResourcePermissionsV2Response{
 		Permissions: access.MaskToTitles(mask, types),
 	})
 }

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/dtorabi/access-manager/internal/access"
-	"github.com/dtorabi/access-manager/internal/logger"
 	"github.com/dtorabi/access-manager/internal/store"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -53,19 +52,19 @@ func toPermissionResponseV2(p *store.Permission, types []store.AccessType) permi
 func (s *Server) permissionCreateV2(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
 	var b permissionBodyV2
-	if !readJSON(w, r, &b) {
+	if !s.readJSON(w, r, &b) {
 		return
 	}
 
 	// Validate title is non-empty.
 	if strings.TrimSpace(b.Title) == "" {
-		writeErr(w, r, http.StatusBadRequest, errors.New("title is required"))
+		s.writeErr(w, r, http.StatusBadRequest, errors.New("title is required"))
 		return
 	}
 
 	types, err := s.loadDomainAccessTypes(r, domainID)
 	if err != nil {
-		writeInternalErr(w, r, err)
+		s.writeInternalErr(w, r, err)
 		return
 	}
 
@@ -73,10 +72,10 @@ func (s *Server) permissionCreateV2(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var ute *access.UnknownTitleError
 		if errors.As(err, &ute) {
-			writeErr(w, r, http.StatusBadRequest, err)
+			s.writeErr(w, r, http.StatusBadRequest, err)
 			return
 		}
-		writeInternalErr(w, r, err)
+		s.writeInternalErr(w, r, err)
 		return
 	}
 
@@ -88,16 +87,16 @@ func (s *Server) permissionCreateV2(w http.ResponseWriter, r *http.Request) {
 		AccessMask: mask,
 	}
 	if err := s.Store.PermissionCreate(r.Context(), p); err != nil {
-		writeStoreErr(w, r, err)
+		s.writeStoreErr(w, r, err)
 		return
 	}
-	logger.Audit(r.Context(), "permission_create",
+	s.auditLog(r.Context(), "permission_create",
 		slog.String("domain_id", domainID),
 		slog.String("permission_id", p.ID),
 		slog.String("resource_id", p.ResourceID),
 		slog.Uint64("access_mask", p.AccessMask),
 	)
-	writeJSON(w, r, http.StatusCreated, toPermissionResponseV2(p, types))
+	s.writeJSON(w, r, http.StatusCreated, toPermissionResponseV2(p, types))
 }
 
 func (s *Server) permissionGetV2(w http.ResponseWriter, r *http.Request) {
@@ -106,41 +105,41 @@ func (s *Server) permissionGetV2(w http.ResponseWriter, r *http.Request) {
 
 	p, err := s.Store.PermissionGet(r.Context(), domainID, id)
 	if err != nil {
-		writeStoreErr(w, r, err)
+		s.writeStoreErr(w, r, err)
 		return
 	}
 
 	types, err := s.loadDomainAccessTypes(r, domainID)
 	if err != nil {
-		writeInternalErr(w, r, err)
+		s.writeInternalErr(w, r, err)
 		return
 	}
 
-	writeJSON(w, r, http.StatusOK, toPermissionResponseV2(p, types))
+	s.writeJSON(w, r, http.StatusOK, toPermissionResponseV2(p, types))
 }
 
 func (s *Server) permissionListV2(w http.ResponseWriter, r *http.Request) {
 	opts, err := parsePermissionListOpts(r)
 	if err != nil {
-		writeErr(w, r, http.StatusBadRequest, err)
+		s.writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	opts.Sort, opts.Order, err = parseSortOrder(r.URL.Query(), store.PermissionSortFields)
 	if err != nil {
-		writeErr(w, r, http.StatusBadRequest, err)
+		s.writeErr(w, r, http.StatusBadRequest, err)
 		return
 	}
 	domainID := chi.URLParam(r, "domainID")
 
 	list, total, err := s.Store.PermissionList(r.Context(), domainID, opts)
 	if err != nil {
-		writeInternalErr(w, r, err)
+		s.writeInternalErr(w, r, err)
 		return
 	}
 
 	types, err := s.loadDomainAccessTypes(r, domainID)
 	if err != nil {
-		writeInternalErr(w, r, err)
+		s.writeInternalErr(w, r, err)
 		return
 	}
 
@@ -148,18 +147,18 @@ func (s *Server) permissionListV2(w http.ResponseWriter, r *http.Request) {
 	for i := range list {
 		dtos = append(dtos, toPermissionResponseV2(&list[i], types))
 	}
-	writeList(w, r, dtos, total, opts.ListOpts)
+	s.writeList(w, r, dtos, total, opts.ListOpts)
 }
 
 func (s *Server) permissionPatchV2(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
 	id := chi.URLParam(r, "permissionID")
 	var b permissionPatchBodyV2
-	if !readJSON(w, r, &b) {
+	if !s.readJSON(w, r, &b) {
 		return
 	}
 	if b.Title == nil && b.ResourceID == nil && b.Permissions == nil {
-		writeErr(w, r, http.StatusBadRequest, errors.New("at least one of title, resource_id, permissions is required"))
+		s.writeErr(w, r, http.StatusBadRequest, errors.New("at least one of title, resource_id, permissions is required"))
 		return
 	}
 
@@ -171,7 +170,7 @@ func (s *Server) permissionPatchV2(w http.ResponseWriter, r *http.Request) {
 	if b.Permissions != nil {
 		types, err = s.loadDomainAccessTypes(r, domainID)
 		if err != nil {
-			writeInternalErr(w, r, err)
+			s.writeInternalErr(w, r, err)
 			return
 		}
 	}
@@ -183,10 +182,10 @@ func (s *Server) permissionPatchV2(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			var ute *access.UnknownTitleError
 			if errors.As(err, &ute) {
-				writeErr(w, r, http.StatusBadRequest, err)
+				s.writeErr(w, r, http.StatusBadRequest, err)
 				return
 			}
-			writeInternalErr(w, r, err)
+			s.writeInternalErr(w, r, err)
 			return
 		}
 		params.AccessMask = &mask
@@ -194,13 +193,13 @@ func (s *Server) permissionPatchV2(w http.ResponseWriter, r *http.Request) {
 
 	p, err := s.Store.PermissionPatch(r.Context(), domainID, id, params)
 	if err != nil {
-		writeStoreErr(w, r, err)
+		s.writeStoreErr(w, r, err)
 		return
 	}
 
 	// Audit log immediately after successful store mutation, before any
 	// subsequent reads that could fail.
-	logger.Audit(r.Context(), "permission_patch",
+	s.auditLog(r.Context(), "permission_patch",
 		slog.String("domain_id", domainID),
 		slog.String("permission_id", id),
 		slog.String("resource_id", p.ResourceID),
@@ -209,13 +208,13 @@ func (s *Server) permissionPatchV2(w http.ResponseWriter, r *http.Request) {
 
 	// If we haven't loaded types yet (because permissions weren't patched),
 	// load them now for the response.
-	if len(types) == 0 && types == nil {
+	if types == nil {
 		types, err = s.loadDomainAccessTypes(r, domainID)
 		if err != nil {
-			writeInternalErr(w, r, err)
+			s.writeInternalErr(w, r, err)
 			return
 		}
 	}
 
-	writeJSON(w, r, http.StatusOK, toPermissionResponseV2(p, types))
+	s.writeJSON(w, r, http.StatusOK, toPermissionResponseV2(p, types))
 }

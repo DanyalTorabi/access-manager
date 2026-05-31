@@ -65,9 +65,10 @@ func MaskToTitles(mask uint64, types []store.AccessType) []string {
 // an *UnknownTitleError to be returned immediately. An empty titles slice
 // returns 0.
 //
-// Access types with Bit=0 are skipped (not included in the mask) and do not
-// cause an error. This ensures consistency with MaskToTitles, which also
-// excludes bit=0 entries.
+// Access types with Bit=0 are excluded from the lookup map. If a caller's
+// titles slice contains such a title, TitlesToMask returns *UnknownTitleError —
+// the same result as referencing a title that does not exist at all.
+// This ensures consistency with MaskToTitles, which also excludes bit=0 entries.
 func TitlesToMask(titles []string, types []store.AccessType) (uint64, error) {
 	if len(titles) == 0 {
 		return 0, nil

@@ -19,15 +19,18 @@ func TestAPI_v2_accessTypeCreate_autoAllocatesLowestBit(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	domID := seedDomain(t, ts, "d")
 
-	var at1 store.AccessType
+	var at1 accessTypeResponseV2
 	if err := json.Unmarshal(mustPostJSON201(t, domainBaseV2(ts, domID)+"/access-types", `{"title":"read"}`), &at1); err != nil {
 		t.Fatal(err)
 	}
 	if at1.Bit != 1 {
 		t.Fatalf("first auto-allocated bit: want 1, got %d", at1.Bit)
 	}
+	if at1.DomainID != domID {
+		t.Fatalf("first auto-allocated: want domain_id %q, got %q", domID, at1.DomainID)
+	}
 
-	var at2 store.AccessType
+	var at2 accessTypeResponseV2
 	if err := json.Unmarshal(mustPostJSON201(t, domainBaseV2(ts, domID)+"/access-types", `{"title":"write"}`), &at2); err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +43,7 @@ func TestAPI_v2_accessTypeCreate_withExplicitBit(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	domID := seedDomain(t, ts, "d")
 
-	var at store.AccessType
+	var at accessTypeResponseV2
 	if err := json.Unmarshal(mustPostJSON201(t, domainBaseV2(ts, domID)+"/access-types", `{"title":"delete","bit":"4"}`), &at); err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +51,7 @@ func TestAPI_v2_accessTypeCreate_withExplicitBit(t *testing.T) {
 		t.Fatalf("explicit bit: want Bit=4 Title=delete, got %+v", at)
 	}
 	// Auto-allocate after explicit creates: lowest unused should be 1 (not 2 or 4)
-	var at2 store.AccessType
+	var at2 accessTypeResponseV2
 	if err := json.Unmarshal(mustPostJSON201(t, domainBaseV2(ts, domID)+"/access-types", `{"title":"read"}`), &at2); err != nil {
 		t.Fatal(err)
 	}
@@ -72,6 +75,16 @@ func TestAPI_v2_accessTypeCreate_invalidBit_400(t *testing.T) {
 	mustPostJSON(t, domainBaseV2(ts, domID)+"/access-types", `{"title":"read","bit":"nope"}`, http.StatusBadRequest)
 }
 
+func TestAPI_v2_accessTypeCreate_nonPowerOfTwoBit_400(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domID := seedDomain(t, ts, "d")
+
+	// 3 is a valid uint64 but not a power of two (covers bits 0 and 1 simultaneously).
+	mustPostJSON(t, domainBaseV2(ts, domID)+"/access-types", `{"title":"rw","bit":"3"}`, http.StatusBadRequest)
+	// 0 is also explicitly rejected.
+	mustPostJSON(t, domainBaseV2(ts, domID)+"/access-types", `{"title":"zero","bit":"0"}`, http.StatusBadRequest)
+}
+
 func TestAPI_v2_accessTypeCreate_allBitsExhausted_409(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	domID := seedDomain(t, ts, "d")
@@ -91,19 +104,19 @@ func TestAPI_v2_accessTypeCreate_v1StillWorksOnV2Types(t *testing.T) {
 	ts, _ := newTestAPI(t)
 	domID := seedDomain(t, ts, "d")
 
-	// Create via v2.
-	var created store.AccessType
+	// Create via v2; decode into accessTypeResponseV2 to validate snake_case fields.
+	var created accessTypeResponseV2
 	if err := json.Unmarshal(mustPostJSON201(t, domainBaseV2(ts, domID)+"/access-types", `{"title":"read"}`), &created); err != nil {
 		t.Fatal(err)
 	}
 
-	// GET via v1 should succeed and return the same record.
+	// GET via v1 should succeed and return the same record (PascalCase).
 	b := mustGet(t, domainBase(ts, domID)+"/access-types/"+created.ID, http.StatusOK)
 	var got store.AccessType
 	if err := json.Unmarshal(b, &got); err != nil {
 		t.Fatal(err)
 	}
 	if got.ID != created.ID || got.Bit != created.Bit || got.Title != created.Title {
-		t.Fatalf("v1 GET: want %+v, got %+v", created, got)
+		t.Fatalf("v1 GET: want id=%s bit=%d title=%s, got %+v", created.ID, created.Bit, created.Title, got)
 	}
 }

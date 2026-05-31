@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/dtorabi/access-manager/internal/access"
-	"github.com/dtorabi/access-manager/internal/logger"
 	"github.com/dtorabi/access-manager/internal/store"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -41,13 +40,13 @@ func (s *Server) loadDomainAccessTypes(r *http.Request, domainID string) ([]stor
 func (s *Server) accessTypeCreateV2(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
 	var b accessTypeBodyV2
-	if !readJSON(w, r, &b) {
+	if !s.readJSON(w, r, &b) {
 		return
 	}
 
 	// Validate title is non-empty.
 	if strings.TrimSpace(b.Title) == "" {
-		writeErr(w, r, http.StatusBadRequest, errors.New("title is required"))
+		s.writeErr(w, r, http.StatusBadRequest, errors.New("title is required"))
 		return
 	}
 
@@ -58,28 +57,28 @@ func (s *Server) accessTypeCreateV2(w http.ResponseWriter, r *http.Request) {
 		var err error
 		bit, err = parseUint64Validated(*b.Bit, maxAccessMask)
 		if err != nil {
-			writeErr(w, r, http.StatusBadRequest, err)
+			s.writeErr(w, r, http.StatusBadRequest, err)
 			return
 		}
 		// Validate that bit is a non-zero power of two.
 		if bit == 0 || (bit&(bit-1)) != 0 {
-			writeErr(w, r, http.StatusBadRequest, errors.New("bit must be a non-zero power of two"))
+			s.writeErr(w, r, http.StatusBadRequest, errors.New("bit must be a non-zero power of two"))
 			return
 		}
 	} else {
 		// Auto-allocate the lowest unused bit in this domain.
 		types, err := s.loadDomainAccessTypes(r, domainID)
 		if err != nil {
-			writeInternalErr(w, r, err)
+			s.writeInternalErr(w, r, err)
 			return
 		}
 		bit, err = access.AllocateNextBit(types)
 		if err != nil {
 			if errors.Is(err, access.ErrBitsExhausted) {
-				writeErr(w, r, http.StatusConflict, errors.New("all 63 permission bits are exhausted for this domain"))
+				s.writeErr(w, r, http.StatusConflict, errors.New("all 63 permission bits are exhausted for this domain"))
 				return
 			}
-			writeInternalErr(w, r, err)
+			s.writeInternalErr(w, r, err)
 			return
 		}
 	}
@@ -92,12 +91,12 @@ func (s *Server) accessTypeCreateV2(w http.ResponseWriter, r *http.Request) {
 		a := &store.AccessType{ID: uuid.NewString(), DomainID: domainID, Title: b.Title, Bit: bit}
 		err := s.Store.AccessTypeCreate(r.Context(), a)
 		if err == nil {
-			logger.Audit(r.Context(), "access_type_create",
+			s.auditLog(r.Context(), "access_type_create",
 				slog.String("domain_id", domainID),
 				slog.String("access_type_id", a.ID),
 				slog.Uint64("bit", a.Bit),
 			)
-			writeJSON(w, r, http.StatusCreated, &accessTypeResponseV2{
+			s.writeJSON(w, r, http.StatusCreated, &accessTypeResponseV2{
 				ID:       a.ID,
 				DomainID: a.DomainID,
 				Title:    a.Title,
@@ -108,23 +107,30 @@ func (s *Server) accessTypeCreateV2(w http.ResponseWriter, r *http.Request) {
 
 		// If conflict and auto-allocation, retry; otherwise fail.
 		if !autoAlloc || !errors.Is(err, store.ErrConflict) || attempt == maxRetries {
-			writeStoreErr(w, r, err)
+			s.writeStoreErr(w, r, err)
 			return
 		}
 
 		// Retry: re-read domain types and re-allocate.
 		types, err := s.loadDomainAccessTypes(r, domainID)
 		if err != nil {
-			writeInternalErr(w, r, err)
+			s.writeInternalErr(w, r, err)
 			return
 		}
+		prevBit := bit
 		bit, err = access.AllocateNextBit(types)
 		if err != nil {
 			if errors.Is(err, access.ErrBitsExhausted) {
-				writeErr(w, r, http.StatusConflict, errors.New("all 63 permission bits are exhausted for this domain"))
+				s.writeErr(w, r, http.StatusConflict, errors.New("all 63 permission bits are exhausted for this domain"))
 				return
 			}
-			writeInternalErr(w, r, err)
+			s.writeInternalErr(w, r, err)
+			return
+		}
+		// If AllocateNextBit returns the same bit as before, the conflict is a title
+		// collision (not a bit race). No point retrying with the same bit.
+		if bit == prevBit {
+			s.writeStoreErr(w, r, store.ErrConflict)
 			return
 		}
 	}
