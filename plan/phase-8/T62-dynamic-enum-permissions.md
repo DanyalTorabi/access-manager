@@ -1,4 +1,4 @@
-# T62 — Dynamic enum permissions: API returns titles (v2), keep mask in DB
+# T62 — /api/v2: title-based permission API (masks stay in DB)
 
 ## Ticket
 
@@ -47,32 +47,28 @@ The change is delivered behind a **versioned API surface**: the existing `/v1/..
 - **Default = versioned**: v1 = mask (current behaviour); v2 = titles. The transport router decides; no per-request `?format=` query parameter.
 - **One bit per title per domain.** Titles are case-sensitive and unique within a `domain_id`.
 - **Sorted titles in responses**: lexical sort for deterministic output (helps test stability and human inspection).
-- **Auto-assignment of `bit`**: in v2, `POST /v2/access-types` may omit `bit`; server allocates the lowest unused bit. v1 continues to require explicit `bit` in the request body for backward compatibility.
+- **Auto-assignment of `bit`**: in v2, `POST /api/v2/access-types` may omit `bit`; server allocates the lowest unused bit. v1 continues to require explicit `bit` in the request body for backward compatibility.
+- **Route prefix**: `/api/v2` — mirrors the existing `/api/v1` prefix exactly.
+- **Auto-bit allocation strategy**: pure helper `access.AllocateNextBit(types []store.AccessType) (uint64, error)` in `internal/access/enum.go`. Reads all access types for the domain via `AccessTypeList`, ORs all `Bit` values, returns the lowest power-of-2 not yet in use. **No change to `store.Store` interface** — MySQL/Postgres stubs are unaffected.
+- **Title uniqueness**: enforced at the DB layer via migration `000004` adding `UNIQUE INDEX idx_access_types_domain_title ON access_types (domain_id, title)`. The existing `wrapConstraintError` in the SQLite store already maps UNIQUE violations to `ErrConflict` → HTTP 409.
+- **Sentinel for unregistered bits**: `MaskToTitles` returns `"_bit:V"` (where `V` is the stored bit value, e.g. `"_bit:4"`) for set bits with no matching `access_types` row. This prevents v2 reads from failing on v1-era data whose access types were later deleted.
+- **V2 authz scope**: all four listing endpoints (`userAuthzResources`, `groupAuthzResources`, `resourceAuthzUsers`, `resourceAuthzGroups`) plus a new effective-permissions endpoint are included in T62 scope.
 
-## Open design points (decide during implementation)
+## Open design points (deferred)
 
-- **Path structure**: prefer flat `/v2/domains/{id}/...` mirroring v1, or a nested `/api/v2/...` prefix. Default plan: route prefix `/v2` only on the affected handlers; non-affected handlers (e.g. `/healthz`, `/metrics`) stay un-prefixed.
-- **Shared handler core**: extract a per-handler core that takes a typed input/output and add thin v1/v2 adapters. Avoids handler duplication.
-- **Caching access-types per domain**: a small per-domain LRU keyed by `domain_id` to avoid hitting the store on every conversion. Decide based on the `T5`/T62b benchmarks; OK to defer.
+- **Caching access-types per domain**: a small per-domain LRU keyed by `domain_id` to avoid hitting the store on every conversion. Decide based on the `T5`/T62b benchmarks; OK to defer. // TODO(T62): revisit after benchmarks
 
 ## Steps
 
-1. **Helpers (`internal/access`)**: add `MaskToTitles` / `TitlesToMask`. Cover with unit tests using a fake `store.Store` that returns a fixed `access_types` set.
-2. **Auto-bit-allocator**: add `store.AllocateNextAccessTypeBit(ctx, domainID) (uint64, error)` returning lowest unused bit or `store.ErrConflict` when 63 bits are taken. Unit-test against the SQLite store.
-3. **v2 route group**: in `internal/api/server.go` (or a new `internal/api/v2.go`) wire `/v2/...` handlers that share the existing service code through the new helpers.
-4. **Endpoints converted in v2** (initial list — confirm at implementation time):
-   - `POST /v2/permissions` → request body `{ "title": "...", "resource_id": "...", "permissions": ["read","write"] }`.
-   - `GET /v2/users/{userID}/resources/{resourceID}/permissions` → `["read","write"]` (sorted).
-   - `GET /v2/users/{userID}/resources` (T42) → each entry's `permissions` field becomes `[]string`.
-   - `GET /v2/groups/{groupID}/resources` (T43), `/v2/resources/{resourceID}/users` (T44), `/v2/resources/{resourceID}/groups` (T45) — same.
-   - `POST /v2/access-types` accepting `{ "title": "..." }` without `bit`.
-5. **OpenAPI**: add v2 schemas (`PermissionTitleArray`, `AccessTypeCreateV2`, …); document the version difference in `api/README.md`.
-6. **Postman**: add a v2 folder mirroring v1 examples with title arrays.
-7. **Tests**:
-   - Unit: helpers, auto-bit allocator, JSON encoders.
-   - Integration: v1 unaffected (regression); v2 round-trips title arrays through the store.
-   - E2E: `go/e2e/v2_journey_test.go` (build tag `e2e`).
-8. **Docs**: update `go/README.md`, root `README.md`, `api/README.md` with a "V1 vs V2 permission representation" section.
+1. **DB migration `000004`**: add `UNIQUE INDEX idx_access_types_domain_title ON access_types (domain_id, title)` for SQLite, MySQL, and Postgres. Verify `wrapConstraintError` surfaces title-uniqueness violations as `ErrConflict` → 409.
+2. **Helpers (`internal/access/enum.go`)**: add `MaskToTitles` / `TitlesToMask` / `AllocateNextBit`. Cover with unit tests using a fixed `[]store.AccessType` slice (no fake store needed — pure functions).
+3. **v2 access-types handler** (`internal/api/server_access_types_v2.go`): `accessTypeCreateV2` accepts optional `bit`; calls `AllocateNextBit` when omitted. All other verbs reuse v1 handlers in the router.
+4. **v2 permission handlers** (`internal/api/server_permissions_v2.go`): new request/response types with `permissions []string` replacing `access_mask string`. Five handlers: create, get, list, patch (all convert mask↔titles); delete reuses v1 handler.
+5. **v2 authz handlers** (`internal/api/server_authz_v2.go`): four listing handlers with `permissions []string` responses plus a new `userResourcePermissionsV2` (GET effective permissions for a user+resource pair).
+6. **Route wiring** (`internal/api/server.go`): add `r.Route("/api/v2", ...)` block with same `BearerAuth` middleware as v1. Reuse v1 handlers where behavior is identical.
+7. **E2E journey test** (`go/e2e/v2_journey_test.go`, build tag `e2e`): end-to-end path from domain creation through title-based permission grant and authz listing, with a regression check that v1 still returns numeric masks.
+8. **OpenAPI** (`api/openapi.yaml`): add v2 path entries and schema components (`PermissionBodyV2`, `PermissionResponseV2`, `AccessTypeBodyV2`).
+9. **Postman** (`api/postman/access-manager.postman_collection.json`): add "V2 — Title-based Permissions" folder. Update `go/README.md`, `README.md`, `api/README.md` with a "V1 vs V2" section.
 
 ## Acceptance criteria
 
