@@ -30,7 +30,7 @@ V1 has 52 comprehensive tests across access types, permissions, and authz. V2 cu
 | Access Types | 12 | 7 | 5 missing |
 | Permissions | 10 | 8 | 2 missing |
 | Authz | 30 | 7 | 23 missing |
-| **Total** | **52** | **22** | **30 missing (58%)** |
+| **Total** | **52** | **22** | **32 missing (62%)** |
 
 ## Deliverables
 
@@ -45,7 +45,7 @@ V1 has 52 comprehensive tests across access types, permissions, and authz. V2 cu
 - **`TestAPI_v2_accessTypeList_invalidOrder`** — Invalid order (not asc/desc) rejected with 400
 - **`TestAPI_v2_accessTypePatch_titleOnly`** — PATCH with title only (auto-allocate new bit if needed)
 
-### 2. Permissions V2 Tests (2 new tests)
+### 2. Permissions V2 Tests (4 new tests)
 
 - **`TestAPI_v2_permissionList_search`** — List with search by title/resource
 - **`TestAPI_v2_permissionList_sort`** — List with sort by title/resource
@@ -98,9 +98,9 @@ V1 has 52 comprehensive tests across access types, permissions, and authz. V2 cu
 - Verify search filters correctly on title/resource fields
 - Verify sort order is stable and consistent
 
-### 5. Regression Tests (1 new test)
+### 5. Regression Tests (0 new tests)
 
-- **`TestAPI_v2_authz_v1CompatibilityRegression`** — V1 and V2 return same effective permissions
+- **`TestAPI_v2_authz_v1RegressionCheck`** — already present from PR #126; verifies V1 `effective_mask` numeric == V2 `permissions` titles for the same underlying data.
 
 ## Non-goals
 
@@ -110,7 +110,7 @@ V1 has 52 comprehensive tests across access types, permissions, and authz. V2 cu
 
 ## Criteria for done
 
-- [ ] All 30 new test functions added and passing
+- [ ] All 32 new test functions added and passing
 - [ ] Test coverage report shows V1 ≈ V2 (within 5%)
 - [ ] `go test -race ./...` passes all tests
 - [ ] No regressions in V1 or V2 existing tests
