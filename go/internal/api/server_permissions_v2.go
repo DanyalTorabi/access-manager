@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/dtorabi/access-manager/internal/access"
 	"github.com/dtorabi/access-manager/internal/logger"
@@ -53,6 +54,12 @@ func (s *Server) permissionCreateV2(w http.ResponseWriter, r *http.Request) {
 	domainID := chi.URLParam(r, "domainID")
 	var b permissionBodyV2
 	if !readJSON(w, r, &b) {
+		return
+	}
+
+	// Validate title is non-empty.
+	if strings.TrimSpace(b.Title) == "" {
+		writeErr(w, r, http.StatusBadRequest, errors.New("title is required"))
 		return
 	}
 
@@ -157,14 +164,22 @@ func (s *Server) permissionPatchV2(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	params := store.PermissionPatchParams{Title: b.Title, ResourceID: b.ResourceID}
-
+	// Load access types early if we need to convert permission titles to mask.
+	// This ensures we have a consistent snapshot if needed for both the store
+	// call (TitlesToMask) and the response (MaskToTitles).
+	var types []store.AccessType
+	var err error
 	if b.Permissions != nil {
-		types, err := s.loadDomainAccessTypes(r, domainID)
+		types, err = s.loadDomainAccessTypes(r, domainID)
 		if err != nil {
 			writeInternalErr(w, r, err)
 			return
 		}
+	}
+
+	params := store.PermissionPatchParams{Title: b.Title, ResourceID: b.ResourceID}
+
+	if b.Permissions != nil {
 		mask, err := access.TitlesToMask(*b.Permissions, types)
 		if err != nil {
 			var ute *access.UnknownTitleError
@@ -184,12 +199,8 @@ func (s *Server) permissionPatchV2(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	types, err := s.loadDomainAccessTypes(r, domainID)
-	if err != nil {
-		writeInternalErr(w, r, err)
-		return
-	}
-
+	// Audit log immediately after successful store mutation, before any
+	// subsequent reads that could fail.
 	logger.Audit(r.Context(), "permission_patch",
 		slog.String("domain_id", domainID),
 		slog.String("permission_id", id),
@@ -197,5 +208,16 @@ func (s *Server) permissionPatchV2(w http.ResponseWriter, r *http.Request) {
 		slog.Uint64("access_mask", p.AccessMask),
 		slog.String("api_version", "v2"),
 	)
+
+	// If we haven't loaded types yet (because permissions weren't patched),
+	// load them now for the response.
+	if len(types) == 0 && types == nil {
+		types, err = s.loadDomainAccessTypes(r, domainID)
+		if err != nil {
+			writeInternalErr(w, r, err)
+			return
+		}
+	}
+
 	writeJSON(w, r, http.StatusOK, toPermissionResponseV2(p, types))
 }
