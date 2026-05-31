@@ -281,4 +281,6 @@ type Store interface {
 	RevokeUserPermission(ctx context.Context, domainID, userID, permissionID string) error
 	GrantGroupPermission(ctx context.Context, domainID, groupID, permissionID string) error
 	RevokeGroupPermission(ctx context.Context, domainID, groupID, permissionID string) error
+
+	ReconcileUserResourceMasks(ctx context.Context) error
 }

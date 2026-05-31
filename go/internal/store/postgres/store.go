@@ -879,6 +879,10 @@ func (s *Store) RevokeGroupPermission(ctx context.Context, domainID, groupID, pe
 	return nil
 }
 
+// ReconcileUserResourceMasks is a no-op for the Postgres store.
+// The user_resource_masks materialized table is SQLite-only (T04).
+func (s *Store) ReconcileUserResourceMasks(_ context.Context) error { return nil }
+
 // userEffectivePermissionPredicateSQL filters permissions down to those
 // effectively held by a given user (direct grant OR via group membership).
 const userEffectivePermissionPredicateSQL = `
