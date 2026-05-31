@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+
+	"github.com/dtorabi/access-manager/internal/store"
 )
 
 // apiBaseV2 returns the /api/v2 root for the current test server.
@@ -157,9 +159,7 @@ func TestV2Journey_TitleBasedPermissions(t *testing.T) {
 
 	// Step 9: v1 backward compatibility — same permission via v1 returns numeric mask
 	b = mustGET(t, c, domainBase(domID)+"/permissions/"+perm.ID, http.StatusOK)
-	var v1perm struct {
-		AccessMask uint64 `json:"AccessMask"`
-	}
+	var v1perm store.Permission
 	if err := json.Unmarshal(b, &v1perm); err != nil {
 		t.Fatalf("step 9 decode: %v", err)
 	}

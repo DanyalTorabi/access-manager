@@ -96,7 +96,6 @@ func (s *Server) permissionCreateV2(w http.ResponseWriter, r *http.Request) {
 		slog.String("permission_id", p.ID),
 		slog.String("resource_id", p.ResourceID),
 		slog.Uint64("access_mask", p.AccessMask),
-		slog.String("api_version", "v2"),
 	)
 	writeJSON(w, r, http.StatusCreated, toPermissionResponseV2(p, types))
 }
@@ -206,7 +205,6 @@ func (s *Server) permissionPatchV2(w http.ResponseWriter, r *http.Request) {
 		slog.String("permission_id", id),
 		slog.String("resource_id", p.ResourceID),
 		slog.Uint64("access_mask", p.AccessMask),
-		slog.String("api_version", "v2"),
 	)
 
 	// If we haven't loaded types yet (because permissions weren't patched),

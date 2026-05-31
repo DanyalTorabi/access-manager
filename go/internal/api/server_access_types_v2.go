@@ -96,7 +96,6 @@ func (s *Server) accessTypeCreateV2(w http.ResponseWriter, r *http.Request) {
 				slog.String("domain_id", domainID),
 				slog.String("access_type_id", a.ID),
 				slog.Uint64("bit", a.Bit),
-				slog.String("api_version", "v2"),
 			)
 			writeJSON(w, r, http.StatusCreated, &accessTypeResponseV2{
 				ID:       a.ID,
