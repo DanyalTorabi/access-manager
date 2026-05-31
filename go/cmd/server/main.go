@@ -187,7 +187,11 @@ func setup(cfg config.Config) (*http.Server, *sql.DB, error) {
 	// Postgres and MySQL this is a no-op; for SQLite it rebuilds from the
 	// source tables so any pre-T04 data (or drift from out-of-band writes)
 	// is corrected before the server starts accepting traffic.
-	if err := st.ReconcileUserResourceMasks(context.Background()); err != nil {
+	// A 5-minute timeout guards against unexpectedly large datasets blocking
+	// startup indefinitely.
+	reconcileCtx, reconcileCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer reconcileCancel()
+	if err := st.ReconcileUserResourceMasks(reconcileCtx); err != nil {
 		_ = db.Close()
 		return nil, nil, fmt.Errorf("reconcile user_resource_masks: %w", err)
 	}
