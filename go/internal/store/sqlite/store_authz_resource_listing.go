@@ -196,90 +196,39 @@ func (s *Store) ResourceAuthzUsersList(ctx context.Context, domainID, resourceID
 		return nil, 0, err
 	}
 
-	baseArgs := resourceAuthzUsersBaseArgs(domainID, resourceID)
-
 	var total int64
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) `+resourceAuthzUsersBaseSQL, baseArgs...).Scan(&total); err != nil {
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM user_resource_masks WHERE domain_id = ? AND resource_id = ? AND access_mask != 0`,
+		domainID, resourceID,
+	).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	// opts.Sort / opts.Order are populated by the handler and reflected in the
-	// meta response via writeList. The store always uses a fixed ORDER BY
-	// u.id ASC for stable, deterministic pagination — opts.Sort/Order are
-	// intentionally NOT honoured here. The handler exposes the meta label
-	// "user_id" which is the public name for the same users.id column.
-	listArgs := append(append([]any{}, baseArgs...), opts.Limit, opts.Offset)
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT u.id `+resourceAuthzUsersBaseSQL+` ORDER BY u.id ASC LIMIT ? OFFSET ?`,
-		listArgs...,
+		`SELECT user_id, access_mask FROM user_resource_masks`+
+			` WHERE domain_id = ? AND resource_id = ? AND access_mask != 0`+
+			` ORDER BY user_id ASC LIMIT ? OFFSET ?`,
+		domainID, resourceID, opts.Limit, opts.Offset,
 	)
 	if err != nil {
 		return nil, 0, err
 	}
+	defer func() { _ = rows.Close() }()
 
-	var userIDs []string
+	var result []store.ResourceAuthzUser
 	for rows.Next() {
 		var uid string
-		if err := rows.Scan(&uid); err != nil {
-			_ = rows.Close()
+		var m int64
+		if err := rows.Scan(&uid, &m); err != nil {
 			return nil, 0, err
 		}
-		userIDs = append(userIDs, uid)
+		result = append(result, store.ResourceAuthzUser{UserID: uid, EffectiveMask: s.maskFromSQL(m)})
 	}
 	if err := rows.Err(); err != nil {
-		_ = rows.Close()
 		return nil, 0, err
 	}
-	if err := rows.Close(); err != nil {
-		return nil, 0, err
-	}
-	if len(userIDs) == 0 {
-		return []store.ResourceAuthzUser{}, total, nil
-	}
-
-	// Invariant: len(userIDs) <= opts.Limit which is clamped to store.MaxLimit
-	// (100) by SanitizeListOpts. SQLite's default SQLITE_MAX_VARIABLE_NUMBER
-	// is well above this (>=999), so the IN (?,…) expansions below are safe.
-	// If MaxLimit is ever raised above the SQLite parameter cap, batch the
-	// IN clauses or chunk userIDs.
-	masksByUser := make(map[string]uint64, len(userIDs))
-
-	// Direct user grants on this resource.
-	directSQL, directArgs, err := buildInQueryAndArgs(
-		`SELECT up.user_id, p.access_mask FROM user_permissions up`+
-			` INNER JOIN permissions p ON p.id = up.permission_id`+
-			` WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0`,
-		"up.user_id",
-		[]any{domainID, resourceID},
-		userIDs,
-	)
-	if err != nil {
-		return nil, 0, err
-	}
-	if err := scanUserMasks(ctx, s, directSQL, directArgs, masksByUser); err != nil {
-		return nil, 0, err
-	}
-
-	// Indirect grants via group membership.
-	indirectSQL, indirectArgs, err := buildInQueryAndArgs(
-		`SELECT gm.user_id, p.access_mask FROM group_members gm`+
-			` INNER JOIN group_permissions gp ON gp.group_id = gm.group_id`+
-			` INNER JOIN permissions p ON p.id = gp.permission_id`+
-			` WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0`,
-		"gm.user_id",
-		[]any{domainID, resourceID},
-		userIDs,
-	)
-	if err != nil {
-		return nil, 0, err
-	}
-	if err := scanUserMasks(ctx, s, indirectSQL, indirectArgs, masksByUser); err != nil {
-		return nil, 0, err
-	}
-
-	result := make([]store.ResourceAuthzUser, 0, len(userIDs))
-	for _, uid := range userIDs {
-		result = append(result, store.ResourceAuthzUser{UserID: uid, EffectiveMask: masksByUser[uid]})
+	if result == nil {
+		result = []store.ResourceAuthzUser{}
 	}
 	return result, total, nil
 }

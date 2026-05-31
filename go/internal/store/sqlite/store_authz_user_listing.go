@@ -10,15 +10,6 @@ import (
 	"github.com/dtorabi/access-manager/internal/store"
 )
 
-// userAuthzResourcesBaseSQL selects resources where the user has a non-
-// zero effective mask via direct grants OR group membership. T51 composite
-// FKs enforce cross-domain isolation at the schema level, so no
-// defensive domain_id filters are layered on top of the join.
-const userAuthzResourcesBaseSQL = `
-FROM permissions p
-WHERE p.domain_id = ? AND p.access_mask > 0
-` + userEffectivePermissionPredicateSQL
-
 func userEffectivePermissionArgs(userID string) []any {
 	return []any{userID, userID}
 }
@@ -32,9 +23,10 @@ func inPlaceholders(n int) (string, error) {
 	return strings.TrimSuffix(strings.Repeat("?,", n), ","), nil
 }
 
-// buildUserAuthzMaskQueryAndArgs builds the batched mask query used by
-// UserAuthzResourcesList and returns the SQL and args in the exact placeholder
-// order to avoid call-site mistakes.
+// buildUserAuthzMaskQueryAndArgs builds the batched mask query that returns
+// per-permission access_mask values for a user across a set of resources
+// (direct grants + group membership). Used by property tests to compare
+// against the materialized cache.
 func buildUserAuthzMaskQueryAndArgs(domainID string, resourceIDs []string, predicateArgs []any) (string, []any, error) {
 	baseSQL := `SELECT p.resource_id, p.access_mask FROM permissions p WHERE p.domain_id = ? AND p.access_mask > 0`
 	baseArgs := []any{domainID}
@@ -64,71 +56,39 @@ func (s *Store) UserAuthzResourcesList(ctx context.Context, domainID, userID str
 		return nil, 0, err
 	}
 
-	predicateArgs := userEffectivePermissionArgs(userID)
-	countArgs := append([]any{domainID}, predicateArgs...)
 	var total int64
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(DISTINCT p.resource_id) `+userAuthzResourcesBaseSQL, countArgs...).Scan(&total); err != nil {
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM user_resource_masks WHERE domain_id = ? AND user_id = ? AND access_mask != 0`,
+		domainID, userID,
+	).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	listArgs := append([]any{domainID}, predicateArgs...)
-	listArgs = append(listArgs, opts.Limit, opts.Offset)
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT DISTINCT p.resource_id `+userAuthzResourcesBaseSQL+` ORDER BY p.resource_id ASC LIMIT ? OFFSET ?`,
-		listArgs...,
+		`SELECT resource_id, access_mask FROM user_resource_masks`+
+			` WHERE domain_id = ? AND user_id = ? AND access_mask != 0`+
+			` ORDER BY resource_id ASC LIMIT ? OFFSET ?`,
+		domainID, userID, opts.Limit, opts.Offset,
 	)
 	if err != nil {
 		return nil, 0, err
 	}
+	defer func() { _ = rows.Close() }()
 
-	var resourceIDs []string
+	var list []store.UserAuthzResource
 	for rows.Next() {
 		var resourceID string
-		if err := rows.Scan(&resourceID); err != nil {
-			_ = rows.Close()
+		var m int64
+		if err := rows.Scan(&resourceID, &m); err != nil {
 			return nil, 0, err
 		}
-		resourceIDs = append(resourceIDs, resourceID)
+		list = append(list, store.UserAuthzResource{ResourceID: resourceID, EffectiveMask: s.maskFromSQL(m)})
 	}
 	if err := rows.Err(); err != nil {
-		_ = rows.Close()
 		return nil, 0, err
 	}
-	if err := rows.Close(); err != nil {
-		return nil, 0, err
-	}
-	if len(resourceIDs) == 0 {
-		return []store.UserAuthzResource{}, total, nil
-	}
-
-	maskSQL, maskArgs, err := buildUserAuthzMaskQueryAndArgs(domainID, resourceIDs, predicateArgs)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	maskRows, err := s.db.QueryContext(ctx, maskSQL, maskArgs...)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer func() { _ = maskRows.Close() }()
-
-	masksByResource := make(map[string]uint64, len(resourceIDs))
-	for maskRows.Next() {
-		var resourceID string
-		var m int64
-		if err := maskRows.Scan(&resourceID, &m); err != nil {
-			return nil, 0, err
-		}
-		masksByResource[resourceID] |= s.maskFromSQL(m)
-	}
-	if err := maskRows.Err(); err != nil {
-		return nil, 0, err
-	}
-
-	list := make([]store.UserAuthzResource, 0, len(resourceIDs))
-	for _, resourceID := range resourceIDs {
-		mask := masksByResource[resourceID]
-		list = append(list, store.UserAuthzResource{ResourceID: resourceID, EffectiveMask: mask})
+	if list == nil {
+		list = []store.UserAuthzResource{}
 	}
 	return list, total, nil
 }
