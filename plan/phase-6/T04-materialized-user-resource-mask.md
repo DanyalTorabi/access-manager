@@ -1,8 +1,8 @@
-# T4 — Materialized `user_resource_mask` hot path
+# T4 — Materialized `user_resource_masks` hot path
 
 ## Ticket
 
-**T4** — Materialized `user_resource_mask` for hot path (GitHub [#15](https://github.com/DanyalTorabi/access-manager/issues/15))
+**T4** — Materialized `user_resource_masks` for hot path (GitHub [#15](https://github.com/DanyalTorabi/access-manager/issues/15))
 
 ## Phase
 
@@ -10,38 +10,57 @@
 
 ## Goal
 
-For very large scale, maintain **`(domain_id, user_id, resource_id) → access_mask`** in a table updated **transactionally** on grant/revoke/membership change so reads are O(1) index lookup.
+Maintain **`(domain_id, user_id, resource_id) → access_mask`** in a table kept in sync with every grant/revoke/membership change so that reads (`EffectiveMask`, `UserAuthzResourcesList`, `ResourceAuthzUsersList`) are O(1) indexed lookups instead of multi-JOIN query-time aggregations.
 
 ## Deliverables
 
-- New migration: materialized table + triggers or application-level write-through from store methods.
-- Invalidation rules documented; backfill job for existing data.
+- Migration 000004: `user_resource_masks` table with covering indexes and ON DELETE CASCADE FKs.
+- Application write-through: all 6 mutation methods (`Grant/Revoke UserPermission`, `Grant/Revoke GroupPermission`, `Add/RemoveUserFromGroup`) wrapped in explicit transactions that upsert/delete from `user_resource_masks` after each write.
+- `EffectiveMask`, `UserAuthzResourcesList`, and `ResourceAuthzUsersList` switched to read from `user_resource_masks`.
+- `ReconcileUserResourceMasks` backfill called at server startup (full DELETE + rebuild from source tables inside a single TX).
+- Property tests that assert materialized result == `CombineMasks(PermissionMasksForUserResource(...))` (ground truth) after every mutation.
 
-## Steps
+## Approach decisions
 
-1. Benchmark current query path (T5) to justify.
-2. Implement write-through in `Grant*`, `Revoke*`, `AddUserToGroup`, etc.
-3. Add reconciliation cron or admin endpoint (optional).
-4. Feature flag or migration cutover strategy.
+- **No T5 benchmarks required** before implementation (deferred; implementation proceeded on design merit).
+- **Application write-through** (not SQLite triggers): explicit, testable, debuggable.
+- **Listing reads from materialized table**: `UserAuthzResourcesList` and `ResourceAuthzUsersList` read from `user_resource_masks`. `GroupAuthzResourcesList` and `ResourceAuthzGroupsList` are group-scoped and unchanged.
+- **Schema designed for T02 extension**: `TODO(T02)` comment in migration documents where ancestor-inheritance invalidation paths would be added.
 
-## Files / paths
+## Files changed
 
-- **Edit:** [internal/store/sqlite/store.go](../../go/internal/store/sqlite/store.go), migrations, possibly [PLAN.md](../../PLAN.md)
+| File | Change |
+|------|--------|
+| `go/migrations/sqlite/000004_user_resource_masks.up.sql` | New table + indexes |
+| `go/migrations/sqlite/000004_user_resource_masks.down.sql` | Rollback |
+| `go/internal/store/sqlite/store_authz_masks.go` | `computeAndUpsertMask`, updated `EffectiveMask`, helper functions |
+| `go/internal/store/sqlite/store_authz_membership.go` | TX + write-through for all 6 mutations |
+| `go/internal/store/sqlite/store_authz_user_listing.go` | `UserAuthzResourcesList` → materialized reads |
+| `go/internal/store/sqlite/store_authz_resource_listing.go` | `ResourceAuthzUsersList` → materialized reads |
+| `go/internal/store/sqlite/store_authz_reconcile.go` | `ReconcileUserResourceMasks` implementation |
+| `go/internal/store/store.go` | `ReconcileUserResourceMasks` added to `Store` interface |
+| `go/internal/store/postgres/store.go` | No-op stub to satisfy interface |
+| `go/internal/store/mysql/store.go` | No-op stub to satisfy interface |
+| `go/cmd/server/main.go` | Call reconcile after migration at startup |
+| `go/internal/store/sqlite/store_authz_masks_property_test.go` | Property tests |
 
 ## Acceptance criteria
 
-- Effective mask matches non-materialized path on randomized property tests.
+- ✅ `EffectiveMask` returns O(1) indexed result from `user_resource_masks`.
+- ✅ Effective mask matches non-materialized ground-truth path on property tests (`TestMaterialized_masksMatchGroundTruth`).
+- ✅ `ReconcileUserResourceMasks` restores correct masks after table wipe (`TestMaterialized_reconcile`).
+- ✅ All existing tests pass unchanged (`make test`).
 
 ## Out of scope
 
 - Cross-region eventual consistency.
+- T5 benchmarks (deferred per implementation decision).
+- MySQL / Postgres materialized tables (no-op stubs only).
+- `GroupAuthzResourcesList` / `ResourceAuthzGroupsList` (group-level; no user key).
+- Admin HTTP endpoint for on-demand reconciliation (future ticket).
 
 ## Dependencies
 
-- **T5** benchmarks; stable evaluator semantics.
+- **T02** (group ancestor inheritance): schema is designed to accommodate via `TODO(T02)` — no structural change needed, only additional invalidation paths in write-through methods.
+- **T5** benchmarks: skipped; implementation justified by O(1) vs O(n joins) design reasoning.
 
-## Curriculum link
-
-— (performance)
-
-**Suggested P3 order:** often **before T5** optimization loop or **after** benchmarks justify it.
