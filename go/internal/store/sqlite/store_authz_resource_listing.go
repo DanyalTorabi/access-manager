@@ -130,54 +130,9 @@ func (s *Store) ResourceAuthzGroupsList(ctx context.Context, domainID, resourceI
 	return result, total, nil
 }
 
-// resourceAuthzUsersBaseSQL selects users in the resource's domain who have a
-// non-zero effective mask on (domainID, resourceID) via direct grants OR via
-// any group they belong to.
-//
-// `p.access_mask > 0` excludes both zero masks (no-op grants) AND any legacy
-// rows with negative int64 mask values — see maskFromSQL, which similarly
-// coerces negative DB values to 0 with a warning. Such rows can only exist
-// from out-of-band/legacy writes (PermissionCreate validates the range), so
-// silently ignoring them in the listing is intentional and matches T42/T43.
-//
-// Placeholder map (three ?'s, built from {domainID, resourceID}; keep this
-// table in sync with resourceAuthzUsersBaseArgs):
-//
-//	1: u.domain_id   = domainID
-//	2: p.domain_id   = domainID
-//	3: p.resource_id = resourceID
-//
-// Example with domainID="D" / resourceID="R": args are ["D","D","R"].
-//
-// T51 composite FKs guarantee that user_permissions / group_permissions /
-// group_members rows cannot reference cross-domain parents, so no
-// defensive up.domain_id / gp.domain_id / gm.domain_id filter is needed
-// in the sub-EXISTS clauses.
-const resourceAuthzUsersBaseSQL = `
-FROM users u
-WHERE u.domain_id = ? AND EXISTS (
-	SELECT 1 FROM permissions p
-	WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0
-	AND (
-		EXISTS (
-			SELECT 1 FROM user_permissions up
-			WHERE up.permission_id = p.id AND up.user_id = u.id
-		)
-		OR EXISTS (
-			SELECT 1 FROM group_permissions gp
-			INNER JOIN group_members gm ON gm.group_id = gp.group_id AND gm.user_id = u.id
-			WHERE gp.permission_id = p.id
-		)
-	)
-)
-`
-
-// resourceAuthzUsersBaseArgs returns the three positional args for
-// resourceAuthzUsersBaseSQL in placeholder order. Centralised so callers
-// (count + page-select) cannot drift out of sync with the SQL.
-func resourceAuthzUsersBaseArgs(domainID, resourceID string) []any {
-	return []any{domainID, domainID, resourceID}
-}
+// Note: resourceAuthzUsersBaseSQL and resourceAuthzUsersBaseArgs are test
+// helpers for verifying ground-truth user lookups against the materialized
+// cache; they live in store_authz_resource_users_test.go.
 
 func (s *Store) ResourceAuthzUsersList(ctx context.Context, domainID, resourceID string, opts store.ListOpts) ([]store.ResourceAuthzUser, int64, error) {
 	opts = store.SanitizeListOpts(opts)
@@ -198,7 +153,7 @@ func (s *Store) ResourceAuthzUsersList(ctx context.Context, domainID, resourceID
 
 	var total int64
 	if err := s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM user_resource_masks WHERE domain_id = ? AND resource_id = ? AND access_mask != 0`,
+		`SELECT COUNT(*) FROM user_resource_masks WHERE domain_id = ? AND resource_id = ?`,
 		domainID, resourceID,
 	).Scan(&total); err != nil {
 		return nil, 0, err
@@ -206,7 +161,7 @@ func (s *Store) ResourceAuthzUsersList(ctx context.Context, domainID, resourceID
 
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT user_id, access_mask FROM user_resource_masks`+
-			` WHERE domain_id = ? AND resource_id = ? AND access_mask != 0`+
+			` WHERE domain_id = ? AND resource_id = ?`+
 			` ORDER BY user_id ASC LIMIT ? OFFSET ?`,
 		domainID, resourceID, opts.Limit, opts.Offset,
 	)
@@ -231,21 +186,4 @@ func (s *Store) ResourceAuthzUsersList(ctx context.Context, domainID, resourceID
 		result = []store.ResourceAuthzUser{}
 	}
 	return result, total, nil
-}
-
-func scanUserMasks(ctx context.Context, s *Store, query string, args []any, into map[string]uint64) error {
-	rows, err := s.db.QueryContext(ctx, query, args...)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = rows.Close() }()
-	for rows.Next() {
-		var uid string
-		var m int64
-		if err := rows.Scan(&uid, &m); err != nil {
-			return err
-		}
-		into[uid] |= s.maskFromSQL(m)
-	}
-	return rows.Err()
 }

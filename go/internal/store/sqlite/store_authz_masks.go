@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-
-	"github.com/dtorabi/access-manager/internal/access"
 )
 
 // userEffectivePermissionPredicateSQL filters permissions p down to those
@@ -176,15 +174,4 @@ func groupMemberIDs(ctx context.Context, tx *sql.Tx, domainID, groupID string) (
 		ids = append(ids, id)
 	}
 	return ids, rows.Err()
-}
-
-// combinedMaskForUserResource computes the effective mask for a user on a
-// resource from the ground-truth junction tables (not the materialized cache).
-// Used by ReconcileUserResourceMasks and property tests.
-func (s *Store) combinedMaskForUserResource(ctx context.Context, domainID, userID, resourceID string) (uint64, error) {
-	masks, err := s.PermissionMasksForUserResource(ctx, domainID, userID, resourceID)
-	if err != nil {
-		return 0, err
-	}
-	return access.CombineMasks(masks), nil
 }
