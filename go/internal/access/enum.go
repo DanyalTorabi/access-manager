@@ -28,6 +28,10 @@ func (e *UnknownTitleError) Error() string {
 // the stored bit value, e.g. "_bit:4") so that v2 reads never fail on v1-era
 // data whose access types were later deleted or are not yet registered.
 //
+// Only bit positions in the range [0, 62] are scanned. Bit 63 (1<<63) and
+// higher are outside the valid permission space and are silently ignored
+// (not included as sentinels).
+//
 // An empty or zero mask returns an empty non-nil slice.
 func MaskToTitles(mask uint64, types []store.AccessType) []string {
 	titles := make([]string, 0)
@@ -60,6 +64,10 @@ func MaskToTitles(mask uint64, types []store.AccessType) []string {
 // mask. Each title must be present in the types slice; an unknown title causes
 // an *UnknownTitleError to be returned immediately. An empty titles slice
 // returns 0.
+//
+// Access types with Bit=0 are skipped (not included in the mask) and do not
+// cause an error. This ensures consistency with MaskToTitles, which also
+// excludes bit=0 entries.
 func TitlesToMask(titles []string, types []store.AccessType) (uint64, error) {
 	if len(titles) == 0 {
 		return 0, nil
@@ -67,7 +75,9 @@ func TitlesToMask(titles []string, types []store.AccessType) (uint64, error) {
 
 	byTitle := make(map[string]uint64, len(types))
 	for _, t := range types {
-		byTitle[t.Title] = t.Bit
+		if t.Bit != 0 {
+			byTitle[t.Title] = t.Bit
+		}
 	}
 
 	var mask uint64
