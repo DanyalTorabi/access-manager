@@ -130,6 +130,29 @@ func (s *Store) PermissionPatch(ctx context.Context, domainID, id string, p stor
 		title, resourceID, maskVal, id, domainID); err != nil {
 		return nil, wrapConstraintError(err)
 	}
+
+	// If the effective mask or resource changed, the materialized cache rows
+	// for every user holding this permission are stale and must be refreshed.
+	if p.AccessMask != nil || p.ResourceID != nil {
+		holders, err := permissionHolderUserIDs(ctx, tx, domainID, id)
+		if err != nil {
+			return nil, err
+		}
+		// When resource_id was reassigned we must also recompute (and
+		// potentially delete) cache rows that pointed to the old resource.
+		oldResourceID := curResourceID
+		for _, uid := range holders {
+			if err := s.computeAndUpsertMask(ctx, tx, domainID, uid, resourceID); err != nil {
+				return nil, err
+			}
+			if p.ResourceID != nil && oldResourceID != resourceID {
+				if err := s.computeAndUpsertMask(ctx, tx, domainID, uid, oldResourceID); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}

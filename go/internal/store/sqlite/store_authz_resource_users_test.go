@@ -12,6 +12,32 @@ import (
 	"github.com/google/uuid"
 )
 
+// resourceAuthzUsersBaseSQL and resourceAuthzUsersBaseArgs are test-only
+// helpers used to verify ground-truth user lookups against the materialized
+// cache. They are not called by production code.
+const resourceAuthzUsersBaseSQL = `
+FROM users u
+WHERE u.domain_id = ? AND EXISTS (
+	SELECT 1 FROM permissions p
+	WHERE p.domain_id = ? AND p.resource_id = ? AND p.access_mask > 0
+	AND (
+		EXISTS (
+			SELECT 1 FROM user_permissions up
+			WHERE up.permission_id = p.id AND up.user_id = u.id
+		)
+		OR EXISTS (
+			SELECT 1 FROM group_permissions gp
+			INNER JOIN group_members gm ON gm.group_id = gp.group_id AND gm.user_id = u.id
+			WHERE gp.permission_id = p.id
+		)
+	)
+)
+`
+
+func resourceAuthzUsersBaseArgs(domainID, resourceID string) []any {
+	return []any{domainID, domainID, resourceID}
+}
+
 func TestResourceAuthzUsersList(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)

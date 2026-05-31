@@ -148,6 +148,21 @@ func TestUserAuthzResourcesList_notFound(t *testing.T) {
 	}
 }
 
+// buildUserAuthzMaskQueryAndArgs is a test-only helper used to verify the
+// ground-truth per-permission masks against the materialized cache. It is
+// not called by production code.
+func buildUserAuthzMaskQueryAndArgs(domainID string, resourceIDs []string, predicateArgs []any) (string, []any, error) {
+	baseSQL := `SELECT p.resource_id, p.access_mask FROM permissions p WHERE p.domain_id = ? AND p.access_mask > 0`
+	baseArgs := []any{domainID}
+	query, args, err := buildInQueryAndArgs(baseSQL, "p.resource_id", baseArgs, resourceIDs)
+	if err != nil {
+		return "", nil, err
+	}
+	query += userEffectivePermissionPredicateSQL
+	args = append(args, predicateArgs...)
+	return query, args, nil
+}
+
 func TestBuildUserAuthzMaskQueryAndArgs(t *testing.T) {
 	predicateArgs := []any{"d", "u", "u", "d", "d"}
 	q, args, err := buildUserAuthzMaskQueryAndArgs("dom", []string{"r1", "r2"}, predicateArgs)
