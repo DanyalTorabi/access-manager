@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/dtorabi/access-manager/internal/store"
@@ -188,5 +189,189 @@ func TestAPI_v2_permission_v1CompatibilityRegression(t *testing.T) {
 	}
 	if v1resp.AccessMask != 1 {
 		t.Fatalf("v1 GET on permission: want AccessMask=1, got %d", v1resp.AccessMask)
+	}
+}
+
+// --- List and PATCH tests (T70) ---
+
+// TestAPI_v2_permissionList_search verifies that the V2 permission list
+// supports ?search= (title substring) and ?resource_id= filtering.
+func TestAPI_v2_permissionList_search(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domID := seedDomain(t, ts, "d")
+	resID := seedResource(t, ts, domID, "res")
+	seedAccessTypeV2(t, ts, domID, "read")
+
+	for _, title := range []string{"can-read", "can-write", "can-read-all"} {
+		mustPostJSON201(t, domainBaseV2(ts, domID)+"/permissions",
+			fmt.Sprintf(`{"title":%q,"resource_id":%q,"permissions":["read"]}`, title, resID))
+	}
+
+	// Search by title substring.
+	b := mustGet(t, domainBaseV2(ts, domID)+"/permissions?search=can-read", http.StatusOK)
+	var env listResponse[permissionResponseV2]
+	if err := json.Unmarshal(b, &env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Meta.Total != 2 || len(env.Data) != 2 {
+		t.Fatalf("search 'can-read': want 2, got total=%d len=%d", env.Meta.Total, len(env.Data))
+	}
+	for _, p := range env.Data {
+		if !strings.Contains(p.Title, "can-read") {
+			t.Fatalf("search result title %q does not contain 'can-read'", p.Title)
+		}
+	}
+
+	// Filter by resource_id.
+	res2ID := seedResource(t, ts, domID, "res2")
+	mustPostJSON201(t, domainBaseV2(ts, domID)+"/permissions",
+		fmt.Sprintf(`{"title":"other","resource_id":%q,"permissions":["read"]}`, res2ID))
+
+	bRes := mustGet(t, domainBaseV2(ts, domID)+"/permissions?resource_id="+resID, http.StatusOK)
+	var envRes listResponse[permissionResponseV2]
+	if err := json.Unmarshal(bRes, &envRes); err != nil {
+		t.Fatal(err)
+	}
+	if envRes.Meta.Total != 3 {
+		t.Fatalf("filter resource_id: want total=3, got %d", envRes.Meta.Total)
+	}
+	for _, p := range envRes.Data {
+		if p.ResourceID != resID {
+			t.Fatalf("filter resource_id: unexpected resource_id %q", p.ResourceID)
+		}
+	}
+}
+
+// TestAPI_v2_permissionList_sort verifies that the V2 permission list
+// supports ?sort= and ?order= query parameters.
+func TestAPI_v2_permissionList_sort(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domID := seedDomain(t, ts, "d")
+	resA := seedResource(t, ts, domID, "Resource A")
+	resB := seedResource(t, ts, domID, "Resource B")
+	seedAccessTypeV2(t, ts, domID, "read")
+
+	mustPostJSON201(t, domainBaseV2(ts, domID)+"/permissions",
+		fmt.Sprintf(`{"title":"perm-b","resource_id":%q,"permissions":["read"]}`, resB))
+	mustPostJSON201(t, domainBaseV2(ts, domID)+"/permissions",
+		fmt.Sprintf(`{"title":"perm-a","resource_id":%q,"permissions":["read"]}`, resA))
+
+	// Sort by title asc.
+	b := mustGet(t, domainBaseV2(ts, domID)+"/permissions?sort=title&order=asc", http.StatusOK)
+	var env listResponse[permissionResponseV2]
+	if err := json.Unmarshal(b, &env); err != nil {
+		t.Fatal(err)
+	}
+	if len(env.Data) != 2 {
+		t.Fatalf("want 2 permissions, got %d", len(env.Data))
+	}
+	if env.Data[0].Title != "perm-a" || env.Data[1].Title != "perm-b" {
+		t.Fatalf("sort title asc: want [perm-a perm-b], got [%q %q]",
+			env.Data[0].Title, env.Data[1].Title)
+	}
+	if env.Meta.Sort != "title" || env.Meta.Order != "asc" {
+		t.Fatalf("meta: sort=%q order=%q", env.Meta.Sort, env.Meta.Order)
+	}
+
+	// Sort by title desc.
+	bDesc := mustGet(t, domainBaseV2(ts, domID)+"/permissions?sort=title&order=desc", http.StatusOK)
+	var envDesc listResponse[permissionResponseV2]
+	if err := json.Unmarshal(bDesc, &envDesc); err != nil {
+		t.Fatal(err)
+	}
+	if envDesc.Data[0].Title != "perm-b" {
+		t.Fatalf("sort title desc: want perm-b first, got %q", envDesc.Data[0].Title)
+	}
+}
+
+// TestAPI_v2_permissionPatch_titleOnly patches only the title field via V2
+// and verifies the V1 GET still returns a consistent numeric access_mask.
+func TestAPI_v2_permissionPatch_titleOnly(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domID := seedDomain(t, ts, "d")
+	resID := seedResource(t, ts, domID, "res")
+	seedAccessTypeV2(t, ts, domID, "read")
+
+	body := fmt.Sprintf(`{"title":"original","resource_id":%q,"permissions":["read"]}`, resID)
+	var created permissionResponseV2
+	if err := json.Unmarshal(mustPostJSON201(t, domainBaseV2(ts, domID)+"/permissions", body), &created); err != nil {
+		t.Fatal(err)
+	}
+
+	// PATCH title only via V2.
+	patched := mustDoRequest(t, http.MethodPatch,
+		domainBaseV2(ts, domID)+"/permissions/"+created.ID,
+		`{"title":"renamed"}`,
+		http.StatusOK)
+	var patchedResp permissionResponseV2
+	if err := json.Unmarshal(patched, &patchedResp); err != nil {
+		t.Fatal(err)
+	}
+	if patchedResp.Title != "renamed" {
+		t.Fatalf("V2 PATCH title: want 'renamed', got %q", patchedResp.Title)
+	}
+	// Permissions (mask) must be unchanged.
+	if len(patchedResp.Permissions) != 1 || patchedResp.Permissions[0] != "read" {
+		t.Fatalf("V2 PATCH title: permissions changed unexpectedly: %v", patchedResp.Permissions)
+	}
+
+	// V1 GET must reflect updated title and same numeric mask (backward compat).
+	bV1 := mustGet(t, domainBase(ts, domID)+"/permissions/"+created.ID, http.StatusOK)
+	var v1resp store.Permission
+	if err := json.Unmarshal(bV1, &v1resp); err != nil {
+		t.Fatal(err)
+	}
+	if v1resp.Title != "renamed" {
+		t.Fatalf("V1 GET after V2 title patch: want 'renamed', got %q", v1resp.Title)
+	}
+	if v1resp.AccessMask != 1 {
+		t.Fatalf("V1 GET after V2 title patch: access_mask changed, want 1 got %d", v1resp.AccessMask)
+	}
+}
+
+// TestAPI_v2_permissionPatch_resourceOnly patches only the resource_id field via
+// V2 and verifies V1 GET returns the updated resource while titles are unchanged.
+func TestAPI_v2_permissionPatch_resourceOnly(t *testing.T) {
+	ts, _ := newTestAPI(t)
+	domID := seedDomain(t, ts, "d")
+	res1ID := seedResource(t, ts, domID, "res1")
+	res2ID := seedResource(t, ts, domID, "res2")
+	seedAccessTypeV2(t, ts, domID, "write")
+
+	body := fmt.Sprintf(`{"title":"p","resource_id":%q,"permissions":["write"]}`, res1ID)
+	var created permissionResponseV2
+	if err := json.Unmarshal(mustPostJSON201(t, domainBaseV2(ts, domID)+"/permissions", body), &created); err != nil {
+		t.Fatal(err)
+	}
+
+	// PATCH resource_id only via V2.
+	patchBody := fmt.Sprintf(`{"resource_id":%q}`, res2ID)
+	patched := mustDoRequest(t, http.MethodPatch,
+		domainBaseV2(ts, domID)+"/permissions/"+created.ID,
+		patchBody,
+		http.StatusOK)
+	var patchedResp permissionResponseV2
+	if err := json.Unmarshal(patched, &patchedResp); err != nil {
+		t.Fatal(err)
+	}
+	if patchedResp.ResourceID != res2ID {
+		t.Fatalf("V2 PATCH resource: want %q, got %q", res2ID, patchedResp.ResourceID)
+	}
+	// Permissions must be unchanged.
+	if len(patchedResp.Permissions) != 1 || patchedResp.Permissions[0] != "write" {
+		t.Fatalf("V2 PATCH resource: permissions changed unexpectedly: %v", patchedResp.Permissions)
+	}
+
+	// V1 GET must reflect updated resource_id and same numeric mask.
+	bV1 := mustGet(t, domainBase(ts, domID)+"/permissions/"+created.ID, http.StatusOK)
+	var v1resp store.Permission
+	if err := json.Unmarshal(bV1, &v1resp); err != nil {
+		t.Fatal(err)
+	}
+	if v1resp.ResourceID != res2ID {
+		t.Fatalf("V1 GET after V2 resource patch: want %q, got %q", res2ID, v1resp.ResourceID)
+	}
+	if v1resp.AccessMask != 1 {
+		t.Fatalf("V1 GET after V2 resource patch: access_mask changed, want 1 got %d", v1resp.AccessMask)
 	}
 }
