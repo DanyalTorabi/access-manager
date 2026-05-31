@@ -446,6 +446,130 @@ components:
           description: OR of all direct group grants for this group/resource pair as decimal string.
           example: "5"
 
+    # ---------------------------------------------------------------------------
+    # V2 schemas — title-based permission representation
+    # ---------------------------------------------------------------------------
+
+    PermissionTitleArray:
+      type: array
+      description: >-
+        Sorted list of access-type titles representing the permissions set.
+        Empty array means no permissions. Titles are case-sensitive and unique
+        within a domain.
+      items:
+        type: string
+      example: ["read", "write"]
+
+    AccessTypeCreateBodyV2:
+      type: object
+      description: >-
+        V2 access-type creation body. The `bit` field is optional: when omitted
+        the server allocates the lowest unused bit in the domain automatically.
+        V1 always requires an explicit `bit`.
+      required: [title]
+      properties:
+        title:
+          type: string
+          description: Human-readable identifier, unique within the domain.
+        bit:
+          type: string
+          description: >-
+            Optional. Decimal or `0x` hex bit value in range [1, 2^62].
+            When omitted the server allocates the lowest available bit.
+
+    PermissionV2:
+      type: object
+      description: >-
+        V2 permission representation. The `permissions` field replaces
+        `access_mask` from V1 and contains a sorted array of access-type titles.
+      required: [id, domain_id, title, resource_id, permissions]
+      properties:
+        id:
+          type: string
+          format: uuid
+        domain_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        resource_id:
+          type: string
+          format: uuid
+        permissions:
+          $ref: "#/components/schemas/PermissionTitleArray"
+
+    PermissionCreateBodyV2:
+      type: object
+      required: [title, resource_id, permissions]
+      properties:
+        title:
+          type: string
+        resource_id:
+          type: string
+          format: uuid
+        permissions:
+          $ref: "#/components/schemas/PermissionTitleArray"
+
+    PermissionPatchBodyV2:
+      type: object
+      description: At least one field required.
+      properties:
+        title:
+          type: string
+        resource_id:
+          type: string
+          format: uuid
+        permissions:
+          $ref: "#/components/schemas/PermissionTitleArray"
+
+    UserAuthzResourceV2:
+      type: object
+      required: [resource_id, permissions]
+      properties:
+        resource_id:
+          type: string
+          format: uuid
+        permissions:
+          $ref: "#/components/schemas/PermissionTitleArray"
+
+    GroupAuthzResourceV2:
+      type: object
+      required: [resource_id, permissions]
+      properties:
+        resource_id:
+          type: string
+          format: uuid
+        permissions:
+          $ref: "#/components/schemas/PermissionTitleArray"
+
+    ResourceAuthzUserV2:
+      type: object
+      required: [user_id, permissions]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        permissions:
+          $ref: "#/components/schemas/PermissionTitleArray"
+
+    ResourceAuthzGroupV2:
+      type: object
+      required: [group_id, permissions]
+      properties:
+        group_id:
+          type: string
+          format: uuid
+        permissions:
+          $ref: "#/components/schemas/PermissionTitleArray"
+
+    UserResourcePermissionsV2:
+      type: object
+      description: Effective permission titles for a specific user on a specific resource.
+      required: [permissions]
+      properties:
+        permissions:
+          $ref: "#/components/schemas/PermissionTitleArray"
+
 paths:
   /health:
     get:
@@ -1790,6 +1914,508 @@ paths:
             text/plain:
               schema:
                 type: string
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  # ---------------------------------------------------------------------------
+  # /api/v2 — title-based permission API
+  # ---------------------------------------------------------------------------
+  # V2 differs from V1 in permission-related endpoints only:
+  #   • access_mask (numeric string) is replaced by permissions (title array)
+  #   • POST /api/v2/.../access-types allows omitting `bit` (auto-allocated)
+  # Domain, user, group, and resource CRUD are unchanged; use /api/v1 for those.
+  # ---------------------------------------------------------------------------
+
+  /api/v2/domains/{domainID}/access-types:
+    get:
+      summary: List access types (v2)
+      description: Same as v1 — returns access types with their bit values.
+      operationId: listAccessTypesV2
+      tags: [V2 AccessTypes]
+      parameters:
+        - $ref: "#/components/parameters/domainID"
+        - $ref: "#/components/parameters/limitParam"
+        - $ref: "#/components/parameters/offsetParam"
+        - $ref: "#/components/parameters/searchParam"
+      responses:
+        "200":
+          description: Paginated list of access types
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AccessType"
+                  meta:
+                    $ref: "#/components/schemas/ListMeta"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      summary: Create access type (v2 — auto-allocates bit if omitted)
+      operationId: createAccessTypeV2
+      tags: [V2 AccessTypes]
+      parameters:
+        - $ref: "#/components/parameters/domainID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccessTypeCreateBodyV2"
+      responses:
+        "201":
+          description: Access type created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessType"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "409":
+          description: Duplicate title or bit, or all 63 bits exhausted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v2/domains/{domainID}/access-types/{accessTypeID}:
+    get:
+      summary: Get access type (v2)
+      operationId: getAccessTypeV2
+      tags: [V2 AccessTypes]
+      parameters:
+        - $ref: "#/components/parameters/domainID"
+        - $ref: "#/components/parameters/accessTypeID"
+      responses:
+        "200":
+          description: Access type
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessType"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    patch:
+      summary: Patch access type (v2)
+      operationId: patchAccessTypeV2
+      tags: [V2 AccessTypes]
+      parameters:
+        - $ref: "#/components/parameters/domainID"
+        - $ref: "#/components/parameters/accessTypeID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccessTypePatchBody"
+      responses:
+        "200":
+          description: Updated access type
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessType"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    delete:
+      summary: Delete access type (v2)
+      operationId: deleteAccessTypeV2
+      tags: [V2 AccessTypes]
+      parameters:
+        - $ref: "#/components/parameters/domainID"
+        - $ref: "#/components/parameters/accessTypeID"
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v2/domains/{domainID}/permissions:
+    get:
+      summary: List permissions (v2 — returns title arrays)
+      operationId: listPermissionsV2
+      tags: [V2 Permissions]
+      parameters:
+        - $ref: "#/components/parameters/domainID"
+        - $ref: "#/components/parameters/limitParam"
+        - $ref: "#/components/parameters/offsetParam"
+        - $ref: "#/components/parameters/searchParam"
+        - name: resource_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Paginated list of permissions with title arrays
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PermissionV2"
+                  meta:
+                    $ref: "#/components/schemas/ListMeta"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    post:
+      summary: Create permission (v2 — accepts title array)
+      operationId: createPermissionV2
+      tags: [V2 Permissions]
+      parameters:
+        - $ref: "#/components/parameters/domainID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PermissionCreateBodyV2"
+      responses:
+        "201":
+          description: Permission created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PermissionV2"
+        "400":
+          description: Unknown permission title or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v2/domains/{domainID}/permissions/{permissionID}:
+    get:
+      summary: Get permission (v2 — returns title array)
+      operationId: getPermissionV2
+      tags: [V2 Permissions]
+      parameters:
+        - $ref: "#/components/parameters/domainID"
+        - $ref: "#/components/parameters/permissionID"
+      responses:
+        "200":
+          description: Permission with title array
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PermissionV2"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    patch:
+      summary: Patch permission (v2 — accepts title array)
+      operationId: patchPermissionV2
+      tags: [V2 Permissions]
+      parameters:
+        - $ref: "#/components/parameters/domainID"
+        - $ref: "#/components/parameters/permissionID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PermissionPatchBodyV2"
+      responses:
+        "200":
+          description: Updated permission with title array
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PermissionV2"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+    delete:
+      summary: Delete permission (v2 — behaviour identical to v1)
+      operationId: deletePermissionV2
+      tags: [V2 Permissions]
+      parameters:
+        - $ref: "#/components/parameters/domainID"
+        - $ref: "#/components/parameters/permissionID"
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v2/domains/{domainID}/users/{userID}/authz/resources:
+    get:
+      summary: List resources a user has any permissions on (v2 — title arrays)
+      operationId: userAuthzResourcesV2
+      tags: [V2 Authz]
+      parameters:
+        - $ref: "#/components/parameters/domainID"
+        - name: userID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/limitParam"
+        - $ref: "#/components/parameters/offsetParam"
+      responses:
+        "200":
+          description: Paginated authz resources with title arrays
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserAuthzResourceV2"
+                  meta:
+                    $ref: "#/components/schemas/ListMeta"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v2/domains/{domainID}/groups/{groupID}/authz/resources:
+    get:
+      summary: List resources a group has any permissions on (v2 — title arrays)
+      operationId: groupAuthzResourcesV2
+      tags: [V2 Authz]
+      parameters:
+        - $ref: "#/components/parameters/domainID"
+        - name: groupID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/limitParam"
+        - $ref: "#/components/parameters/offsetParam"
+      responses:
+        "200":
+          description: Paginated authz resources with title arrays
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/GroupAuthzResourceV2"
+                  meta:
+                    $ref: "#/components/schemas/ListMeta"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v2/domains/{domainID}/resources/{resourceID}/authz/users:
+    get:
+      summary: List users with any permissions on a resource (v2 — title arrays)
+      operationId: resourceAuthzUsersV2
+      tags: [V2 Authz]
+      parameters:
+        - $ref: "#/components/parameters/domainID"
+        - name: resourceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/limitParam"
+        - $ref: "#/components/parameters/offsetParam"
+      responses:
+        "200":
+          description: Paginated authz users with title arrays
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ResourceAuthzUserV2"
+                  meta:
+                    $ref: "#/components/schemas/ListMeta"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v2/domains/{domainID}/resources/{resourceID}/authz/groups:
+    get:
+      summary: List groups with any permissions on a resource (v2 — title arrays)
+      operationId: resourceAuthzGroupsV2
+      tags: [V2 Authz]
+      parameters:
+        - $ref: "#/components/parameters/domainID"
+        - name: resourceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/limitParam"
+        - $ref: "#/components/parameters/offsetParam"
+      responses:
+        "200":
+          description: Paginated authz groups with title arrays
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ResourceAuthzGroupV2"
+                  meta:
+                    $ref: "#/components/schemas/ListMeta"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v2/domains/{domainID}/users/{userID}/resources/{resourceID}/permissions:
+    get:
+      summary: Get effective permission titles for a user on a resource (v2 only)
+      description: >-
+        Returns the sorted list of access-type titles that make up the
+        user's effective permission on the specified resource. This is a
+        new endpoint with no V1 equivalent (V1 uses /authz/masks instead).
+      operationId: userResourcePermissionsV2
+      tags: [V2 Authz]
+      parameters:
+        - $ref: "#/components/parameters/domainID"
+        - name: userID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: resourceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Effective permission titles
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResourcePermissionsV2"
         "401":
           description: Unauthorized
           content:
